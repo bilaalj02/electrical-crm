@@ -1,0 +1,173 @@
+import { FiX, FiEdit, FiTrash2, FiDollarSign, FiCalendar } from 'react-icons/fi';
+
+function JobDetail({ job, onClose, onEdit, onDelete }) {
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount || 0);
+  };
+
+  const formatDate = (date) => {
+    if (!date) return 'Not set';
+    return new Date(date).toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content large" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <h2>{job.title}</h2>
+            <div className="job-number">{job.jobNumber}</div>
+          </div>
+          <div className="header-actions">
+            <button className="icon-btn" onClick={() => onEdit(job)}>
+              <FiEdit />
+            </button>
+            <button className="icon-btn delete" onClick={() => onDelete(job._id)}>
+              <FiTrash2 />
+            </button>
+            <button className="icon-btn" onClick={onClose}>
+              <FiX />
+            </button>
+          </div>
+        </div>
+
+        <div className="modal-body">
+          <section className="detail-section">
+            <h3>Client Information</h3>
+            <div className="detail-grid">
+              <div className="detail-item">
+                <span className="label">Name:</span>
+                <span className="value">{job.client?.name}</span>
+              </div>
+              <div className="detail-item">
+                <span className="label">Email:</span>
+                <span className="value">{job.client?.email}</span>
+              </div>
+              <div className="detail-item">
+                <span className="label">Phone:</span>
+                <span className="value">{job.client?.phone || 'N/A'}</span>
+              </div>
+            </div>
+          </section>
+
+          <section className="detail-section">
+            <h3>Job Details</h3>
+            <div className="detail-grid">
+              <div className="detail-item">
+                <span className="label">Status:</span>
+                <span className="value badge">{job.status}</span>
+              </div>
+              <div className="detail-item">
+                <span className="label">Priority:</span>
+                <span className="value badge">{job.priority}</span>
+              </div>
+              <div className="detail-item">
+                <span className="label">Scheduled:</span>
+                <span className="value">{formatDate(job.scheduledDate)}</span>
+              </div>
+              <div className="detail-item">
+                <span className="label">Due Date:</span>
+                <span className="value">{formatDate(job.dueDate)}</span>
+              </div>
+            </div>
+            {job.description && (
+              <div className="detail-item full-width">
+                <span className="label">Description:</span>
+                <p className="value">{job.description}</p>
+              </div>
+            )}
+          </section>
+
+          <section className="detail-section">
+            <h3>Financial Summary</h3>
+            <div className="cost-breakdown">
+              <div className="cost-row">
+                <span>Labor ({job.costs?.laborHours} hrs @ {formatCurrency(job.costs?.laborRate)}/hr):</span>
+                <span>{formatCurrency(job.costs?.laborTotal)}</span>
+              </div>
+              <div className="cost-row">
+                <span>Materials:</span>
+                <span>{formatCurrency(job.costs?.materialsTotal)}</span>
+              </div>
+              <div className="cost-row">
+                <span>Equipment:</span>
+                <span>{formatCurrency(job.costs?.equipmentTotal)}</span>
+              </div>
+              <div className="cost-row">
+                <span>Permits:</span>
+                <span>{formatCurrency(job.costs?.permitsCost)}</span>
+              </div>
+              <div className="cost-row">
+                <span>Subcontractors:</span>
+                <span>{formatCurrency(job.costs?.subcontractorsCost)}</span>
+              </div>
+              <div className="cost-row">
+                <span>Other Costs:</span>
+                <span>{formatCurrency(job.costs?.otherCosts)}</span>
+              </div>
+              <div className="cost-row subtotal">
+                <span>Subtotal:</span>
+                <span>{formatCurrency(job.costs?.subtotal)}</span>
+              </div>
+              <div className="cost-row">
+                <span>Tax ({(job.costs?.taxRate * 100).toFixed(2)}%):</span>
+                <span>{formatCurrency(job.costs?.tax)}</span>
+              </div>
+              <div className="cost-row">
+                <span>Discount:</span>
+                <span>-{formatCurrency(job.costs?.discount)}</span>
+              </div>
+              <div className="cost-row total">
+                <span>Total:</span>
+                <span>{formatCurrency(job.costs?.finalTotal)}</span>
+              </div>
+              <div className="cost-row">
+                <span>Amount Paid:</span>
+                <span>{formatCurrency(job.payment?.amountPaid)}</span>
+              </div>
+              <div className="cost-row balance">
+                <span>Balance Due:</span>
+                <span>{formatCurrency(job.payment?.balance)}</span>
+              </div>
+            </div>
+          </section>
+
+          {job.costs?.materials && job.costs.materials.length > 0 && (
+            <section className="detail-section">
+              <h3>Materials</h3>
+              <table className="materials-table">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Qty</th>
+                    <th>Unit Price</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {job.costs.materials.map((material, index) => (
+                    <tr key={index}>
+                      <td>{material.name}</td>
+                      <td>{material.quantity}</td>
+                      <td>{formatCurrency(material.unitPrice)}</td>
+                      <td>{formatCurrency(material.totalPrice)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default JobDetail;
