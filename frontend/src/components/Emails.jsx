@@ -682,8 +682,8 @@ function Emails() {
 
       {/* Compose Email Modal */}
       {showComposeModal && (
-        <div className="modal-overlay" onClick={() => setShowComposeModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', background: 'white' }}>
+        <div className="modal-overlay" onClick={() => setShowComposeModal(false)} style={{ zIndex: 9999 }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', background: 'white', pointerEvents: 'auto', position: 'relative', zIndex: 10000 }}>
             <div className="modal-header" style={{ background: 'linear-gradient(135deg, #fef9e7 0%, #fef5d4 100%)', borderBottom: '2px solid #d4af37' }}>
               <h2 style={{ color: '#1a1a1a', display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <FiEdit style={{ color: '#d4af37' }} />
