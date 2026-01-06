@@ -11,6 +11,7 @@ function Emails() {
   const [selectedEmail, setSelectedEmail] = useState(null);
   const [emailAccounts, setEmailAccounts] = useState([]);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showSyncModal, setShowSyncModal] = useState(false);
 
   const [filters, setFilters] = useState({
     accountType: '',
@@ -202,7 +203,7 @@ function Emails() {
           <button onClick={() => setShowAccountModal(true)} className="btn-primary">
             <FiPlus /> Connect Account
           </button>
-          <button onClick={syncEmails} className="btn-sync" disabled={loading}>
+          <button onClick={() => setShowSyncModal(true)} className="btn-sync" disabled={loading || emailAccounts.length === 0}>
             <FiRefreshCw className={loading ? 'spinning' : ''} />
             {loading ? 'Syncing...' : 'Sync Emails'}
           </button>
@@ -348,10 +349,8 @@ function Emails() {
             }}
           >
             <option value="">All Accounts</option>
-            <option value="gmail1">Gmail 1</option>
-            <option value="gmail2">Gmail 2</option>
+            <option value="gmail">Gmail</option>
             <option value="microsoft">Microsoft</option>
-            <option value="godaddy">GoDaddy</option>
           </select>
         </div>
         <div>
@@ -592,6 +591,69 @@ function Emails() {
             </div>
             <div className="modal-footer">
               <button className="btn-secondary" onClick={() => setShowAccountModal(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sync Emails Modal */}
+      {showSyncModal && (
+        <div className="modal-overlay" onClick={() => setShowSyncModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h2><FiRefreshCw /> Sync Email Accounts</h2>
+              <button className="icon-btn" onClick={() => setShowSyncModal(false)}>×</button>
+            </div>
+            <div className="modal-body" style={{ padding: '24px' }}>
+              <p style={{ marginBottom: '20px', color: '#6b7280' }}>
+                Select which email accounts to sync:
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {emailAccounts.map((account) => (
+                  <button
+                    key={account._id}
+                    onClick={() => {
+                      syncAccountEmails(account._id);
+                      setShowSyncModal(false);
+                    }}
+                    disabled={loading}
+                    style={{
+                      padding: '16px 20px',
+                      background: 'white',
+                      border: '2px solid #e5e7eb',
+                      borderRadius: '12px',
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                      fontSize: '15px',
+                      fontWeight: '500',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      transition: 'all 0.2s',
+                      opacity: loading ? 0.6 : 1
+                    }}
+                    onMouseOver={(e) => {
+                      if (!loading) {
+                        e.currentTarget.style.borderColor = '#d4af37';
+                        e.currentTarget.style.background = '#fef9e7';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.borderColor = '#e5e7eb';
+                      e.currentTarget.style.background = 'white';
+                    }}
+                  >
+                    <FiMail size={24} style={{ color: account.provider === 'gmail' ? '#ef4444' : '#0078d4' }} />
+                    <div style={{ textAlign: 'left', flex: 1 }}>
+                      <div style={{ fontWeight: '600', color: '#1f2937' }}>{account.email}</div>
+                      <div style={{ fontSize: '12px', color: '#6b7280', textTransform: 'capitalize' }}>{account.provider}</div>
+                    </div>
+                    <FiRefreshCw size={18} style={{ color: '#3b82f6' }} />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setShowSyncModal(false)}>Cancel</button>
             </div>
           </div>
         </div>
