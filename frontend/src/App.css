@@ -43,13 +43,13 @@ body {
 }
 
 .sidebar-header {
-  padding: 1.5rem 1.5rem;
+  padding: 1rem 1.5rem;
   border-bottom: none;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 1rem;
-  min-height: 100px;
+  min-height: 80px;
 }
 
 .sidebar-logo {
