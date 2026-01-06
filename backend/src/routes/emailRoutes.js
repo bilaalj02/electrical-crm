@@ -16,6 +16,7 @@ router.get('/', async (req, res) => {
       isWorkRelated,
       isRead,
       search,
+      folder,
       sortBy = 'date',
       sortOrder = 'desc'
     } = req.query;
@@ -38,6 +39,13 @@ router.get('/', async (req, res) => {
           total: 0
         });
       }
+    }
+
+    // Handle folder filter (inbox/sent based on labels)
+    if (folder === 'sent') {
+      filter.labels = { $in: ['SENT'] };
+    } else if (folder === 'inbox') {
+      filter.labels = { $nin: ['SENT'] };
     }
 
     if (isWorkRelated !== undefined) {

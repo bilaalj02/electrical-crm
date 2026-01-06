@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FiMail, FiRefreshCw, FiFilter, FiSearch, FiPlus, FiCheck, FiX } from 'react-icons/fi';
+import { FiMail, FiRefreshCw, FiFilter, FiSearch, FiPlus, FiCheck, FiX, FiEdit } from 'react-icons/fi';
 
 const API_URL = 'http://localhost:5001/api';
 
@@ -25,7 +25,16 @@ function Emails() {
     try {
       const queryParams = new URLSearchParams();
       if (filters.accountType) queryParams.append('accountType', filters.accountType);
-      if (filters.isWorkRelated) queryParams.append('isWorkRelated', filters.isWorkRelated);
+
+      // Handle inbox/sent filtering
+      if (filters.isWorkRelated === 'inbox') {
+        queryParams.append('folder', 'inbox');
+      } else if (filters.isWorkRelated === 'sent') {
+        queryParams.append('folder', 'sent');
+      } else if (filters.isWorkRelated) {
+        queryParams.append('isWorkRelated', filters.isWorkRelated);
+      }
+
       if (filters.isRead) queryParams.append('isRead', filters.isRead);
       if (filters.search) queryParams.append('search', filters.search);
 
@@ -203,6 +212,9 @@ function Emails() {
           <button onClick={() => setShowAccountModal(true)} className="btn-primary">
             <FiPlus /> Connect Account
           </button>
+          <button onClick={() => alert('Compose email functionality coming soon!')} className="btn-primary">
+            <FiEdit /> Compose
+          </button>
           <button onClick={() => setShowSyncModal(true)} className="btn-sync" disabled={loading || emailAccounts.length === 0}>
             <FiRefreshCw className={loading ? 'spinning' : ''} />
             {loading ? 'Syncing...' : 'Sync Emails'}
@@ -372,6 +384,8 @@ function Emails() {
             }}
           >
             <option value="">All Emails</option>
+            <option value="inbox">Inbox</option>
+            <option value="sent">Sent</option>
             <option value="true">Work Related</option>
             <option value="false">Non-Work</option>
           </select>
