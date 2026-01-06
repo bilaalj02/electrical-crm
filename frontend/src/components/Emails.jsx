@@ -14,6 +14,7 @@ function Emails() {
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [showComposeModal, setShowComposeModal] = useState(false);
   const [composeData, setComposeData] = useState({
+    fromAccount: '',
     to: '',
     cc: '',
     subject: '',
@@ -693,6 +694,30 @@ function Emails() {
             </div>
             <div className="modal-body" style={{ padding: '24px' }}>
               <div className="form-group" style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#1a1a1a' }}>From:</label>
+                <select
+                  value={composeData.fromAccount}
+                  onChange={(e) => setComposeData({...composeData, fromAccount: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '8px',
+                    fontSize: '15px',
+                    color: '#1a1a1a',
+                    backgroundColor: 'white',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="">Select email account...</option>
+                  {emailAccounts.map((account) => (
+                    <option key={account._id} value={account._id}>
+                      {account.email} ({account.provider})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group" style={{ marginBottom: '20px' }}>
                 <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#1a1a1a' }}>To:</label>
                 <input
                   type="email"
@@ -709,7 +734,8 @@ function Emails() {
                     transition: 'border-color 0.2s',
                     userSelect: 'text',
                     pointerEvents: 'auto',
-                    cursor: 'text'
+                    cursor: 'text',
+                    color: '#1a1a1a'
                   }}
                 />
               </div>
@@ -730,7 +756,8 @@ function Emails() {
                     transition: 'border-color 0.2s',
                     userSelect: 'text',
                     pointerEvents: 'auto',
-                    cursor: 'text'
+                    cursor: 'text',
+                    color: '#1a1a1a'
                   }}
                 />
               </div>
@@ -751,7 +778,8 @@ function Emails() {
                     transition: 'border-color 0.2s',
                     userSelect: 'text',
                     pointerEvents: 'auto',
-                    cursor: 'text'
+                    cursor: 'text',
+                    color: '#1a1a1a'
                   }}
                 />
               </div>
@@ -801,7 +829,7 @@ function Emails() {
                   // TODO: Implement send email functionality
                   alert('Email sending functionality will be implemented soon!');
                   setShowComposeModal(false);
-                  setComposeData({ to: '', cc: '', subject: '', body: '' });
+                  setComposeData({ fromAccount: '', to: '', cc: '', subject: '', body: '' });
                 }}
                 style={{
                   padding: '10px 24px',
