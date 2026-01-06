@@ -99,6 +99,48 @@ router.get('/:id', async (req, res) => {
 });
 
 /**
+ * POST /api/clients/website-lead
+ * Create a new client from website contact form (no auth required)
+ */
+router.post('/website-lead', async (req, res) => {
+  try {
+    const { name, email, phone, service, message } = req.body;
+
+    // Validate required fields
+    if (!name || !email || !phone || !message) {
+      return res.status(400).json({
+        error: 'Missing required fields: name, email, phone, and message are required'
+      });
+    }
+
+    // Create client with website lead data
+    const client = await Client.create({
+      name,
+      email,
+      phone,
+      source: 'website',
+      status: 'new',
+      serviceRequested: service || 'Not specified',
+      initialMessage: message,
+      clientType: 'residential' // default for website leads
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Lead received successfully',
+      client: {
+        id: client._id,
+        name: client.name,
+        email: client.email
+      }
+    });
+  } catch (error) {
+    console.error('Error creating website lead:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * POST /api/clients
  * Create a new client
  */

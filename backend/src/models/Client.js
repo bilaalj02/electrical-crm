@@ -31,6 +31,19 @@ const clientSchema = new mongoose.Schema({
     default: 'residential'
   },
 
+  // Lead Source
+  source: {
+    type: String,
+    enum: ['website', 'referral', 'manual', 'phone', 'email'],
+    default: 'manual'
+  },
+
+  // Service requested (from website form)
+  serviceRequested: String,
+
+  // Initial message from contact form
+  initialMessage: String,
+
   notes: String,
 
   // Financial
@@ -42,8 +55,8 @@ const clientSchema = new mongoose.Schema({
   // Status
   status: {
     type: String,
-    enum: ['active', 'inactive', 'prospect'],
-    default: 'active'
+    enum: ['new', 'contacted', 'quoted', 'active', 'inactive', 'prospect', 'won', 'lost'],
+    default: 'new'
   },
 
   // Related jobs
