@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FiMail, FiRefreshCw, FiFilter, FiSearch } from 'react-icons/fi';
+import { FiMail, FiRefreshCw, FiFilter, FiSearch, FiPlus, FiCheck, FiX } from 'react-icons/fi';
 
 const API_URL = 'http://localhost:5000/api';
 
@@ -9,6 +9,8 @@ function Emails() {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState(null);
   const [selectedEmail, setSelectedEmail] = useState(null);
+  const [emailAccounts, setEmailAccounts] = useState([]);
+  const [showAccountModal, setShowAccountModal] = useState(false);
 
   const [filters, setFilters] = useState({
     accountType: '',
@@ -41,6 +43,68 @@ function Emails() {
       setStats(response.data);
     } catch (error) {
       console.error('Error fetching stats:', error);
+    }
+  };
+
+  const fetchEmailAccounts = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/oauth/accounts`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setEmailAccounts(response.data.emailAccounts);
+    } catch (error) {
+      console.error('Error fetching email accounts:', error);
+    }
+  };
+
+  const connectGmail = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/oauth/gmail/auth-url`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      // Open OAuth window
+      const { authUrl } = response.data;
+      window.location.href = authUrl;
+    } catch (error) {
+      console.error('Error connecting Gmail:', error);
+      alert('Error initiating Gmail connection');
+    }
+  };
+
+  const disconnectAccount = async (accountId) => {
+    if (!confirm('Are you sure you want to disconnect this email account?')) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`${API_URL}/oauth/accounts/${accountId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchEmailAccounts();
+      alert('Email account disconnected successfully');
+    } catch (error) {
+      console.error('Error disconnecting account:', error);
+      alert('Error disconnecting email account');
+    }
+  };
+
+  const syncAccountEmails = async (accountId) => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(`${API_URL}/email-sync/sync/${accountId}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      await fetchEmails();
+      await fetchStats();
+      alert('Emails synced successfully!');
+    } catch (error) {
+      console.error('Error syncing emails:', error);
+      alert('Error syncing emails');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -85,6 +149,20 @@ function Emails() {
   useEffect(() => {
     fetchEmails();
     fetchStats();
+    fetchEmailAccounts();
+
+    // Check for OAuth success callback
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('oauth') === 'success') {
+      const email = urlParams.get('email');
+      alert(`Successfully connected ${email}!`);
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      fetchEmailAccounts();
+    } else if (urlParams.get('error')) {
+      alert('Failed to connect email account. Please try again.');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
   }, []);
 
   useEffect(() => {
@@ -104,11 +182,82 @@ function Emails() {
     <div className="emails-page">
       <div className="page-header">
         <h1><FiMail /> Unified Inbox</h1>
-        <button onClick={syncEmails} className="btn-sync" disabled={loading}>
-          <FiRefreshCw className={loading ? 'spinning' : ''} />
-          {loading ? 'Syncing...' : 'Sync Emails'}
-        </button>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button onClick={() => setShowAccountModal(true)} className="btn-primary">
+            <FiPlus /> Connect Account
+          </button>
+          <button onClick={syncEmails} className="btn-sync" disabled={loading}>
+            <FiRefreshCw className={loading ? 'spinning' : ''} />
+            {loading ? 'Syncing...' : 'Sync Emails'}
+          </button>
+        </div>
       </div>
+
+      {/* Connected Accounts Section */}
+      {emailAccounts.length > 0 && (
+        <div style={{
+          background: 'linear-gradient(135deg, #fef9e7 0%, #fef5d4 100%)',
+          padding: '16px 24px',
+          borderRadius: '12px',
+          marginBottom: '20px',
+          boxShadow: '0 2px 8px rgba(212, 175, 55, 0.15)',
+          border: '1px solid rgba(212, 175, 55, 0.3)'
+        }}>
+          <h3 style={{ margin: '0 0 12px 0', color: '#78350f', fontSize: '14px', fontWeight: '600' }}>
+            Connected Email Accounts ({emailAccounts.length})
+          </h3>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            {emailAccounts.map((account) => (
+              <div key={account._id} style={{
+                background: 'white',
+                padding: '10px 16px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+              }}>
+                <FiCheck style={{ color: '#10b981' }} />
+                <span style={{ fontSize: '14px', fontWeight: '500' }}>{account.email}</span>
+                <span style={{
+                  fontSize: '11px',
+                  background: '#eff6ff',
+                  color: '#3b82f6',
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  textTransform: 'uppercase'
+                }}>{account.provider}</span>
+                <button
+                  onClick={() => syncAccountEmails(account._id)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    color: '#3b82f6'
+                  }}
+                  title="Sync this account"
+                >
+                  <FiRefreshCw size={14} />
+                </button>
+                <button
+                  onClick={() => disconnectAccount(account._id)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    color: '#ef4444'
+                  }}
+                  title="Disconnect account"
+                >
+                  <FiX size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {stats && (
         <div className="stats-bar">
@@ -244,6 +393,109 @@ function Emails() {
           </div>
         )}
       </div>
+
+      {/* Connect Account Modal */}
+      {showAccountModal && (
+        <div className="modal-overlay" onClick={() => setShowAccountModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h2><FiPlus /> Connect Email Account</h2>
+              <button className="icon-btn" onClick={() => setShowAccountModal(false)}>×</button>
+            </div>
+            <div className="modal-body" style={{ padding: '24px' }}>
+              <p style={{ marginBottom: '20px', color: '#6b7280' }}>
+                Choose an email provider to connect to your CRM:
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <button
+                  onClick={() => {
+                    connectGmail();
+                    setShowAccountModal(false);
+                  }}
+                  style={{
+                    padding: '16px 20px',
+                    background: 'white',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    fontSize: '15px',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.borderColor = '#d4af37';
+                    e.currentTarget.style.background = '#fef9e7';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.borderColor = '#e5e7eb';
+                    e.currentTarget.style.background = 'white';
+                  }}
+                >
+                  <FiMail size={24} style={{ color: '#ef4444' }} />
+                  <div style={{ textAlign: 'left' }}>
+                    <div style={{ fontWeight: '600' }}>Gmail</div>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Connect your Google account</div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => alert('Microsoft integration coming soon!')}
+                  style={{
+                    padding: '16px 20px',
+                    background: 'white',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    fontSize: '15px',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    opacity: 0.6
+                  }}
+                  disabled
+                >
+                  <FiMail size={24} style={{ color: '#0078d4' }} />
+                  <div style={{ textAlign: 'left' }}>
+                    <div style={{ fontWeight: '600' }}>Microsoft / Outlook</div>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Coming soon</div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => alert('IMAP integration coming soon!')}
+                  style={{
+                    padding: '16px 20px',
+                    background: 'white',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    fontSize: '15px',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    opacity: 0.6
+                  }}
+                  disabled
+                >
+                  <FiMail size={24} style={{ color: '#6b7280' }} />
+                  <div style={{ textAlign: 'left' }}>
+                    <div style={{ fontWeight: '600' }}>IMAP / Other Providers</div>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Coming soon</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setShowAccountModal(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

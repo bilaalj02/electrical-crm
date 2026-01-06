@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Email = require('../models/Email');
-const emailSyncService = require('../services/emailSyncService');
+// const emailSyncService = require('../services/emailSyncService'); // Disabled - using new OAuth system
 
 /**
  * GET /api/emails
@@ -9,6 +9,7 @@ const emailSyncService = require('../services/emailSyncService');
  */
 router.get('/', async (req, res) => {
   try {
+    console.log('=== EMAIL ROUTES FILE LOADED - NO POPULATE ===');
     const {
       page = 1,
       limit = 50,
@@ -43,8 +44,7 @@ router.get('/', async (req, res) => {
     const emails = await Email.find(filter)
       .sort({ [sortBy]: sortOrder === 'desc' ? -1 : 1 })
       .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .populate('linkedJob');
+      .skip((page - 1) * limit);
 
     const count = await Email.countDocuments(filter);
 
@@ -66,7 +66,7 @@ router.get('/', async (req, res) => {
  */
 router.get('/:id', async (req, res) => {
   try {
-    const email = await Email.findById(req.params.id).populate('linkedJob');
+    const email = await Email.findById(req.params.id);
 
     if (!email) {
       return res.status(404).json({ error: 'Email not found' });
@@ -85,19 +85,19 @@ router.get('/:id', async (req, res) => {
  */
 router.patch('/:id', async (req, res) => {
   try {
-    const { isRead, isStarred, isWorkRelated, linkedJob } = req.body;
+    const { isRead, isStarred, isWorkRelated, jobId } = req.body;
 
     const updateData = {};
     if (isRead !== undefined) updateData.isRead = isRead;
     if (isStarred !== undefined) updateData.isStarred = isStarred;
     if (isWorkRelated !== undefined) updateData.isWorkRelated = isWorkRelated;
-    if (linkedJob !== undefined) updateData.linkedJob = linkedJob;
+    if (jobId !== undefined) updateData.jobId = jobId;
 
     const email = await Email.findByIdAndUpdate(
       req.params.id,
       updateData,
       { new: true }
-    ).populate('linkedJob');
+    );
 
     if (!email) {
       return res.status(404).json({ error: 'Email not found' });
@@ -116,10 +116,10 @@ router.patch('/:id', async (req, res) => {
  */
 router.post('/sync', async (req, res) => {
   try {
-    const results = await emailSyncService.syncAllAccounts();
-    res.json({
-      message: 'Email sync completed',
-      results
+    // Old sync disabled - use new OAuth system: /api/email-sync/sync/:accountId
+    res.status(501).json({
+      error: 'Old sync method disabled. Please use the new OAuth system.',
+      message: 'Connect your Gmail account through the UI first, then use /api/email-sync/sync/:accountId'
     });
   } catch (error) {
     console.error('Error syncing emails:', error);
@@ -133,13 +133,10 @@ router.post('/sync', async (req, res) => {
  */
 router.post('/sync/:accountType', async (req, res) => {
   try {
-    const { accountType } = req.params;
-    const { maxResults } = req.body;
-
-    const result = await emailSyncService.syncAccount(accountType, maxResults);
-    res.json({
-      message: `Email sync completed for ${accountType}`,
-      result
+    // Old sync disabled - use new OAuth system
+    res.status(501).json({
+      error: 'Old sync method disabled. Please use the new OAuth system.',
+      message: 'Connect your Gmail account through the UI first, then use /api/email-sync/sync/:accountId'
     });
   } catch (error) {
     console.error('Error syncing emails:', error);
