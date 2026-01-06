@@ -801,7 +801,8 @@ function Emails() {
                     fontFamily: 'inherit',
                     userSelect: 'text',
                     pointerEvents: 'auto',
-                    cursor: 'text'
+                    cursor: 'text',
+                    color: '#1a1a1a'
                   }}
                 />
               </div>
