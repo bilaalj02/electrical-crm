@@ -14,7 +14,7 @@ import Calendar from './components/Calendar';
 import mesLogo from './assets/mes-logo.png';
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5001/api';
+const API_URL = 'http://localhost:5000/api';
 
 function App() {
   const { isAuthenticated, user, logout, loading } = useAuth();
