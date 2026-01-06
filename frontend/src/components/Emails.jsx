@@ -12,6 +12,13 @@ function Emails() {
   const [emailAccounts, setEmailAccounts] = useState([]);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showSyncModal, setShowSyncModal] = useState(false);
+  const [showComposeModal, setShowComposeModal] = useState(false);
+  const [composeData, setComposeData] = useState({
+    to: '',
+    cc: '',
+    subject: '',
+    body: ''
+  });
 
   const [filters, setFilters] = useState({
     accountType: '',
@@ -212,7 +219,7 @@ function Emails() {
           <button onClick={() => setShowAccountModal(true)} className="btn-primary">
             <FiPlus /> Connect Account
           </button>
-          <button onClick={() => alert('Compose email functionality coming soon!')} className="btn-primary">
+          <button onClick={() => setShowComposeModal(true)} className="btn-primary">
             <FiEdit /> Compose
           </button>
           <button onClick={() => setShowSyncModal(true)} className="btn-sync" disabled={loading || emailAccounts.length === 0}>
@@ -668,6 +675,77 @@ function Emails() {
             </div>
             <div className="modal-footer">
               <button className="btn-secondary" onClick={() => setShowSyncModal(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Compose Email Modal */}
+      {showComposeModal && (
+        <div className="modal-overlay" onClick={() => setShowComposeModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>
+                <FiEdit />
+                Compose Email
+              </h2>
+              <button className="btn-close" onClick={() => setShowComposeModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>To:</label>
+                <input
+                  type="email"
+                  value={composeData.to}
+                  onChange={(e) => setComposeData({...composeData, to: e.target.value})}
+                  placeholder="recipient@example.com"
+                  className="form-control"
+                />
+              </div>
+              <div className="form-group">
+                <label>CC:</label>
+                <input
+                  type="email"
+                  value={composeData.cc}
+                  onChange={(e) => setComposeData({...composeData, cc: e.target.value})}
+                  placeholder="cc@example.com (optional)"
+                  className="form-control"
+                />
+              </div>
+              <div className="form-group">
+                <label>Subject:</label>
+                <input
+                  type="text"
+                  value={composeData.subject}
+                  onChange={(e) => setComposeData({...composeData, subject: e.target.value})}
+                  placeholder="Email subject"
+                  className="form-control"
+                />
+              </div>
+              <div className="form-group">
+                <label>Body:</label>
+                <textarea
+                  value={composeData.body}
+                  onChange={(e) => setComposeData({...composeData, body: e.target.value})}
+                  placeholder="Write your message..."
+                  className="form-control"
+                  rows="10"
+                  style={{ minHeight: '200px' }}
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="modal-btn-secondary" onClick={() => setShowComposeModal(false)}>
+                Cancel
+              </button>
+              <button className="modal-btn-primary" onClick={() => {
+                // TODO: Implement send email functionality
+                alert('Email sending functionality will be implemented soon!');
+                setShowComposeModal(false);
+                setComposeData({ to: '', cc: '', subject: '', body: '' });
+              }}>
+                <FiSend /> Send
+              </button>
             </div>
           </div>
         </div>
