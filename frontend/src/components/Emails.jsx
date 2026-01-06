@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FiMail, FiRefreshCw, FiFilter, FiSearch } from 'react-icons/fi';
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = 'http://localhost:5001/api';
 
 function Emails() {
   const [emails, setEmails] = useState([]);

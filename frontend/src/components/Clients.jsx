@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FiUsers, FiPlus, FiEdit, FiTrash2, FiMail, FiPhone } from 'react-icons/fi';
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = 'http://localhost:5001/api';
 
 function Clients() {
   const [clients, setClients] = useState([]);
