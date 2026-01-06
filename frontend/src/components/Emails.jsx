@@ -699,13 +699,17 @@ function Emails() {
                   value={composeData.to}
                   onChange={(e) => setComposeData({...composeData, to: e.target.value})}
                   placeholder="recipient@example.com"
+                  autoComplete="off"
                   style={{
                     width: '100%',
                     padding: '10px 14px',
                     border: '2px solid #e5e7eb',
                     borderRadius: '8px',
                     fontSize: '15px',
-                    transition: 'border-color 0.2s'
+                    transition: 'border-color 0.2s',
+                    userSelect: 'text',
+                    pointerEvents: 'auto',
+                    cursor: 'text'
                   }}
                 />
               </div>
@@ -716,13 +720,17 @@ function Emails() {
                   value={composeData.cc}
                   onChange={(e) => setComposeData({...composeData, cc: e.target.value})}
                   placeholder="cc@example.com (optional)"
+                  autoComplete="off"
                   style={{
                     width: '100%',
                     padding: '10px 14px',
                     border: '2px solid #e5e7eb',
                     borderRadius: '8px',
                     fontSize: '15px',
-                    transition: 'border-color 0.2s'
+                    transition: 'border-color 0.2s',
+                    userSelect: 'text',
+                    pointerEvents: 'auto',
+                    cursor: 'text'
                   }}
                 />
               </div>
@@ -733,13 +741,17 @@ function Emails() {
                   value={composeData.subject}
                   onChange={(e) => setComposeData({...composeData, subject: e.target.value})}
                   placeholder="Email subject"
+                  autoComplete="off"
                   style={{
                     width: '100%',
                     padding: '10px 14px',
                     border: '2px solid #e5e7eb',
                     borderRadius: '8px',
                     fontSize: '15px',
-                    transition: 'border-color 0.2s'
+                    transition: 'border-color 0.2s',
+                    userSelect: 'text',
+                    pointerEvents: 'auto',
+                    cursor: 'text'
                   }}
                 />
               </div>
@@ -758,7 +770,10 @@ function Emails() {
                     borderRadius: '8px',
                     fontSize: '15px',
                     resize: 'vertical',
-                    fontFamily: 'inherit'
+                    fontFamily: 'inherit',
+                    userSelect: 'text',
+                    pointerEvents: 'auto',
+                    cursor: 'text'
                   }}
                 />
               </div>
