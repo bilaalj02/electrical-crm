@@ -349,11 +349,11 @@ function Clients() {
       {/* Clients Table */}
       <div className="clients-table" style={{ background: 'white', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
         {loading ? (
-          <div className="loading" style={{ padding: '40px', textAlign: 'center' }}>Loading clients...</div>
+          <div className="loading" style={{ padding: '60px 20px', textAlign: 'center' }}>Loading clients...</div>
         ) : filteredClients.length === 0 ? (
-          <div className="empty" style={{ padding: '40px', textAlign: 'center' }}>
-            <FiUsers size={48} style={{ color: '#ccc', marginBottom: '10px' }} />
-            <p>No clients found</p>
+          <div className="empty" style={{ padding: '60px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+            <FiUsers size={64} style={{ color: '#d1d5db' }} />
+            <p style={{ fontSize: '18px', color: '#6b7280', margin: 0 }}>No clients found</p>
             {clients.length === 0 && (
               <button className="btn-primary" onClick={() => setShowForm(true)} style={{ marginTop: '10px' }}>
                 <FiPlus /> Add Your First Client

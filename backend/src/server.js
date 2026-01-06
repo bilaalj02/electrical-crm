@@ -6,7 +6,9 @@ const emailRoutes = require('./routes/emailRoutes');
 const jobRoutes = require('./routes/jobRoutes');
 const clientRoutes = require('./routes/clientRoutes');
 const authRoutes = require('./routes/authRoutes');
-const emailSyncService = require('./services/emailSyncService');
+const oauthRoutes = require('./routes/oauth');
+const emailApiRoutes = require('./routes/emails');
+// const emailSyncService = require('./services/emailSyncService'); // Disabled - using new OAuth system
 
 const app = express();
 
@@ -29,7 +31,9 @@ app.get('/', (req, res) => {
       jobs: '/api/jobs',
       clients: '/api/clients',
       sync: '/api/emails/sync',
-      stats: '/api/emails/stats/summary'
+      stats: '/api/emails/stats/summary',
+      oauth: '/api/oauth',
+      emailSync: '/api/email-sync'
     }
   });
 });
@@ -38,6 +42,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/emails', emailRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/clients', clientRoutes);
+app.use('/api/oauth', oauthRoutes);
+app.use('/api/email-sync', emailApiRoutes);
 
 // OAuth callback routes (for future implementation)
 app.get('/auth/gmail/callback', async (req, res) => {
@@ -81,23 +87,23 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV}`);
 
-  // Start automatic email sync
-  if (process.env.AUTO_SYNC !== 'false') {
-    console.log('Starting automatic email sync...');
-    emailSyncService.startAutoSync();
-  }
+  // Old auto-sync disabled - using new OAuth system
+  // if (process.env.AUTO_SYNC !== 'false') {
+  //   console.log('Starting automatic email sync...');
+  //   emailSyncService.startAutoSync();
+  // }
 });
 
 // Handle graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM signal received: closing HTTP server');
-  emailSyncService.stopAutoSync();
+  // emailSyncService.stopAutoSync();
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
   console.log('SIGINT signal received: closing HTTP server');
-  emailSyncService.stopAutoSync();
+  // emailSyncService.stopAutoSync();
   process.exit(0);
 });
 

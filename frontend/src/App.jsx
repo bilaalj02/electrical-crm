@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import './App.css';
-import { FiMail, FiBriefcase, FiUsers, FiMenu, FiX, FiHome, FiBarChart2, FiSend, FiChevronDown, FiChevronUp, FiPlus, FiUser, FiLogOut, FiSettings, FiMoon, FiSun, FiBell } from 'react-icons/fi';
+import { FiMail, FiBriefcase, FiUsers, FiMenu, FiX, FiHome, FiBarChart2, FiSend, FiCalendar, FiChevronDown, FiChevronUp, FiChevronLeft, FiChevronRight, FiPlus, FiUser, FiLogOut, FiSettings, FiMoon, FiSun, FiBell } from 'react-icons/fi';
 import { useAuth } from './context/AuthContext';
 import Login from './components/Login';
 import Home from './components/Home';
@@ -10,6 +10,7 @@ import Clients from './components/Clients';
 import Analytics from './components/Analytics';
 import MarketingOutreach from './components/MarketingOutreach';
 import EmailJobSummarizer from './components/EmailJobSummarizer';
+import Calendar from './components/Calendar';
 import mesLogo from './assets/mes-logo.png';
 import axios from 'axios';
 
@@ -155,6 +156,14 @@ function App() {
             {sidebarOpen && <span>Clients</span>}
           </button>
           <button
+            className={`sidebar-link ${currentPage === 'calendar' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('calendar')}
+            title="Calendar"
+          >
+            <FiCalendar className="sidebar-icon" />
+            {sidebarOpen && <span>Calendar</span>}
+          </button>
+          <button
             className={`sidebar-link ${currentPage === 'analytics' ? 'active' : ''}`}
             onClick={() => setCurrentPage('analytics')}
             title="Analytics"
@@ -219,16 +228,44 @@ function App() {
             {darkMode ? <FiSun className="sidebar-icon" /> : <FiMoon className="sidebar-icon" />}
             {sidebarOpen && <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>}
           </button>
-
-          <button
-            className="sidebar-toggle"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-          >
-            {sidebarOpen ? <FiX /> : <FiMenu />}
-          </button>
         </div>
       </aside>
+
+      {/* Sidebar Toggle Button - At edge between sidebar and main content */}
+      <button
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+        style={{
+          position: 'fixed',
+          left: sidebarOpen ? '240px' : '70px',
+          top: '80px',
+          background: '#d4af37',
+          border: 'none',
+          borderRadius: '50%',
+          width: '24px',
+          height: '24px',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'white',
+          fontSize: '14px',
+          boxShadow: '0 2px 6px rgba(212, 175, 55, 0.4)',
+          zIndex: 1000,
+          transition: 'left 0.3s ease',
+          padding: '0'
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.background = '#b8941f';
+          e.currentTarget.style.boxShadow = '0 3px 10px rgba(212, 175, 55, 0.6)';
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.background = '#d4af37';
+          e.currentTarget.style.boxShadow = '0 2px 6px rgba(212, 175, 55, 0.4)';
+        }}
+      >
+        {sidebarOpen ? <FiChevronLeft size={14} /> : <FiChevronRight size={14} />}
+      </button>
 
       {/* Main Content Area */}
       <main className={`main-content ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
@@ -237,6 +274,7 @@ function App() {
           {currentPage === 'emails' && <Emails />}
           {currentPage === 'jobs' && <Jobs />}
           {currentPage === 'clients' && <Clients />}
+          {currentPage === 'calendar' && <Calendar />}
           {currentPage === 'analytics' && <Analytics />}
           {currentPage === 'marketing' && <MarketingOutreach />}
         </div>

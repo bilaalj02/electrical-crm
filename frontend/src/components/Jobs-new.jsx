@@ -4,7 +4,7 @@ import { FiBriefcase, FiPlus, FiEdit, FiTrash2, FiDollarSign, FiClock, FiUser } 
 import JobForm from './JobForm';
 import JobDetail from './JobDetail';
 
-const API_URL = 'http://localhost:5001/api';
+const API_URL = 'http://localhost:5000/api';
 
 function Jobs() {
   const [jobs, setJobs] = useState([]);
@@ -188,56 +188,11 @@ function Jobs() {
       )}
 
       {/* Filters */}
-      <div className="filters-section" style={{
-        background: 'linear-gradient(135deg, #fef9e7 0%, #fef5d4 100%)',
-        padding: '24px',
-        borderRadius: '16px',
-        marginBottom: '24px',
-        boxShadow: '0 4px 12px rgba(212, 175, 55, 0.15)',
-        border: '2px solid rgba(212, 175, 55, 0.3)',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px'
-      }}>
-        <div>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>Search</label>
-          <input
-            type="text"
-            placeholder="Search jobs..."
-            value={filters.search}
-            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              border: 'none',
-              borderRadius: '12px',
-              fontSize: '14px',
-              outline: 'none',
-              background: 'white',
-              color: '#333',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-            }}
-          />
-        </div>
-
-        <div>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>Status</label>
-          <select
-            value={filters.status}
-            onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              border: 'none',
-              borderRadius: '12px',
-              fontSize: '14px',
-              outline: 'none',
-              background: 'white',
-              color: '#333',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              cursor: 'pointer'
-            }}
-          >
+      <div className="filters">
+        <select
+          value={filters.status}
+          onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+        >
           <option value="">All Status</option>
           <option value="quote">Quote</option>
           <option value="approved">Approved</option>
@@ -247,25 +202,10 @@ function Jobs() {
           <option value="invoiced">Invoiced</option>
           <option value="paid">Paid</option>
           <option value="cancelled">Cancelled</option>
-          </select>
-        </div>
+        </select>
 
-        <div>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>Priority</label>
-          <select
-            value={filters.priority}
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              border: 'none',
-              borderRadius: '12px',
-              fontSize: '14px',
-              outline: 'none',
-              background: 'white',
-              color: '#333',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              cursor: 'pointer'
-            }}
+        <select
+          value={filters.priority}
           onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
         >
           <option value="">All Priorities</option>
@@ -273,42 +213,35 @@ function Jobs() {
           <option value="medium">Medium</option>
           <option value="high">High</option>
           <option value="urgent">Urgent</option>
-          </select>
-        </div>
+        </select>
 
-        <div>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>Sort By</label>
-          <select
-            value={filters.sortBy}
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              border: 'none',
-              borderRadius: '12px',
-              fontSize: '14px',
-              outline: 'none',
-              background: 'white',
-              color: '#333',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              cursor: 'pointer'
-            }}
+        <select
+          value={filters.sortBy}
           onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
         >
           <option value="scheduledDate">Scheduled Date</option>
           <option value="costs.finalTotal">Payment Amount</option>
           <option value="createdAt">Created Date</option>
-          <option value="priority">Priority</option>          </select>
-        </div>
+          <option value="priority">Priority</option>
+        </select>
+
+        <input
+          type="text"
+          placeholder="Search jobs..."
+          value={filters.search}
+          onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+          className="search-input"
+        />
       </div>
 
       {/* Jobs List */}
       <div className="jobs-grid">
         {loading && jobs.length === 0 ? (
-          <div className="loading" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '60px 20px' }}>Loading jobs...</div>
+          <div className="loading">Loading jobs...</div>
         ) : jobs.length === 0 ? (
-          <div className="empty" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '60px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
-            <FiBriefcase size={64} style={{ color: '#d1d5db' }} />
-            <p style={{ fontSize: '18px', color: '#6b7280', margin: 0 }}>No jobs found</p>
+          <div className="empty">
+            <FiBriefcase size={48} />
+            <p>No jobs found</p>
             <button className="btn-primary" onClick={() => setShowJobForm(true)}>
               <FiPlus /> Create Your First Job
             </button>

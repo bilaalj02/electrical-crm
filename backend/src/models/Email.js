@@ -1,32 +1,27 @@
 const mongoose = require('mongoose');
 
 const emailSchema = new mongoose.Schema({
-  // Email identification
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  emailAccountId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'EmailAccount',
+    required: true
+  },
   messageId: {
     type: String,
     required: true,
     unique: true
   },
-  threadId: String,
-
-  // Email account info
-  accountEmail: {
-    type: String,
-    required: true
+  threadId: {
+    type: String
   },
-  accountType: {
-    type: String,
-    enum: ['gmail1', 'gmail2', 'microsoft', 'godaddy'],
-    required: true
-  },
-
-  // Email content
   from: {
     name: String,
-    email: {
-      type: String,
-      required: true
-    }
+    email: String
   },
   to: [{
     name: String,
@@ -36,26 +31,24 @@ const emailSchema = new mongoose.Schema({
     name: String,
     email: String
   }],
+  bcc: [{
+    name: String,
+    email: String
+  }],
   subject: {
     type: String,
-    default: ''
+    default: '(No Subject)'
   },
   body: {
     text: String,
     html: String
   },
-  attachments: [{
-    filename: String,
-    contentType: String,
-    size: Number,
-    url: String
-  }],
-
-  // Email metadata
+  snippet: String,
   date: {
     type: Date,
     required: true
   },
+  labels: [String],
   isRead: {
     type: Boolean,
     default: false
@@ -64,45 +57,38 @@ const emailSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  labels: [String],
-
-  // Classification
+  hasAttachments: {
+    type: Boolean,
+    default: false
+  },
+  attachments: [{
+    filename: String,
+    mimeType: String,
+    size: Number,
+    attachmentId: String
+  }],
+  clientId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Client'
+  },
+  jobId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Job'
+  },
   isWorkRelated: {
     type: Boolean,
-    default: null // null means not yet classified
-  },
-  classificationConfidence: Number,
-
-  // Job linking
-  linkedJob: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Job',
     default: null
-  },
-
-  // Search optimization
-  searchText: String,
-
-  // Sync metadata
-  lastSynced: {
-    type: Date,
-    default: Date.now
   }
 }, {
   timestamps: true
 });
 
-// Indexes for efficient querying
-emailSchema.index({ accountEmail: 1, date: -1 });
-emailSchema.index({ isWorkRelated: 1, date: -1 });
+// Indexes for fast queries
+emailSchema.index({ userId: 1, date: -1 });
+emailSchema.index({ emailAccountId: 1 });
+emailSchema.index({ clientId: 1 });
+emailSchema.index({ jobId: 1 });
 emailSchema.index({ 'from.email': 1 });
-emailSchema.index({ linkedJob: 1 });
-emailSchema.index({ searchText: 'text' });
-
-// Pre-save middleware to create searchText
-emailSchema.pre('save', function(next) {
-  this.searchText = `${this.subject} ${this.from.name} ${this.from.email} ${this.body.text}`.toLowerCase();
-  next();
-});
+emailSchema.index({ subject: 'text', 'body.text': 'text' });
 
 module.exports = mongoose.model('Email', emailSchema);
