@@ -1,7 +1,8 @@
 const { google } = require('googleapis');
+const axios = require('axios');
 const Email = require('../models/Email');
 const EmailAccount = require('../models/EmailAccount');
-const { getAuthenticatedClient } = require('./oauthController');
+const { getAuthenticatedClient, getAuthenticatedMicrosoftClient } = require('./oauthController');
 
 // Parse email address string
 const parseEmailAddress = (addressString) => {
@@ -23,7 +24,7 @@ const parseHeaders = (headers) => {
   return result;
 };
 
-// Sync emails from Gmail
+// Sync emails from Gmail or Microsoft
 const syncEmails = async (req, res) => {
   try {
     const { accountId } = req.params;
@@ -39,119 +40,202 @@ const syncEmails = async (req, res) => {
       return res.status(404).json({ error: 'Email account not found' });
     }
 
-    const oauth2Client = await getAuthenticatedClient(emailAccount);
-    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
-
-    // Get list of messages
-    const listParams = {
-      userId: 'me',
-      maxResults: parseInt(maxResults)
-    };
-
-    // Use sync token for incremental sync if available
-    if (emailAccount.syncToken) {
-      listParams.pageToken = emailAccount.syncToken;
+    // Route to appropriate sync function based on provider
+    if (emailAccount.provider === 'gmail') {
+      return await syncGmailEmails(req, res, emailAccount, maxResults);
+    } else if (emailAccount.provider === 'microsoft') {
+      return await syncMicrosoftEmails(req, res, emailAccount, maxResults);
+    } else {
+      return res.status(400).json({ error: 'Unsupported email provider' });
     }
-
-    const response = await gmail.users.messages.list(listParams);
-    const messages = response.data.messages || [];
-
-    let syncedCount = 0;
-
-    for (const message of messages) {
-      // Check if email already exists
-      const existingEmail = await Email.findOne({ messageId: message.id });
-      if (existingEmail) continue;
-
-      // Fetch full message details
-      const fullMessage = await gmail.users.messages.get({
-        userId: 'me',
-        id: message.id,
-        format: 'full'
-      });
-
-      const headers = parseHeaders(fullMessage.data.payload.headers);
-
-      // Parse email body
-      let bodyText = '';
-      let bodyHtml = '';
-
-      const getBody = (payload) => {
-        if (payload.body.data) {
-          const data = Buffer.from(payload.body.data, 'base64').toString('utf-8');
-          if (payload.mimeType === 'text/plain') {
-            bodyText = data;
-          } else if (payload.mimeType === 'text/html') {
-            bodyHtml = data;
-          }
-        }
-
-        if (payload.parts) {
-          payload.parts.forEach(part => getBody(part));
-        }
-      };
-
-      getBody(fullMessage.data.payload);
-
-      // Parse attachments
-      const attachments = [];
-      const getAttachments = (payload) => {
-        if (payload.filename && payload.body.attachmentId) {
-          attachments.push({
-            filename: payload.filename,
-            mimeType: payload.mimeType,
-            size: payload.body.size,
-            attachmentId: payload.body.attachmentId
-          });
-        }
-        if (payload.parts) {
-          payload.parts.forEach(part => getAttachments(part));
-        }
-      };
-      getAttachments(fullMessage.data.payload);
-
-      // Create email record
-      await Email.create({
-        userId: req.user._id,
-        emailAccountId: emailAccount._id,
-        messageId: message.id,
-        threadId: fullMessage.data.threadId,
-        from: parseEmailAddress(headers.from),
-        to: headers.to ? headers.to.split(',').map(parseEmailAddress) : [],
-        cc: headers.cc ? headers.cc.split(',').map(parseEmailAddress) : [],
-        subject: headers.subject || '(No Subject)',
-        body: {
-          text: bodyText,
-          html: bodyHtml
-        },
-        snippet: fullMessage.data.snippet,
-        date: new Date(parseInt(fullMessage.data.internalDate)),
-        labels: fullMessage.data.labelIds || [],
-        isRead: !fullMessage.data.labelIds?.includes('UNREAD'),
-        isStarred: fullMessage.data.labelIds?.includes('STARRED'),
-        hasAttachments: attachments.length > 0,
-        attachments
-      });
-
-      syncedCount++;
-    }
-
-    // Update last synced time
-    emailAccount.lastSyncedAt = new Date();
-    if (response.data.nextPageToken) {
-      emailAccount.syncToken = response.data.nextPageToken;
-    }
-    await emailAccount.save();
-
-    res.json({
-      message: `Successfully synced ${syncedCount} emails`,
-      syncedCount,
-      totalMessages: messages.length
-    });
   } catch (error) {
     console.error('Error syncing emails:', error);
     res.status(500).json({ error: 'Failed to sync emails' });
   }
+};
+
+// Sync Gmail emails
+const syncGmailEmails = async (req, res, emailAccount, maxResults) => {
+  const oauth2Client = await getAuthenticatedClient(emailAccount);
+  const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+
+  // Get list of messages
+  const listParams = {
+    userId: 'me',
+    maxResults: parseInt(maxResults)
+  };
+
+  // Use sync token for incremental sync if available
+  if (emailAccount.syncToken) {
+    listParams.pageToken = emailAccount.syncToken;
+  }
+
+  const response = await gmail.users.messages.list(listParams);
+  const messages = response.data.messages || [];
+
+  let syncedCount = 0;
+
+  for (const message of messages) {
+    // Check if email already exists
+    const existingEmail = await Email.findOne({ messageId: message.id });
+    if (existingEmail) continue;
+
+    // Fetch full message details
+    const fullMessage = await gmail.users.messages.get({
+      userId: 'me',
+      id: message.id,
+      format: 'full'
+    });
+
+    const headers = parseHeaders(fullMessage.data.payload.headers);
+
+    // Parse email body
+    let bodyText = '';
+    let bodyHtml = '';
+
+    const getBody = (payload) => {
+      if (payload.body.data) {
+        const data = Buffer.from(payload.body.data, 'base64').toString('utf-8');
+        if (payload.mimeType === 'text/plain') {
+          bodyText = data;
+        } else if (payload.mimeType === 'text/html') {
+          bodyHtml = data;
+        }
+      }
+
+      if (payload.parts) {
+        payload.parts.forEach(part => getBody(part));
+      }
+    };
+
+    getBody(fullMessage.data.payload);
+
+    // Parse attachments
+    const attachments = [];
+    const getAttachments = (payload) => {
+      if (payload.filename && payload.body.attachmentId) {
+        attachments.push({
+          filename: payload.filename,
+          mimeType: payload.mimeType,
+          size: payload.body.size,
+          attachmentId: payload.body.attachmentId
+        });
+      }
+      if (payload.parts) {
+        payload.parts.forEach(part => getAttachments(part));
+      }
+    };
+    getAttachments(fullMessage.data.payload);
+
+    // Create email record
+    await Email.create({
+      userId: req.user._id,
+      emailAccountId: emailAccount._id,
+      messageId: message.id,
+      threadId: fullMessage.data.threadId,
+      from: parseEmailAddress(headers.from),
+      to: headers.to ? headers.to.split(',').map(parseEmailAddress) : [],
+      cc: headers.cc ? headers.cc.split(',').map(parseEmailAddress) : [],
+      subject: headers.subject || '(No Subject)',
+      body: {
+        text: bodyText,
+        html: bodyHtml
+      },
+      snippet: fullMessage.data.snippet,
+      date: new Date(parseInt(fullMessage.data.internalDate)),
+      labels: fullMessage.data.labelIds || [],
+      isRead: !fullMessage.data.labelIds?.includes('UNREAD'),
+      isStarred: fullMessage.data.labelIds?.includes('STARRED'),
+      hasAttachments: attachments.length > 0,
+      attachments
+    });
+
+    syncedCount++;
+  }
+
+  // Update last synced time
+  emailAccount.lastSyncedAt = new Date();
+  if (response.data.nextPageToken) {
+    emailAccount.syncToken = response.data.nextPageToken;
+  }
+  await emailAccount.save();
+
+  res.json({
+    message: `Successfully synced ${syncedCount} emails`,
+    syncedCount,
+    totalMessages: messages.length
+  });
+};
+
+// Sync Microsoft emails
+const syncMicrosoftEmails = async (req, res, emailAccount, maxResults) => {
+  const accessToken = await getAuthenticatedMicrosoftClient(emailAccount);
+
+  // Get list of messages from Microsoft Graph API
+  const response = await axios.get(
+    `https://graph.microsoft.com/v1.0/me/messages?$top=${maxResults}&$select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,bodyPreview,body,isRead,hasAttachments,conversationId`,
+    {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    }
+  );
+
+  const messages = response.data.value || [];
+  let syncedCount = 0;
+
+  for (const message of messages) {
+    // Check if email already exists
+    const existingEmail = await Email.findOne({ messageId: message.id });
+    if (existingEmail) continue;
+
+    // Parse recipients
+    const parseRecipients = (recipients) => {
+      if (!recipients) return [];
+      return recipients.map(r => ({
+        name: r.emailAddress.name || '',
+        email: r.emailAddress.address
+      }));
+    };
+
+    // Create email record
+    await Email.create({
+      userId: req.user._id,
+      emailAccountId: emailAccount._id,
+      messageId: message.id,
+      threadId: message.conversationId,
+      from: {
+        name: message.from?.emailAddress?.name || '',
+        email: message.from?.emailAddress?.address || ''
+      },
+      to: parseRecipients(message.toRecipients),
+      cc: parseRecipients(message.ccRecipients),
+      subject: message.subject || '(No Subject)',
+      body: {
+        text: message.body?.contentType === 'text' ? message.body.content : '',
+        html: message.body?.contentType === 'html' ? message.body.content : ''
+      },
+      snippet: message.bodyPreview || '',
+      date: new Date(message.receivedDateTime),
+      labels: [],
+      isRead: message.isRead,
+      isStarred: false,
+      hasAttachments: message.hasAttachments,
+      attachments: []
+    });
+
+    syncedCount++;
+  }
+
+  // Update last synced time
+  emailAccount.lastSyncedAt = new Date();
+  await emailAccount.save();
+
+  res.json({
+    message: `Successfully synced ${syncedCount} emails`,
+    syncedCount,
+    totalMessages: messages.length
+  });
 };
 
 // Get emails

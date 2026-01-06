@@ -9,7 +9,6 @@ const Email = require('../models/Email');
  */
 router.get('/', async (req, res) => {
   try {
-    console.log('=== EMAIL ROUTES FILE LOADED - NO POPULATE ===');
     const {
       page = 1,
       limit = 50,
@@ -24,8 +23,21 @@ router.get('/', async (req, res) => {
     // Build filter
     const filter = {};
 
+    // Handle accountType filter by looking up the EmailAccount
     if (accountType) {
-      filter.accountType = accountType;
+      const EmailAccount = require('../models/EmailAccount');
+      const accounts = await EmailAccount.find({ provider: accountType });
+      if (accounts.length > 0) {
+        filter.emailAccountId = { $in: accounts.map(acc => acc._id) };
+      } else {
+        // No accounts found for this provider, return empty
+        return res.json({
+          emails: [],
+          totalPages: 0,
+          currentPage: page,
+          total: 0
+        });
+      }
     }
 
     if (isWorkRelated !== undefined) {
@@ -37,19 +49,34 @@ router.get('/', async (req, res) => {
     }
 
     if (search) {
-      filter.$text = { $search: search };
+      filter.$or = [
+        { subject: { $regex: search, $options: 'i' } },
+        { 'from.email': { $regex: search, $options: 'i' } },
+        { 'from.name': { $regex: search, $options: 'i' } },
+        { 'to.email': { $regex: search, $options: 'i' } },
+        { 'to.name': { $regex: search, $options: 'i' } },
+        { snippet: { $regex: search, $options: 'i' } }
+      ];
     }
 
-    // Execute query
+    // Execute query with populate
     const emails = await Email.find(filter)
+      .populate('emailAccountId', 'email provider')
       .sort({ [sortBy]: sortOrder === 'desc' ? -1 : 1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
 
+    // Transform emails to include accountType for frontend compatibility
+    const transformedEmails = emails.map(email => {
+      const emailObj = email.toObject();
+      emailObj.accountType = email.emailAccountId?.provider || 'unknown';
+      return emailObj;
+    });
+
     const count = await Email.countDocuments(filter);
 
     res.json({
-      emails,
+      emails: transformedEmails,
       totalPages: Math.ceil(count / limit),
       currentPage: page,
       total: count
@@ -155,10 +182,22 @@ router.get('/stats/summary', async (req, res) => {
     const workRelated = await Email.countDocuments({ isWorkRelated: true });
     const notClassified = await Email.countDocuments({ isWorkRelated: null });
 
+    // Get by account with proper population
     const byAccount = await Email.aggregate([
       {
+        $lookup: {
+          from: 'emailaccounts',
+          localField: 'emailAccountId',
+          foreignField: '_id',
+          as: 'account'
+        }
+      },
+      {
+        $unwind: '$account'
+      },
+      {
         $group: {
-          _id: '$accountType',
+          _id: '$account.provider',
           count: { $sum: 1 }
         }
       }

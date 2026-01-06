@@ -74,6 +74,22 @@ function Emails() {
     }
   };
 
+  const connectMicrosoft = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/oauth/microsoft/auth-url`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      // Open OAuth window
+      const { authUrl } = response.data;
+      window.location.href = authUrl;
+    } catch (error) {
+      console.error('Error connecting Microsoft:', error);
+      alert('Error initiating Microsoft connection');
+    }
+  };
+
   const disconnectAccount = async (accountId) => {
     if (!confirm('Are you sure you want to disconnect this email account?')) return;
 
@@ -218,14 +234,15 @@ function Emails() {
                 boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
               }}>
                 <FiCheck style={{ color: '#10b981' }} />
-                <span style={{ fontSize: '14px', fontWeight: '500' }}>{account.email}</span>
+                <span style={{ fontSize: '14px', fontWeight: '500', color: '#1f2937' }}>{account.email}</span>
                 <span style={{
                   fontSize: '11px',
                   background: '#eff6ff',
                   color: '#3b82f6',
                   padding: '2px 8px',
                   borderRadius: '4px',
-                  textTransform: 'uppercase'
+                  textTransform: 'uppercase',
+                  fontWeight: '600'
                 }}>{account.provider}</span>
                 <button
                   onClick={() => syncAccountEmails(account._id)}
@@ -280,35 +297,108 @@ function Emails() {
         </div>
       )}
 
-      <div className="filters">
-        <div className="filter-group">
-          <FiFilter />
-          <select value={filters.accountType} onChange={(e) => setFilters({ ...filters, accountType: e.target.value })}>
+      {/* Filters */}
+      <div className="filters-section" style={{
+        background: 'linear-gradient(135deg, #fef9e7 0%, #fef5d4 100%)',
+        padding: '24px',
+        borderRadius: '16px',
+        marginBottom: '24px',
+        boxShadow: '0 4px 12px rgba(212, 175, 55, 0.15)',
+        border: '2px solid rgba(212, 175, 55, 0.3)',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: '16px'
+      }}>
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>Search</label>
+          <input
+            type="text"
+            placeholder="Search emails..."
+            value={filters.search}
+            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+            style={{
+              width: '100%',
+              padding: '10px 14px',
+              border: 'none',
+              borderRadius: '12px',
+              fontSize: '14px',
+              outline: 'none',
+              background: 'white',
+              color: '#333',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}
+          />
+        </div>
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>Account</label>
+          <select
+            value={filters.accountType}
+            onChange={(e) => setFilters({ ...filters, accountType: e.target.value })}
+            style={{
+              width: '100%',
+              padding: '10px 14px',
+              border: 'none',
+              borderRadius: '12px',
+              fontSize: '14px',
+              outline: 'none',
+              background: 'white',
+              color: '#333',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              cursor: 'pointer'
+            }}
+          >
             <option value="">All Accounts</option>
             <option value="gmail1">Gmail 1</option>
             <option value="gmail2">Gmail 2</option>
             <option value="microsoft">Microsoft</option>
             <option value="godaddy">GoDaddy</option>
           </select>
-          <select value={filters.isWorkRelated} onChange={(e) => setFilters({ ...filters, isWorkRelated: e.target.value })}>
+        </div>
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>Type</label>
+          <select
+            value={filters.isWorkRelated}
+            onChange={(e) => setFilters({ ...filters, isWorkRelated: e.target.value })}
+            style={{
+              width: '100%',
+              padding: '10px 14px',
+              border: 'none',
+              borderRadius: '12px',
+              fontSize: '14px',
+              outline: 'none',
+              background: 'white',
+              color: '#333',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              cursor: 'pointer'
+            }}
+          >
             <option value="">All Emails</option>
             <option value="true">Work Related</option>
             <option value="false">Non-Work</option>
           </select>
-          <select value={filters.isRead} onChange={(e) => setFilters({ ...filters, isRead: e.target.value })}>
+        </div>
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>Status</label>
+          <select
+            value={filters.isRead}
+            onChange={(e) => setFilters({ ...filters, isRead: e.target.value })}
+            style={{
+              width: '100%',
+              padding: '10px 14px',
+              border: 'none',
+              borderRadius: '12px',
+              fontSize: '14px',
+              outline: 'none',
+              background: 'white',
+              color: '#333',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              cursor: 'pointer'
+            }}
+          >
             <option value="">Read & Unread</option>
             <option value="false">Unread Only</option>
             <option value="true">Read Only</option>
           </select>
-        </div>
-        <div className="search-box">
-          <FiSearch />
-          <input
-            type="text"
-            placeholder="Search emails..."
-            value={filters.search}
-            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-          />
         </div>
       </div>
 
@@ -442,7 +532,10 @@ function Emails() {
                 </button>
 
                 <button
-                  onClick={() => alert('Microsoft integration coming soon!')}
+                  onClick={() => {
+                    connectMicrosoft();
+                    setShowAccountModal(false);
+                  }}
                   style={{
                     padding: '16px 20px',
                     background: 'white',
@@ -454,14 +547,21 @@ function Emails() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '12px',
-                    opacity: 0.6
+                    transition: 'all 0.2s'
                   }}
-                  disabled
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.borderColor = '#d4af37';
+                    e.currentTarget.style.background = '#fef9e7';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.borderColor = '#e5e7eb';
+                    e.currentTarget.style.background = 'white';
+                  }}
                 >
                   <FiMail size={24} style={{ color: '#0078d4' }} />
                   <div style={{ textAlign: 'left' }}>
                     <div style={{ fontWeight: '600' }}>Microsoft / Outlook</div>
-                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Coming soon</div>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Connect your Microsoft account</div>
                   </div>
                 </button>
 
