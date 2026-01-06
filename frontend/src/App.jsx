@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './App.css';
-import { FiMail, FiBriefcase, FiUsers, FiMenu, FiX, FiHome, FiBarChart2, FiSend, FiChevronDown, FiChevronUp, FiPlus, FiUser, FiLogOut, FiSettings } from 'react-icons/fi';
+import { FiMail, FiBriefcase, FiUsers, FiMenu, FiX, FiHome, FiBarChart2, FiSend, FiChevronDown, FiChevronUp, FiPlus, FiUser, FiLogOut, FiSettings, FiMoon, FiSun, FiBell } from 'react-icons/fi';
 import { useAuth } from './context/AuthContext';
 import Login from './components/Login';
 import Home from './components/Home';
@@ -9,7 +9,11 @@ import Jobs from './components/Jobs';
 import Clients from './components/Clients';
 import Analytics from './components/Analytics';
 import MarketingOutreach from './components/MarketingOutreach';
+import EmailJobSummarizer from './components/EmailJobSummarizer';
 import mesLogo from './assets/mes-logo.png';
+import axios from 'axios';
+
+const API_URL = 'http://localhost:5000/api';
 
 function App() {
   const { isAuthenticated, user, logout, loading } = useAuth();
@@ -19,6 +23,43 @@ function App() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [modalContent, setModalContent] = useState({ title: '', message: '' });
+  const [summarizerOpen, setSummarizerOpen] = useState(false);
+  const [potentialJobsCount, setPotentialJobsCount] = useState(0);
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem('darkMode');
+    return saved ? JSON.parse(saved) : false;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('darkMode', JSON.stringify(darkMode));
+    if (darkMode) {
+      document.body.classList.add('dark-mode');
+    } else {
+      document.body.classList.remove('dark-mode');
+    }
+  }, [darkMode]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      // Fetch potential jobs count on load and every 5 minutes
+      fetchPotentialJobsCount();
+      const interval = setInterval(fetchPotentialJobsCount, 5 * 60 * 1000);
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated]);
+
+  const fetchPotentialJobsCount = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/emails?isWorkRelated=true&isRead=false`);
+      setPotentialJobsCount(response.data.emails?.length || 0);
+    } catch (error) {
+      console.error('Error fetching potential jobs count:', error);
+    }
+  };
+
+  const toggleDarkMode = () => {
+    setDarkMode(!darkMode);
+  };
 
   if (loading) {
     return (
@@ -169,13 +210,24 @@ function App() {
           )}
         </div>
 
-        <button
-          className="sidebar-toggle"
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-        >
-          {sidebarOpen ? <FiX /> : <FiMenu />}
-        </button>
+        <div className="sidebar-footer">
+          <button
+            className="dark-mode-toggle"
+            onClick={toggleDarkMode}
+            title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {darkMode ? <FiSun className="sidebar-icon" /> : <FiMoon className="sidebar-icon" />}
+            {sidebarOpen && <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>}
+          </button>
+
+          <button
+            className="sidebar-toggle"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+          >
+            {sidebarOpen ? <FiX /> : <FiMenu />}
+          </button>
+        </div>
       </aside>
 
       {/* Main Content Area */}
@@ -212,6 +264,27 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* Floating Job Opportunities Button */}
+      <button
+        className="floating-notification-btn"
+        onClick={() => setSummarizerOpen(true)}
+        title="View potential job opportunities"
+      >
+        <FiBell />
+        {potentialJobsCount > 0 && (
+          <span className="notification-badge">{potentialJobsCount}</span>
+        )}
+      </button>
+
+      {/* Email Job Summarizer Popup */}
+      <EmailJobSummarizer
+        isOpen={summarizerOpen}
+        onClose={() => {
+          setSummarizerOpen(false);
+          fetchPotentialJobsCount();
+        }}
+      />
     </div>
   );
 }
