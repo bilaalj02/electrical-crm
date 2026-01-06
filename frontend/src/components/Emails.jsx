@@ -216,13 +216,13 @@ function Emails() {
       <div className="page-header">
         <h1><FiMail /> Unified Inbox</h1>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button onClick={() => setShowAccountModal(true)} className="btn-primary">
+          <button type="button" onClick={() => setShowAccountModal(true)} className="btn-primary">
             <FiPlus /> Connect Account
           </button>
-          <button onClick={() => setShowComposeModal(true)} className="btn-primary">
+          <button type="button" onClick={() => setShowComposeModal(true)} className="btn-primary">
             <FiEdit /> Compose
           </button>
-          <button onClick={() => setShowSyncModal(true)} className="btn-sync" disabled={loading || emailAccounts.length === 0}>
+          <button type="button" onClick={() => setShowSyncModal(true)} className="btn-sync" disabled={loading || emailAccounts.length === 0}>
             <FiRefreshCw className={loading ? 'spinning' : ''} />
             {loading ? 'Syncing...' : 'Sync Emails'}
           </button>
