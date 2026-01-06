@@ -683,67 +683,124 @@ function Emails() {
       {/* Compose Email Modal */}
       {showComposeModal && (
         <div className="modal-overlay" onClick={() => setShowComposeModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>
-                <FiEdit />
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', background: 'white' }}>
+            <div className="modal-header" style={{ background: 'linear-gradient(135deg, #fef9e7 0%, #fef5d4 100%)', borderBottom: '2px solid #d4af37' }}>
+              <h2 style={{ color: '#1a1a1a', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <FiEdit style={{ color: '#d4af37' }} />
                 Compose Email
               </h2>
-              <button className="btn-close" onClick={() => setShowComposeModal(false)}>×</button>
+              <button className="icon-btn" onClick={() => setShowComposeModal(false)} style={{ fontSize: '28px', color: '#6b7280' }}>×</button>
             </div>
-            <div className="modal-body">
-              <div className="form-group">
-                <label>To:</label>
+            <div className="modal-body" style={{ padding: '24px' }}>
+              <div className="form-group" style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#1a1a1a' }}>To:</label>
                 <input
                   type="email"
                   value={composeData.to}
                   onChange={(e) => setComposeData({...composeData, to: e.target.value})}
                   placeholder="recipient@example.com"
-                  className="form-control"
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '8px',
+                    fontSize: '15px',
+                    transition: 'border-color 0.2s'
+                  }}
                 />
               </div>
-              <div className="form-group">
-                <label>CC:</label>
+              <div className="form-group" style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#1a1a1a' }}>CC:</label>
                 <input
                   type="email"
                   value={composeData.cc}
                   onChange={(e) => setComposeData({...composeData, cc: e.target.value})}
                   placeholder="cc@example.com (optional)"
-                  className="form-control"
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '8px',
+                    fontSize: '15px',
+                    transition: 'border-color 0.2s'
+                  }}
                 />
               </div>
-              <div className="form-group">
-                <label>Subject:</label>
+              <div className="form-group" style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#1a1a1a' }}>Subject:</label>
                 <input
                   type="text"
                   value={composeData.subject}
                   onChange={(e) => setComposeData({...composeData, subject: e.target.value})}
                   placeholder="Email subject"
-                  className="form-control"
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '8px',
+                    fontSize: '15px',
+                    transition: 'border-color 0.2s'
+                  }}
                 />
               </div>
-              <div className="form-group">
-                <label>Body:</label>
+              <div className="form-group" style={{ marginBottom: '0' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#1a1a1a' }}>Body:</label>
                 <textarea
                   value={composeData.body}
                   onChange={(e) => setComposeData({...composeData, body: e.target.value})}
                   placeholder="Write your message..."
-                  className="form-control"
                   rows="10"
-                  style={{ minHeight: '200px' }}
+                  style={{
+                    width: '100%',
+                    minHeight: '200px',
+                    padding: '10px 14px',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '8px',
+                    fontSize: '15px',
+                    resize: 'vertical',
+                    fontFamily: 'inherit'
+                  }}
                 />
               </div>
             </div>
-            <div className="modal-footer">
-              <button className="modal-btn-secondary" onClick={() => setShowComposeModal(false)}>
+            <div className="modal-footer" style={{ padding: '20px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setShowComposeModal(false)}
+                style={{
+                  padding: '10px 24px',
+                  border: '2px solid #e5e7eb',
+                  background: 'white',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
                 Cancel
               </button>
-              <button className="modal-btn-primary" onClick={() => {
-                // TODO: Implement send email functionality
-                alert('Email sending functionality will be implemented soon!');
-                setShowComposeModal(false);
-                setComposeData({ to: '', cc: '', subject: '', body: '' });
-              }}>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  // TODO: Implement send email functionality
+                  alert('Email sending functionality will be implemented soon!');
+                  setShowComposeModal(false);
+                  setComposeData({ to: '', cc: '', subject: '', body: '' });
+                }}
+                style={{
+                  padding: '10px 24px',
+                  background: '#d4af37',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: 'white',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
                 <FiSend /> Send
               </button>
             </div>
