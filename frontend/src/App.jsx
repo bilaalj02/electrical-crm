@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import './App.css';
-import { FiMail, FiBriefcase, FiUsers, FiMenu, FiX, FiHome, FiBarChart2, FiSend, FiChevronDown, FiChevronUp, FiPlus } from 'react-icons/fi';
+import { FiMail, FiBriefcase, FiUsers, FiMenu, FiX, FiHome, FiBarChart2, FiSend, FiChevronDown, FiChevronUp, FiPlus, FiUser, FiLogOut, FiSettings } from 'react-icons/fi';
+import { useAuth } from './context/AuthContext';
+import Login from './components/Login';
 import Home from './components/Home';
 import Emails from './components/Emails';
 import Jobs from './components/Jobs';
@@ -10,9 +12,26 @@ import MarketingOutreach from './components/MarketingOutreach';
 import mesLogo from './assets/mes-logo.png';
 
 function App() {
+  const { isAuthenticated, user, logout, loading } = useAuth();
   const [currentPage, setCurrentPage] = useState('home');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [emailDropdownOpen, setEmailDropdownOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [modalContent, setModalContent] = useState({ title: '', message: '' });
+
+  if (loading) {
+    return (
+      <div className="loading-screen">
+        <img src={mesLogo} alt="MES Logo" className="loading-logo" />
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Login />;
+  }
 
   return (
     <div className="app-container">
@@ -20,7 +39,6 @@ function App() {
       <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
         <div className="sidebar-header">
           <img src={mesLogo} alt="MES Logo" className="sidebar-logo" />
-          {sidebarOpen && <h2>MES Electrical</h2>}
         </div>
 
         <nav className="sidebar-nav">
@@ -34,13 +52,15 @@ function App() {
           </button>
 
           <div className="sidebar-dropdown">
-            <button
-              className={`sidebar-link ${currentPage === 'emails' ? 'active' : ''}`}
-              onClick={() => setCurrentPage('emails')}
-              title="Emails"
-            >
-              <FiMail className="sidebar-icon" />
-              {sidebarOpen && <span>Emails</span>}
+            <div className="sidebar-link-wrapper">
+              <button
+                className={`sidebar-link ${currentPage === 'emails' ? 'active' : ''}`}
+                onClick={() => setCurrentPage('emails')}
+                title="Emails"
+              >
+                <FiMail className="sidebar-icon" />
+                {sidebarOpen && <span>Emails</span>}
+              </button>
               {sidebarOpen && (
                 <button
                   className="dropdown-toggle"
@@ -52,16 +72,25 @@ function App() {
                   {emailDropdownOpen ? <FiChevronUp /> : <FiChevronDown />}
                 </button>
               )}
-            </button>
+            </div>
             {sidebarOpen && emailDropdownOpen && (
               <div className="dropdown-menu">
-                <button className="dropdown-item" onClick={() => alert('Add Gmail account functionality coming soon')}>
+                <button className="dropdown-item" onClick={() => {
+                  setModalContent({ title: 'Add Gmail Account', message: 'Gmail account integration coming soon! This feature will allow you to connect multiple Gmail accounts to your CRM.' });
+                  setShowModal(true);
+                }}>
                   <FiPlus /> Add Gmail Account
                 </button>
-                <button className="dropdown-item" onClick={() => alert('Add Microsoft account functionality coming soon')}>
+                <button className="dropdown-item" onClick={() => {
+                  setModalContent({ title: 'Add Microsoft Account', message: 'Microsoft account integration coming soon! Connect your Outlook and Office 365 accounts seamlessly.' });
+                  setShowModal(true);
+                }}>
                   <FiPlus /> Add Microsoft Account
                 </button>
-                <button className="dropdown-item" onClick={() => alert('Add IMAP account functionality coming soon')}>
+                <button className="dropdown-item" onClick={() => {
+                  setModalContent({ title: 'Add IMAP Account', message: 'IMAP account integration coming soon! Connect any email provider that supports IMAP protocol.' });
+                  setShowModal(true);
+                }}>
                   <FiPlus /> Add IMAP Account
                 </button>
               </div>
@@ -102,6 +131,44 @@ function App() {
           </button>
         </nav>
 
+        {/* User Menu */}
+        <div className="sidebar-user-menu">
+          <button
+            className="user-menu-trigger"
+            onClick={() => setUserMenuOpen(!userMenuOpen)}
+          >
+            <div className="user-avatar">
+              <FiUser />
+            </div>
+            {sidebarOpen && (
+              <>
+                <div className="user-info">
+                  <div className="user-name">{user?.name}</div>
+                  <div className="user-role">{user?.role}</div>
+                </div>
+                <FiChevronUp className={`user-menu-arrow ${userMenuOpen ? 'open' : ''}`} />
+              </>
+            )}
+          </button>
+
+          {userMenuOpen && sidebarOpen && (
+            <div className="user-dropdown">
+              <button className="user-dropdown-item" onClick={() => {
+                setCurrentPage('settings');
+                setUserMenuOpen(false);
+              }}>
+                <FiSettings /> Settings
+              </button>
+              <button className="user-dropdown-item logout" onClick={() => {
+                logout();
+                setUserMenuOpen(false);
+              }}>
+                <FiLogOut /> Logout
+              </button>
+            </div>
+          )}
+        </div>
+
         <button
           className="sidebar-toggle"
           onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -122,6 +189,29 @@ function App() {
           {currentPage === 'marketing' && <MarketingOutreach />}
         </div>
       </main>
+
+      {/* Custom Modal */}
+      {showModal && (
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>
+                <FiMail />
+                {modalContent.title}
+              </h2>
+              <button className="btn-close" onClick={() => setShowModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p>{modalContent.message}</p>
+            </div>
+            <div className="modal-footer">
+              <button className="modal-btn-primary" onClick={() => setShowModal(false)}>
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

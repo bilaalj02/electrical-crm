@@ -5,6 +5,7 @@ const connectDB = require('./config/database');
 const emailRoutes = require('./routes/emailRoutes');
 const jobRoutes = require('./routes/jobRoutes');
 const clientRoutes = require('./routes/clientRoutes');
+const authRoutes = require('./routes/authRoutes');
 const emailSyncService = require('./services/emailSyncService');
 
 const app = express();
@@ -23,6 +24,7 @@ app.get('/', (req, res) => {
     message: 'Electrical CRM API',
     version: '1.0.0',
     endpoints: {
+      auth: '/api/auth',
       emails: '/api/emails',
       jobs: '/api/jobs',
       clients: '/api/clients',
@@ -32,6 +34,7 @@ app.get('/', (req, res) => {
   });
 });
 
+app.use('/api/auth', authRoutes);
 app.use('/api/emails', emailRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/clients', clientRoutes);
