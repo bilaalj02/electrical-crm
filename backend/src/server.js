@@ -21,6 +21,7 @@ const corsOptions = {
       'https://electrical-crm-beta.vercel.app',
       'https://meselectrical-crm.vercel.app',
       'https://meselectrical.vercel.app',
+      'https://electrical-crm-git-main-bilaal-jangikhan-s-projects.vercel.app',
       process.env.FRONTEND_URL
     ].filter(Boolean); // Remove any undefined values
 
