@@ -276,7 +276,19 @@ const jobSchema = new mongoose.Schema({
   }],
 
   // Internal Notes
-  internalNotes: String
+  internalNotes: String,
+
+  // Marketing Automation
+  reviewRequestSent: {
+    type: Boolean,
+    default: false
+  },
+  reviewRequestDate: Date,
+  referralRequestSent: {
+    type: Boolean,
+    default: false
+  },
+  referralRequestDate: Date
 }, {
   timestamps: true
 });

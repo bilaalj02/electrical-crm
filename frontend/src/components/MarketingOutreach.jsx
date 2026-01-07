@@ -1,21 +1,34 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FiSend, FiMail, FiUsers, FiChevronDown, FiChevronUp, FiTarget, FiBarChart2, FiPlus } from 'react-icons/fi';
+import { FiSend, FiMail, FiUsers, FiChevronDown, FiChevronUp, FiTarget, FiBarChart2, FiPlus, FiStar, FiUserPlus, FiSettings, FiCheck } from 'react-icons/fi';
 
 const API_URL = 'http://localhost:5001/api';
 
 function MarketingOutreach() {
   const [clients, setClients] = useState([]);
+  const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
     overview: true,
     campaigns: false,
     audience: false,
-    performance: false
+    performance: false,
+    reviewRequests: true,
+    referralRequests: true
+  });
+  const [automationSettings, setAutomationSettings] = useState({
+    reviewRequestEnabled: false,
+    reviewRequestDays: 3,
+    referralRequestEnabled: false,
+    referralRequestDays: 7,
+    reviewTemplate: "Hi {clientName},\n\nThank you for choosing MES Electrical for your recent {jobType}. We hope you're happy with the work we completed!\n\nWould you mind taking a moment to leave us a review? Your feedback helps us improve and helps other customers find great electrical services.\n\nReview us on Google: [Link]\n\nThank you!\nMES Electrical Team",
+    referralTemplate: "Hi {clientName},\n\nWe're so glad we could help with your {jobType}!\n\nIf you know anyone who needs electrical work, we'd love it if you could refer them to us. As a thank you, we're offering {referralDiscount}% off your next service for every successful referral!\n\nThank you for your continued trust in MES Electrical!\n\nBest regards,\nMES Electrical Team",
+    referralDiscount: 10
   });
 
   useEffect(() => {
     fetchClients();
+    fetchJobs();
   }, []);
 
   const fetchClients = async () => {
@@ -29,6 +42,100 @@ function MarketingOutreach() {
       setLoading(false);
     }
   };
+
+  const fetchJobs = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/jobs?limit=1000`);
+      setJobs(response.data.jobs || []);
+    } catch (error) {
+      console.error('Error fetching jobs:', error);
+    }
+  };
+
+  const getEligibleForReviewRequests = () => {
+    const daysAgo = new Date();
+    daysAgo.setDate(daysAgo.getDate() - automationSettings.reviewRequestDays);
+
+    return jobs.filter(job =>
+      job.status === 'completed' &&
+      new Date(job.completionDate) >= daysAgo &&
+      !job.reviewRequestSent
+    );
+  };
+
+  const getEligibleForReferralRequests = () => {
+    const daysAgo = new Date();
+    daysAgo.setDate(daysAgo.getDate() - automationSettings.referralRequestDays);
+
+    return jobs.filter(job =>
+      job.status === 'completed' &&
+      new Date(job.completionDate) >= daysAgo &&
+      !job.referralRequestSent
+    );
+  };
+
+  const sendReviewRequests = async () => {
+    const eligible = getEligibleForReviewRequests();
+    if (eligible.length === 0) {
+      alert('No eligible jobs for review requests at this time.');
+      return;
+    }
+
+    if (!confirm(`Send review requests to ${eligible.length} clients?`)) return;
+
+    try {
+      // TODO: Implement actual email sending
+      for (const job of eligible) {
+        await axios.patch(`${API_URL}/jobs/${job._id}`, {
+          reviewRequestSent: true,
+          reviewRequestDate: new Date()
+        });
+      }
+      alert(`Successfully sent ${eligible.length} review requests!`);
+      fetchJobs();
+    } catch (error) {
+      console.error('Error sending review requests:', error);
+      alert('Failed to send review requests');
+    }
+  };
+
+  const sendReferralRequests = async () => {
+    const eligible = getEligibleForReferralRequests();
+    if (eligible.length === 0) {
+      alert('No eligible jobs for referral requests at this time.');
+      return;
+    }
+
+    if (!confirm(`Send referral requests to ${eligible.length} clients?`)) return;
+
+    try {
+      // TODO: Implement actual email sending
+      for (const job of eligible) {
+        await axios.patch(`${API_URL}/jobs/${job._id}`, {
+          referralRequestSent: true,
+          referralRequestDate: new Date()
+        });
+      }
+      alert(`Successfully sent ${eligible.length} referral requests!`);
+      fetchJobs();
+    } catch (error) {
+      console.error('Error sending referral requests:', error);
+      alert('Failed to send referral requests');
+    }
+  };
+
+  const saveAutomationSettings = () => {
+    // TODO: Save to backend/localStorage
+    localStorage.setItem('marketingAutomation', JSON.stringify(automationSettings));
+    alert('Automation settings saved!');
+  };
+
+  useEffect(() => {
+    const saved = localStorage.getItem('marketingAutomation');
+    if (saved) {
+      setAutomationSettings(JSON.parse(saved));
+    }
+  }, []);
 
   const toggleSection = (section) => {
     setExpandedSections(prev => ({
@@ -85,6 +192,195 @@ function MarketingOutreach() {
                 <div className="card-footer">
                   <span>Available for campaigns</span>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Review Request Automation - Collapsible */}
+      <div className="analytics-section-collapsible">
+        <div className="section-header" onClick={() => toggleSection('reviewRequests')}>
+          <h2><FiStar /> Review Request Automation</h2>
+          {expandedSections.reviewRequests ? <FiChevronUp /> : <FiChevronDown />}
+        </div>
+        {expandedSections.reviewRequests && (
+          <div className="section-content">
+            <div className="automation-settings-card">
+              <div className="settings-header">
+                <FiSettings />
+                <h3>Automation Settings</h3>
+              </div>
+
+              <div className="form-group">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={automationSettings.reviewRequestEnabled}
+                    onChange={(e) => setAutomationSettings(prev => ({
+                      ...prev,
+                      reviewRequestEnabled: e.target.checked
+                    }))}
+                  />
+                  <span>Enable automated review requests</span>
+                </label>
+              </div>
+
+              <div className="form-group">
+                <label>Send review request after job completion:</label>
+                <div className="input-with-unit">
+                  <input
+                    type="number"
+                    min="1"
+                    max="30"
+                    value={automationSettings.reviewRequestDays}
+                    onChange={(e) => setAutomationSettings(prev => ({
+                      ...prev,
+                      reviewRequestDays: parseInt(e.target.value) || 1
+                    }))}
+                  />
+                  <span className="unit">days</span>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Email Template:</label>
+                <textarea
+                  rows="8"
+                  value={automationSettings.reviewTemplate}
+                  onChange={(e) => setAutomationSettings(prev => ({
+                    ...prev,
+                    reviewTemplate: e.target.value
+                  }))}
+                  placeholder="Template variables: {clientName}, {jobType}"
+                />
+                <small className="hint">Available variables: {'{clientName}'}, {'{jobType}'}</small>
+              </div>
+
+              <div className="stats-row">
+                <div className="stat-box">
+                  <span className="stat-label">Eligible Jobs</span>
+                  <span className="stat-value">{getEligibleForReviewRequests().length}</span>
+                </div>
+                <div className="stat-box">
+                  <span className="stat-label">Requests Sent</span>
+                  <span className="stat-value">{jobs.filter(j => j.reviewRequestSent).length}</span>
+                </div>
+              </div>
+
+              <div className="action-buttons-row">
+                <button className="btn-secondary" onClick={saveAutomationSettings}>
+                  <FiSettings /> Save Settings
+                </button>
+                <button
+                  className="btn-primary"
+                  onClick={sendReviewRequests}
+                  disabled={getEligibleForReviewRequests().length === 0}
+                >
+                  <FiSend /> Send Review Requests ({getEligibleForReviewRequests().length})
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Referral Request Automation - Collapsible */}
+      <div className="analytics-section-collapsible">
+        <div className="section-header" onClick={() => toggleSection('referralRequests')}>
+          <h2><FiUserPlus /> Referral Request Automation</h2>
+          {expandedSections.referralRequests ? <FiChevronUp /> : <FiChevronDown />}
+        </div>
+        {expandedSections.referralRequests && (
+          <div className="section-content">
+            <div className="automation-settings-card">
+              <div className="settings-header">
+                <FiSettings />
+                <h3>Automation Settings</h3>
+              </div>
+
+              <div className="form-group">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={automationSettings.referralRequestEnabled}
+                    onChange={(e) => setAutomationSettings(prev => ({
+                      ...prev,
+                      referralRequestEnabled: e.target.checked
+                    }))}
+                  />
+                  <span>Enable automated referral requests</span>
+                </label>
+              </div>
+
+              <div className="form-group">
+                <label>Send referral request after job completion:</label>
+                <div className="input-with-unit">
+                  <input
+                    type="number"
+                    min="1"
+                    max="30"
+                    value={automationSettings.referralRequestDays}
+                    onChange={(e) => setAutomationSettings(prev => ({
+                      ...prev,
+                      referralRequestDays: parseInt(e.target.value) || 1
+                    }))}
+                  />
+                  <span className="unit">days</span>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Referral Discount (%):</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="50"
+                  value={automationSettings.referralDiscount}
+                  onChange={(e) => setAutomationSettings(prev => ({
+                    ...prev,
+                    referralDiscount: parseInt(e.target.value) || 0
+                  }))}
+                  style={{ width: '100px' }}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Email Template:</label>
+                <textarea
+                  rows="8"
+                  value={automationSettings.referralTemplate}
+                  onChange={(e) => setAutomationSettings(prev => ({
+                    ...prev,
+                    referralTemplate: e.target.value
+                  }))}
+                  placeholder="Template variables: {clientName}, {jobType}, {referralDiscount}"
+                />
+                <small className="hint">Available variables: {'{clientName}'}, {'{jobType}'}, {'{referralDiscount}'}</small>
+              </div>
+
+              <div className="stats-row">
+                <div className="stat-box">
+                  <span className="stat-label">Eligible Jobs</span>
+                  <span className="stat-value">{getEligibleForReferralRequests().length}</span>
+                </div>
+                <div className="stat-box">
+                  <span className="stat-label">Requests Sent</span>
+                  <span className="stat-value">{jobs.filter(j => j.referralRequestSent).length}</span>
+                </div>
+              </div>
+
+              <div className="action-buttons-row">
+                <button className="btn-secondary" onClick={saveAutomationSettings}>
+                  <FiSettings /> Save Settings
+                </button>
+                <button
+                  className="btn-primary"
+                  onClick={sendReferralRequests}
+                  disabled={getEligibleForReferralRequests().length === 0}
+                >
+                  <FiSend /> Send Referral Requests ({getEligibleForReferralRequests().length})
+                </button>
               </div>
             </div>
           </div>
