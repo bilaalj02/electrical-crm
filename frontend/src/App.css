@@ -985,7 +985,7 @@ body {
 }
 
 .modal-content {
-  background: linear-gradient(180deg, #1a1a1a 0%, #000000 100%);
+  background: #ffffff;
   border-radius: 16px;
   max-width: 500px;
   width: 100%;
@@ -993,8 +993,8 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(212, 175, 55, 0.3);
-  border: 2px solid rgba(212, 175, 55, 0.4);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(212, 175, 55, 0.2);
+  border: 2px solid rgba(212, 175, 55, 0.3);
   animation: slideUp 0.3s ease;
 }
 
@@ -1015,16 +1015,16 @@ body {
 
 .modal-header {
   padding: 1.75rem 2rem;
-  border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+  border-bottom: 1px solid rgba(212, 175, 55, 0.3);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(212, 175, 55, 0.05);
+  background: rgba(212, 175, 55, 0.08);
 }
 
 .modal-header h2 {
   margin: 0;
-  color: #d4af37;
+  color: #333333;
   font-size: 1.5rem;
   font-weight: 700;
   display: flex;
@@ -1041,12 +1041,12 @@ body {
   flex: 1;
   overflow-y: auto;
   padding: 2rem;
-  color: #ffffff;
+  color: #333333;
   max-height: calc(90vh - 200px);
 }
 
 .modal-body p {
-  color: #e5e7eb;
+  color: #1f2937;
   line-height: 1.6;
   margin: 0;
 }
@@ -1061,11 +1061,11 @@ body {
 
 .modal-footer {
   padding: 1.5rem 2rem;
-  border-top: 1px solid rgba(212, 175, 55, 0.2);
+  border-top: 1px solid rgba(212, 175, 55, 0.3);
   display: flex;
   justify-content: flex-end;
   gap: 1rem;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(212, 175, 55, 0.05);
 }
 
 .modal-btn-primary {
@@ -1144,34 +1144,34 @@ body {
 }
 
 .modal-content .form-group label {
-  color: #d4af37;
+  color: #333333;
   font-weight: 600;
 }
 
 .modal-content .form-group input,
 .modal-content .form-group select,
 .modal-content .form-group textarea {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(212, 175, 55, 0.3);
-  color: #ffffff;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #333333;
 }
 
 .modal-content .form-group input:focus,
 .modal-content .form-group select:focus,
 .modal-content .form-group textarea:focus {
-  background: rgba(255, 255, 255, 0.15);
+  background: #ffffff;
   border-color: #d4af37;
   box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
 }
 
 .modal-content .form-group input::placeholder,
 .modal-content .form-group textarea::placeholder {
-  color: rgba(255, 255, 255, 0.5);
+  color: #9ca3af;
 }
 
 .modal-content .form-group select option {
-  background: #1a1a1a;
-  color: #ffffff;
+  background: #ffffff;
+  color: #333333;
 }
 
 .form-group input,
@@ -3371,26 +3371,23 @@ body {
   right: 30px;
   width: 60px;
   height: 60px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.95);
-  border: 2px solid #d4af37;
+  background: transparent;
+  border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #d4af37;
-  font-size: 28px;
+  font-size: 36px;
   transition: all 0.3s ease;
   z-index: 999;
-  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
 }
 
 .floating-notification-btn:hover {
-  transform: scale(1.1);
-  background: rgba(255, 255, 255, 1);
-  color: #b8941f;
-  border-color: #b8941f;
-  box-shadow: 0 6px 16px rgba(212, 175, 55, 0.5);
+  transform: scale(1.15);
+  color: #f4d03f;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.3));
 }
 
 .floating-notification-btn:active {
