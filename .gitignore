@@ -11,6 +11,9 @@ backend/node_modules/
 backend/.env
 frontend/.env
 
+# Security documentation with actual credentials
+SECURITY_ROTATION_COMPLETE.md
+
 # Build outputs
 dist/
 build/
