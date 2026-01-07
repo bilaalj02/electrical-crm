@@ -282,18 +282,22 @@ async function sendGmailEmail(emailAccount, { to, cc, subject, body }) {
   const oauth2Client = await getAuthenticatedClient(emailAccount);
   const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
-  // Create email message
+  // Convert plain text body to HTML if needed
+  const htmlBody = body.includes('<') ? body : body.replace(/\n/g, '<br>');
+
+  // Create properly formatted email message with MIME
   const messageParts = [
+    `From: ${emailAccount.email}`,
     `To: ${to}`,
     cc ? `Cc: ${cc}` : '',
-    'Content-Type: text/html; charset=utf-8',
-    'MIME-Version: 1.0',
     `Subject: ${subject}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/html; charset=utf-8',
     '',
-    body
+    htmlBody
   ];
 
-  const message = messageParts.filter(part => part).join('\n');
+  const message = messageParts.filter(part => part).join('\r\n');
   const encodedMessage = Buffer.from(message)
     .toString('base64')
     .replace(/\+/g, '-')
@@ -315,19 +319,23 @@ async function sendMicrosoftEmail(emailAccount, { to, cc, subject, body }) {
 
   const accessToken = await getAuthenticatedMicrosoftClient(emailAccount);
 
+  // Convert plain text body to HTML if needed
+  const htmlBody = body.includes('<') ? body : body.replace(/\n/g, '<br>');
+
   const message = {
     message: {
       subject: subject,
       body: {
         contentType: 'HTML',
-        content: body
+        content: htmlBody
       },
       toRecipients: to.split(',').map(email => ({
         emailAddress: {
           address: email.trim()
         }
       }))
-    }
+    },
+    saveToSentItems: true
   };
 
   // Add CC recipients if provided
