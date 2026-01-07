@@ -3,7 +3,7 @@ import axios from 'axios';
 import { FiDollarSign, FiClock, FiBriefcase, FiUsers, FiMail, FiCheckCircle } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = 'http://localhost:5001/api';
 
 function Home() {
   const { user } = useAuth();
