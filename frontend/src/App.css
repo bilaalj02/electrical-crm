@@ -3371,23 +3371,24 @@ body {
   right: 30px;
   width: 60px;
   height: 60px;
-  background: transparent;
+  background: #d4af37;
   border: none;
+  border-radius: 50%;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #d4af37;
-  font-size: 36px;
+  color: #ffffff;
+  font-size: 28px;
   transition: all 0.3s ease;
   z-index: 999;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
 }
 
 .floating-notification-btn:hover {
-  transform: scale(1.15);
-  color: #f4d03f;
-  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.3));
+  transform: scale(1.1);
+  background: #f4d03f;
+  box-shadow: 0 6px 16px rgba(212, 175, 55, 0.6);
 }
 
 .floating-notification-btn:active {

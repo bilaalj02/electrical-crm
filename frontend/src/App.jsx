@@ -272,7 +272,7 @@ function App() {
         onClick={() => setSummarizerOpen(true)}
         title="View potential job opportunities"
       >
-        <FiBell />
+        <FiMail />
         {potentialJobsCount > 0 && (
           <span className="notification-badge">{potentialJobsCount}</span>
         )}
