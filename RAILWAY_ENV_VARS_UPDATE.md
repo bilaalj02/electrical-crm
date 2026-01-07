@@ -42,15 +42,17 @@ These should already exist (verify they're there):
 ```
 NODE_ENV=production
 PORT=8080
-MONGODB_URI=mongodb+srv://meselectrical:fdJI2UcbMDwQXZDC@cluster1mes.ijhlfur.mongodb.net/electrical-crm?retryWrites=true&w=majority&appName=Cluster1MES
-JWT_SECRET=1c44e3eec2922212e4d3de48e8e6b33c8d93aee06fc604445ad9171a3657b87e
+MONGODB_URI=<your-mongodb-connection-string>
+JWT_SECRET=<your-jwt-secret-from-crypto-random-bytes>
 JWT_EXPIRES_IN=7d
-ENCRYPTION_KEY=b0425739636f3f24ee2ff494f61d3b64a28832d2237eb2aafc7236dd1fe5500c
-GOOGLE_CLIENT_ID=1013633694578-q8tkun1vn87u1q2pmis1o6rt5gm55j0v.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=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
-MICROSOFT_CLIENT_ID=f41e0e9e-5e09-40b5-8893-b7fbbd22697f
-MICROSOFT_TENANT_ID=95eff101-b143-48d7-be62-3320fc93b193
+ENCRYPTION_KEY=<your-encryption-key-from-crypto-random-bytes>
+GOOGLE_CLIENT_ID=<your-google-client-id>
+GOOGLE_CLIENT_SECRET=<your-google-client-secret>
+MICROSOFT_CLIENT_ID=<your-microsoft-client-id>
+MICROSOFT_TENANT_ID=<your-microsoft-tenant-id>
 ```
+
+**IMPORTANT:** These are already configured in Railway. Do NOT change them unless rotating secrets for security.
 
 ---
 
