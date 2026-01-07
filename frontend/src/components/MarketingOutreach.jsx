@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FiSend, FiMail, FiUsers, FiChevronDown, FiChevronUp, FiTarget, FiBarChart2, FiPlus, FiStar, FiUserPlus, FiSettings, FiCheck } from 'react-icons/fi';
 
-const API_URL = 'http://localhost:5001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
 function MarketingOutreach() {
   const [clients, setClients] = useState([]);

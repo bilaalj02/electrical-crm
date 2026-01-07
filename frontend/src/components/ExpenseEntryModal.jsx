@@ -3,7 +3,7 @@ import { FiX, FiDollarSign, FiPlus, FiTrash2, FiAlertCircle } from 'react-icons/
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
-const API_URL = 'http://localhost:5001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
 function ExpenseEntryModal({ isOpen, onClose, job, onSave }) {
   const { user } = useAuth();

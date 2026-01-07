@@ -4,7 +4,7 @@ import { FiBriefcase, FiPlus, FiEdit, FiTrash2, FiDollarSign, FiClock, FiUser } 
 import JobForm from './JobForm';
 import JobDetail from './JobDetail';
 
-const API_URL = 'http://localhost:5001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
 function Jobs() {
   const [jobs, setJobs] = useState([]);
