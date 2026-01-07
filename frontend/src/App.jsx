@@ -14,7 +14,7 @@ import Calendar from './components/Calendar';
 import mesLogo from './assets/mes-logo.png';
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5001/api';
+const API_URL = 'http://localhost:5000/api';
 
 function App() {
   const { isAuthenticated, user, logout, loading } = useAuth();
@@ -93,51 +93,14 @@ function App() {
             {sidebarOpen && <span>Home</span>}
           </button>
 
-          <div className="sidebar-dropdown">
-            <div className="sidebar-link-wrapper">
-              <button
-                className={`sidebar-link ${currentPage === 'emails' ? 'active' : ''}`}
-                onClick={() => setCurrentPage('emails')}
-                title="Emails"
-              >
-                <FiMail className="sidebar-icon" />
-                {sidebarOpen && <span>Emails</span>}
-              </button>
-              {sidebarOpen && (
-                <button
-                  className="dropdown-toggle"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setEmailDropdownOpen(!emailDropdownOpen);
-                  }}
-                >
-                  {emailDropdownOpen ? <FiChevronUp /> : <FiChevronDown />}
-                </button>
-              )}
-            </div>
-            {sidebarOpen && emailDropdownOpen && (
-              <div className="dropdown-menu">
-                <button className="dropdown-item" onClick={() => {
-                  setModalContent({ title: 'Add Gmail Account', message: 'Gmail account integration coming soon! This feature will allow you to connect multiple Gmail accounts to your CRM.' });
-                  setShowModal(true);
-                }}>
-                  <FiPlus /> Add Gmail Account
-                </button>
-                <button className="dropdown-item" onClick={() => {
-                  setModalContent({ title: 'Add Microsoft Account', message: 'Microsoft account integration coming soon! Connect your Outlook and Office 365 accounts seamlessly.' });
-                  setShowModal(true);
-                }}>
-                  <FiPlus /> Add Microsoft Account
-                </button>
-                <button className="dropdown-item" onClick={() => {
-                  setModalContent({ title: 'Add IMAP Account', message: 'IMAP account integration coming soon! Connect any email provider that supports IMAP protocol.' });
-                  setShowModal(true);
-                }}>
-                  <FiPlus /> Add IMAP Account
-                </button>
-              </div>
-            )}
-          </div>
+          <button
+            className={`sidebar-link ${currentPage === 'emails' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('emails')}
+            title="Emails"
+          >
+            <FiMail className="sidebar-icon" />
+            {sidebarOpen && <span>Emails</span>}
+          </button>
 
           <button
             className={`sidebar-link ${currentPage === 'jobs' ? 'active' : ''}`}

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FiDollarSign, FiClock, FiBriefcase, FiUsers, FiMail, FiCheckCircle } from 'react-icons/fi';
+import { useAuth } from '../context/AuthContext';
 
-const API_URL = 'http://localhost:5001/api';
+const API_URL = 'http://localhost:5000/api';
 
 function Home() {
+  const { user } = useAuth();
   const [stats, setStats] = useState({
     totalRevenue: 0,
     pendingRevenue: 0,
@@ -65,7 +67,7 @@ function Home() {
       <div className="page-header">
         <div>
           <h1>Dashboard</h1>
-          <p className="page-subtitle">Welcome to MES Electrical CRM</p>
+          <p className="page-subtitle">Welcome {user?.name || 'User'}</p>
         </div>
       </div>
 

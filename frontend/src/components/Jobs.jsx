@@ -5,7 +5,7 @@ import JobForm from './JobForm';
 import JobDetail from './JobDetail';
 import ExpenseEntryModal from './ExpenseEntryModal';
 
-const API_URL = 'http://localhost:5001/api';
+const API_URL = 'http://localhost:5000/api';
 
 function Jobs() {
   const [jobs, setJobs] = useState([]);

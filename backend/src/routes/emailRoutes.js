@@ -16,6 +16,7 @@ router.get('/', async (req, res) => {
       isWorkRelated,
       isRead,
       search,
+      folder,
       sortBy = 'date',
       sortOrder = 'desc'
     } = req.query;
@@ -38,6 +39,13 @@ router.get('/', async (req, res) => {
           total: 0
         });
       }
+    }
+
+    // Handle folder filter (inbox/sent based on labels)
+    if (folder === 'sent') {
+      filter.labels = { $in: ['SENT'] };
+    } else if (folder === 'inbox') {
+      filter.labels = { $nin: ['SENT'] };
     }
 
     if (isWorkRelated !== undefined) {
@@ -215,5 +223,132 @@ router.get('/stats/summary', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+/**
+ * POST /api/emails/send
+ * Send an email through a connected account
+ */
+router.post('/send', async (req, res) => {
+  try {
+    const { accountId, to, cc, subject, body } = req.body;
+
+    // Validation
+    if (!accountId || !to || !subject || !body) {
+      return res.status(400).json({
+        error: 'Missing required fields. Please provide accountId, to, subject, and body.'
+      });
+    }
+
+    // Get the email account
+    const EmailAccount = require('../models/EmailAccount');
+    const emailAccount = await EmailAccount.findById(accountId);
+
+    if (!emailAccount) {
+      return res.status(404).json({ error: 'Email account not found' });
+    }
+
+    if (!emailAccount.isActive) {
+      return res.status(403).json({ error: 'Email account is not active' });
+    }
+
+    // Send email based on provider
+    if (emailAccount.provider === 'gmail') {
+      await sendGmailEmail(emailAccount, { to, cc, subject, body });
+    } else if (emailAccount.provider === 'microsoft') {
+      await sendMicrosoftEmail(emailAccount, { to, cc, subject, body });
+    } else {
+      return res.status(400).json({ error: 'Unsupported email provider' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Email sent successfully',
+      from: emailAccount.email
+    });
+  } catch (error) {
+    console.error('Error sending email:', error);
+    res.status(500).json({
+      error: 'Failed to send email',
+      details: error.message
+    });
+  }
+});
+
+// Helper function to send email via Gmail
+async function sendGmailEmail(emailAccount, { to, cc, subject, body }) {
+  const { google } = require('googleapis');
+  const { getAuthenticatedClient } = require('../controllers/oauthController');
+
+  const oauth2Client = await getAuthenticatedClient(emailAccount);
+  const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+
+  // Create email message
+  const messageParts = [
+    `To: ${to}`,
+    cc ? `Cc: ${cc}` : '',
+    'Content-Type: text/html; charset=utf-8',
+    'MIME-Version: 1.0',
+    `Subject: ${subject}`,
+    '',
+    body
+  ];
+
+  const message = messageParts.filter(part => part).join('\n');
+  const encodedMessage = Buffer.from(message)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+
+  await gmail.users.messages.send({
+    userId: 'me',
+    requestBody: {
+      raw: encodedMessage
+    }
+  });
+}
+
+// Helper function to send email via Microsoft Graph
+async function sendMicrosoftEmail(emailAccount, { to, cc, subject, body }) {
+  const axios = require('axios');
+  const { getAuthenticatedMicrosoftClient } = require('../controllers/oauthController');
+
+  const accessToken = await getAuthenticatedMicrosoftClient(emailAccount);
+
+  const message = {
+    message: {
+      subject: subject,
+      body: {
+        contentType: 'HTML',
+        content: body
+      },
+      toRecipients: to.split(',').map(email => ({
+        emailAddress: {
+          address: email.trim()
+        }
+      }))
+    }
+  };
+
+  // Add CC recipients if provided
+  if (cc) {
+    message.message.ccRecipients = cc.split(',').map(email => ({
+      emailAddress: {
+        address: email.trim()
+      }
+    }));
+  }
+
+  await axios.post(
+    'https://graph.microsoft.com/v1.0/me/sendMail',
+    message,
+    {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+}
 
 module.exports = router;
