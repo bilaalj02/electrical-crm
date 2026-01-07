@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { FiX, FiDollarSign, FiPlus, FiTrash2, FiAlertCircle } from 'react-icons/fi';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import NotificationModal from './NotificationModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
@@ -21,6 +22,13 @@ function ExpenseEntryModal({ isOpen, onClose, job, onSave }) {
 
   const [showSkipWarning, setShowSkipWarning] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [notification, setNotification] = useState({
+    isOpen: false,
+    type: 'info',
+    title: '',
+    message: '',
+    onConfirm: null
+  });
 
   // Initialize with job's quoted costs if available
   useEffect(() => {
@@ -76,7 +84,13 @@ function ExpenseEntryModal({ isOpen, onClose, job, onSave }) {
       onClose();
     } catch (error) {
       console.error('Error saving actual expenses:', error);
-      alert('Failed to save actual expenses');
+      setNotification({
+        isOpen: true,
+        type: 'error',
+        title: 'Save Failed',
+        message: 'Failed to save actual expenses. Please try again.',
+        onConfirm: null
+      });
     } finally {
       setLoading(false);
     }
@@ -96,7 +110,13 @@ function ExpenseEntryModal({ isOpen, onClose, job, onSave }) {
       onClose();
     } catch (error) {
       console.error('Error updating status:', error);
-      alert('Failed to update job status');
+      setNotification({
+        isOpen: true,
+        type: 'error',
+        title: 'Update Failed',
+        message: 'Failed to update job status. Please try again.',
+        onConfirm: null
+      });
     } finally {
       setLoading(false);
     }
@@ -374,6 +394,16 @@ function ExpenseEntryModal({ isOpen, onClose, job, onSave }) {
           </button>
         </div>
       </div>
+
+      {/* Notification Modal */}
+      <NotificationModal
+        isOpen={notification.isOpen}
+        onClose={() => setNotification({ ...notification, isOpen: false })}
+        type={notification.type}
+        title={notification.title}
+        message={notification.message}
+        onConfirm={notification.onConfirm}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FiMail, FiRefreshCw, FiFilter, FiSearch, FiPlus, FiCheck, FiX, FiEdit, FiSend } from 'react-icons/fi';
+import NotificationModal from './NotificationModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
@@ -20,6 +21,15 @@ function Emails() {
     cc: '',
     subject: '',
     body: ''
+  });
+
+  // Notification modal state
+  const [notification, setNotification] = useState({
+    isOpen: false,
+    type: 'info',
+    title: '',
+    message: '',
+    onConfirm: null
   });
 
   const [filters, setFilters] = useState({
@@ -89,7 +99,13 @@ function Emails() {
       window.location.href = authUrl;
     } catch (error) {
       console.error('Error connecting Gmail:', error);
-      alert('Error initiating Gmail connection');
+      setNotification({
+        isOpen: true,
+        type: 'error',
+        title: 'Connection Error',
+        message: 'Error initiating Gmail connection. Please try again.',
+        onConfirm: null
+      });
     }
   };
 
@@ -105,24 +121,48 @@ function Emails() {
       window.location.href = authUrl;
     } catch (error) {
       console.error('Error connecting Microsoft:', error);
-      alert('Error initiating Microsoft connection');
+      setNotification({
+        isOpen: true,
+        type: 'error',
+        title: 'Connection Error',
+        message: 'Error initiating Microsoft connection. Please try again.',
+        onConfirm: null
+      });
     }
   };
 
   const disconnectAccount = async (accountId) => {
-    if (!confirm('Are you sure you want to disconnect this email account?')) return;
-
-    try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`${API_URL}/oauth/accounts/${accountId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      fetchEmailAccounts();
-      alert('Email account disconnected successfully');
-    } catch (error) {
-      console.error('Error disconnecting account:', error);
-      alert('Error disconnecting email account');
-    }
+    setNotification({
+      isOpen: true,
+      type: 'confirm',
+      title: 'Disconnect Email Account',
+      message: 'Are you sure you want to disconnect this email account?',
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem('token');
+          await axios.delete(`${API_URL}/oauth/accounts/${accountId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          fetchEmailAccounts();
+          setNotification({
+            isOpen: true,
+            type: 'success',
+            title: 'Success',
+            message: 'Email account disconnected successfully',
+            onConfirm: null
+          });
+        } catch (error) {
+          console.error('Error disconnecting account:', error);
+          setNotification({
+            isOpen: true,
+            type: 'error',
+            title: 'Error',
+            message: 'Error disconnecting email account. Please try again.',
+            onConfirm: null
+          });
+        }
+      }
+    });
   };
 
   const syncAccountEmails = async (accountId) => {
@@ -134,10 +174,22 @@ function Emails() {
       });
       await fetchEmails();
       await fetchStats();
-      alert('Emails synced successfully!');
+      setNotification({
+        isOpen: true,
+        type: 'success',
+        title: 'Success',
+        message: 'Emails synced successfully!',
+        onConfirm: null
+      });
     } catch (error) {
       console.error('Error syncing emails:', error);
-      alert('Error syncing emails');
+      setNotification({
+        isOpen: true,
+        type: 'error',
+        title: 'Sync Error',
+        message: 'Error syncing emails. Please try again.',
+        onConfirm: null
+      });
     } finally {
       setLoading(false);
     }
@@ -149,10 +201,22 @@ function Emails() {
       await axios.post(`${API_URL}/emails/sync`);
       await fetchEmails();
       await fetchStats();
-      alert('Emails synced successfully!');
+      setNotification({
+        isOpen: true,
+        type: 'success',
+        title: 'Success',
+        message: 'Emails synced successfully!',
+        onConfirm: null
+      });
     } catch (error) {
       console.error('Error syncing emails:', error);
-      alert('Error syncing emails. Make sure the backend is running and configured.');
+      setNotification({
+        isOpen: true,
+        type: 'error',
+        title: 'Sync Error',
+        message: 'Error syncing emails. Make sure the backend is running and configured.',
+        onConfirm: null
+      });
     } finally {
       setLoading(false);
     }
@@ -190,12 +254,24 @@ function Emails() {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('oauth') === 'success') {
       const email = urlParams.get('email');
-      alert(`Successfully connected ${email}!`);
+      setNotification({
+        isOpen: true,
+        type: 'success',
+        title: 'Email Connected',
+        message: `Successfully connected ${email}!`,
+        onConfirm: null
+      });
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
       fetchEmailAccounts();
     } else if (urlParams.get('error')) {
-      alert('Failed to connect email account. Please try again.');
+      setNotification({
+        isOpen: true,
+        type: 'error',
+        title: 'Connection Failed',
+        message: 'Failed to connect email account. Please try again.',
+        onConfirm: null
+      });
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
@@ -588,7 +664,13 @@ function Emails() {
                 </button>
 
                 <button
-                  onClick={() => alert('IMAP integration coming soon!')}
+                  onClick={() => setNotification({
+                    isOpen: true,
+                    type: 'info',
+                    title: 'Coming Soon',
+                    message: 'IMAP integration coming soon!',
+                    onConfirm: null
+                  })}
                   style={{
                     padding: '16px 20px',
                     background: 'white',
@@ -830,19 +912,43 @@ function Emails() {
                 onClick={async () => {
                   // Validation
                   if (!composeData.fromAccount) {
-                    alert('Please select an email account to send from');
+                    setNotification({
+                      isOpen: true,
+                      type: 'warning',
+                      title: 'Missing Information',
+                      message: 'Please select an email account to send from',
+                      onConfirm: null
+                    });
                     return;
                   }
                   if (!composeData.to) {
-                    alert('Please enter a recipient email address');
+                    setNotification({
+                      isOpen: true,
+                      type: 'warning',
+                      title: 'Missing Information',
+                      message: 'Please enter a recipient email address',
+                      onConfirm: null
+                    });
                     return;
                   }
                   if (!composeData.subject) {
-                    alert('Please enter an email subject');
+                    setNotification({
+                      isOpen: true,
+                      type: 'warning',
+                      title: 'Missing Information',
+                      message: 'Please enter an email subject',
+                      onConfirm: null
+                    });
                     return;
                   }
                   if (!composeData.body) {
-                    alert('Please enter an email body');
+                    setNotification({
+                      isOpen: true,
+                      type: 'warning',
+                      title: 'Missing Information',
+                      message: 'Please enter an email body',
+                      onConfirm: null
+                    });
                     return;
                   }
 
@@ -856,12 +962,24 @@ function Emails() {
                       body: composeData.body
                     });
 
-                    alert('Email sent successfully!');
                     setShowComposeModal(false);
                     setComposeData({ fromAccount: '', to: '', cc: '', subject: '', body: '' });
+                    setNotification({
+                      isOpen: true,
+                      type: 'success',
+                      title: 'Email Sent',
+                      message: 'Email sent successfully!',
+                      onConfirm: null
+                    });
                   } catch (error) {
                     console.error('Error sending email:', error);
-                    alert(`Failed to send email: ${error.response?.data?.details || error.message}`);
+                    setNotification({
+                      isOpen: true,
+                      type: 'error',
+                      title: 'Send Failed',
+                      message: `Failed to send email: ${error.response?.data?.details || error.message}`,
+                      onConfirm: null
+                    });
                   } finally {
                     setSendingEmail(false);
                   }
@@ -887,6 +1005,16 @@ function Emails() {
           </div>
         </div>
       )}
+
+      {/* Notification Modal */}
+      <NotificationModal
+        isOpen={notification.isOpen}
+        onClose={() => setNotification({ ...notification, isOpen: false })}
+        type={notification.type}
+        title={notification.title}
+        message={notification.message}
+        onConfirm={notification.onConfirm}
+      />
     </div>
   );
 }
