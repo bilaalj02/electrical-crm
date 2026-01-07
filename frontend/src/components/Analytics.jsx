@@ -10,6 +10,7 @@ function Analytics() {
     clients: null,
     emails: null
   });
+  const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedSections, setExpandedSections] = useState({
     revenue: true,
@@ -25,10 +26,11 @@ function Analytics() {
   const fetchAnalytics = async () => {
     setLoading(true);
     try {
-      const [jobsRes, clientsRes, emailsRes] = await Promise.all([
+      const [jobsRes, clientsRes, emailsRes, allJobsRes] = await Promise.all([
         axios.get(`${API_URL}/jobs/stats`),
         axios.get(`${API_URL}/clients/stats`),
-        axios.get(`${API_URL}/emails/stats/summary`)
+        axios.get(`${API_URL}/emails/stats/summary`),
+        axios.get(`${API_URL}/jobs?limit=1000`) // Get all jobs for profitability calc
       ]);
 
       setStats({
@@ -36,6 +38,7 @@ function Analytics() {
         clients: clientsRes.data,
         emails: emailsRes.data
       });
+      setJobs(allJobsRes.data.jobs || []);
     } catch (error) {
       console.error('Error fetching analytics:', error);
     } finally {
@@ -67,6 +70,44 @@ function Analytics() {
     if (!total) return 0;
     return Math.round((value / total) * 100);
   };
+
+  // Calculate profitability metrics
+  const calculateProfitability = () => {
+    const jobsWithExpenses = jobs.filter(j =>
+      j.actualExpenses?.finalTotal &&
+      j.actualExpenses.finalTotal > 0 &&
+      j.costs?.finalTotal &&
+      j.costs.finalTotal > 0
+    );
+
+    if (jobsWithExpenses.length === 0) {
+      return {
+        count: 0,
+        totalProfit: 0,
+        avgProfitMargin: 0,
+        totalRevenue: 0
+      };
+    }
+
+    const totalProfit = jobsWithExpenses.reduce((sum, j) =>
+      sum + (j.costs.finalTotal - j.actualExpenses.finalTotal), 0
+    );
+
+    const totalRevenue = jobsWithExpenses.reduce((sum, j) =>
+      sum + j.costs.finalTotal, 0
+    );
+
+    const avgProfitMargin = (totalProfit / totalRevenue) * 100;
+
+    return {
+      count: jobsWithExpenses.length,
+      totalProfit,
+      avgProfitMargin,
+      totalRevenue
+    };
+  };
+
+  const profitability = calculateProfitability();
 
   if (loading) {
     return (
@@ -128,6 +169,24 @@ function Analytics() {
                 <div className="card-value">{formatCurrency(stats.jobs?.pendingRevenue)}</div>
                 <div className="card-footer">
                   <span>{stats.jobs?.unpaidInvoices || 0} unpaid invoices</span>
+                </div>
+              </div>
+
+              <div className={`dashboard-card ${profitability.avgProfitMargin >= 0 ? 'profit-positive' : 'profit-negative'}`}>
+                <div className="card-header">
+                  <div className={`card-icon ${profitability.avgProfitMargin >= 0 ? 'green' : 'red'}`}>
+                    <FiTrendingUp />
+                  </div>
+                  <div className="card-title">
+                    <h3>Avg Profit Margin</h3>
+                    <p>From Completed Jobs</p>
+                  </div>
+                </div>
+                <div className="card-value">{profitability.avgProfitMargin.toFixed(1)}%</div>
+                <div className="card-footer">
+                  <span className="trend">
+                    {formatCurrency(profitability.totalProfit)} profit from {profitability.count} jobs
+                  </span>
                 </div>
               </div>
             </div>

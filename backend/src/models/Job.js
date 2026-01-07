@@ -123,6 +123,90 @@ const jobSchema = new mongoose.Schema({
     }
   },
 
+  // Actual Expenses (tracked separately from quoted costs)
+  actualExpenses: {
+    laborHours: {
+      type: Number,
+      default: 0
+    },
+    laborRate: {
+      type: Number,
+      default: 85
+    },
+    laborTotal: {
+      type: Number,
+      default: 0
+    },
+
+    materials: [{
+      name: String,
+      description: String,
+      quantity: Number,
+      unitPrice: Number,
+      totalPrice: Number
+    }],
+    materialsTotal: {
+      type: Number,
+      default: 0
+    },
+
+    equipment: [{
+      name: String,
+      cost: Number
+    }],
+    equipmentTotal: {
+      type: Number,
+      default: 0
+    },
+
+    permitsCost: {
+      type: Number,
+      default: 0
+    },
+    subcontractorsCost: {
+      type: Number,
+      default: 0
+    },
+    otherCosts: {
+      type: Number,
+      default: 0
+    },
+
+    subtotal: {
+      type: Number,
+      default: 0
+    },
+    taxRate: {
+      type: Number,
+      default: 0
+    },
+    tax: {
+      type: Number,
+      default: 0
+    },
+    total: {
+      type: Number,
+      default: 0
+    },
+    discount: {
+      type: Number,
+      default: 0
+    },
+    finalTotal: {
+      type: Number,
+      default: 0
+    },
+
+    enteredAt: Date,
+    enteredBy: String
+  },
+
+  // Profit margin (quoted total - actual total)
+  profitMargin: {
+    type: Number,
+    default: 0
+  },
+
   // Payment Information
   payment: {
     method: {
@@ -207,20 +291,17 @@ jobSchema.index({ 'costs.finalTotal': -1 }); // For sorting by payment amount
 
 // Pre-save middleware to calculate totals
 jobSchema.pre('save', function(next) {
-  // Calculate labor total
+  // Calculate quoted costs totals
   this.costs.laborTotal = this.costs.laborHours * this.costs.laborRate;
 
-  // Calculate materials total
   this.costs.materialsTotal = this.costs.materials.reduce((sum, item) => {
     return sum + (item.totalPrice || 0);
   }, 0);
 
-  // Calculate equipment total
   this.costs.equipmentTotal = this.costs.equipment.reduce((sum, item) => {
     return sum + (item.cost || 0);
   }, 0);
 
-  // Calculate subtotal
   this.costs.subtotal =
     this.costs.laborTotal +
     this.costs.materialsTotal +
@@ -229,14 +310,37 @@ jobSchema.pre('save', function(next) {
     this.costs.subcontractorsCost +
     this.costs.otherCosts;
 
-  // Calculate tax
   this.costs.tax = this.costs.subtotal * this.costs.taxRate;
-
-  // Calculate total
   this.costs.total = this.costs.subtotal + this.costs.tax;
-
-  // Calculate final total (after discount)
   this.costs.finalTotal = this.costs.total - this.costs.discount;
+
+  // Calculate actual expenses totals (if they exist)
+  if (this.actualExpenses && (this.actualExpenses.laborHours || this.actualExpenses.materials.length > 0)) {
+    this.actualExpenses.laborTotal = this.actualExpenses.laborHours * this.actualExpenses.laborRate;
+
+    this.actualExpenses.materialsTotal = this.actualExpenses.materials.reduce((sum, item) => {
+      return sum + (item.totalPrice || 0);
+    }, 0);
+
+    this.actualExpenses.equipmentTotal = this.actualExpenses.equipment.reduce((sum, item) => {
+      return sum + (item.cost || 0);
+    }, 0);
+
+    this.actualExpenses.subtotal =
+      this.actualExpenses.laborTotal +
+      this.actualExpenses.materialsTotal +
+      this.actualExpenses.equipmentTotal +
+      this.actualExpenses.permitsCost +
+      this.actualExpenses.subcontractorsCost +
+      this.actualExpenses.otherCosts;
+
+    this.actualExpenses.tax = this.actualExpenses.subtotal * this.actualExpenses.taxRate;
+    this.actualExpenses.total = this.actualExpenses.subtotal + this.actualExpenses.tax;
+    this.actualExpenses.finalTotal = this.actualExpenses.total - this.actualExpenses.discount;
+
+    // Calculate profit margin
+    this.profitMargin = this.costs.finalTotal - this.actualExpenses.finalTotal;
+  }
 
   // Calculate payment balance
   this.payment.balance = this.costs.finalTotal - this.payment.amountPaid;

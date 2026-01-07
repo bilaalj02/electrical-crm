@@ -3,6 +3,7 @@ import axios from 'axios';
 import { FiBriefcase, FiPlus, FiEdit, FiTrash2, FiDollarSign, FiClock, FiUser } from 'react-icons/fi';
 import JobForm from './JobForm';
 import JobDetail from './JobDetail';
+import ExpenseEntryModal from './ExpenseEntryModal';
 
 const API_URL = 'http://localhost:5001/api';
 
@@ -14,6 +15,8 @@ function Jobs() {
   const [selectedJob, setSelectedJob] = useState(null);
   const [showJobForm, setShowJobForm] = useState(false);
   const [editingJob, setEditingJob] = useState(null);
+  const [expenseModalOpen, setExpenseModalOpen] = useState(false);
+  const [jobForExpenses, setJobForExpenses] = useState(null);
 
   // Filters
   const [filters, setFilters] = useState({
@@ -417,8 +420,29 @@ function Jobs() {
             fetchJobs();
             fetchStats();
           }}
+          onEnterExpenses={(job) => {
+            setJobForExpenses(job);
+            setExpenseModalOpen(true);
+            setSelectedJob(null);
+          }}
         />
       )}
+
+      {/* Expense Entry Modal */}
+      <ExpenseEntryModal
+        isOpen={expenseModalOpen}
+        onClose={() => {
+          setExpenseModalOpen(false);
+          setJobForExpenses(null);
+        }}
+        job={jobForExpenses}
+        onSave={() => {
+          fetchJobs();
+          fetchStats();
+          setExpenseModalOpen(false);
+          setJobForExpenses(null);
+        }}
+      />
     </div>
   );
 }

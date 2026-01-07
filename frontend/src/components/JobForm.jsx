@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FiX, FiSave, FiPlus, FiTrash2 } from 'react-icons/fi';
+import { FiX, FiSave, FiPlus, FiTrash2, FiTrendingUp } from 'react-icons/fi';
 
 const API_URL = 'http://localhost:5001/api';
 
 function JobForm({ job, clients, onClose, onSave }) {
+  const [recommendations, setRecommendations] = useState(null);
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -44,6 +46,22 @@ function JobForm({ job, clients, onClose, onSave }) {
         client: job.client?._id || job.client
       });
     }
+  }, [job]);
+
+  // Fetch recommendations for new jobs only
+  useEffect(() => {
+    const fetchRecommendations = async () => {
+      if (!job) { // Only for new jobs
+        try {
+          const response = await axios.get(`${API_URL}/jobs/recommendations`);
+          setRecommendations(response.data);
+        } catch (error) {
+          console.error('Error fetching recommendations:', error);
+        }
+      }
+    };
+
+    fetchRecommendations();
   }, [job]);
 
   const handleSubmit = async (e) => {
@@ -106,6 +124,24 @@ function JobForm({ job, clients, onClose, onSave }) {
         materials: formData.costs.materials.filter((_, i) => i !== index)
       }
     });
+  };
+
+  const applyRecommendations = () => {
+    if (!recommendations?.recommendations) return;
+
+    const rec = recommendations.recommendations;
+    setFormData(prev => ({
+      ...prev,
+      costs: {
+        ...prev.costs,
+        laborHours: rec.laborHours,
+        laborRate: rec.laborRate,
+        permitsCost: rec.permitsCost,
+        subcontractorsCost: rec.subcontractorsCost,
+        otherCosts: rec.otherCosts,
+        taxRate: rec.taxRate
+      }
+    }));
   };
 
   return (
@@ -269,6 +305,22 @@ function JobForm({ job, clients, onClose, onSave }) {
                 </div>
               </div>
             </section>
+
+            {/* Recommendations Banner */}
+            {recommendations?.hasData && !job && (
+              <div className="recommendations-banner">
+                <div className="banner-icon">
+                  <FiTrendingUp size={24} />
+                </div>
+                <div className="banner-content">
+                  <h4>Recommended Values Available</h4>
+                  <p>Based on {recommendations.basedOnJobs} completed jobs with actual expenses</p>
+                </div>
+                <button onClick={applyRecommendations} className="btn-secondary">
+                  Apply Recommendations
+                </button>
+              </div>
+            )}
 
             {/* Labor Costs */}
             <section className="form-section">
