@@ -28,22 +28,22 @@ function NotificationModal({
   const getIcon = () => {
     switch (type) {
       case 'success':
-        return <FiCheckCircle size={48} style={{ color: '#10b981' }} />;
+        return <FiCheckCircle size={48} style={{ color: '#d4af37' }} />;
       case 'error':
         return <FiAlertCircle size={48} style={{ color: '#ef4444' }} />;
       case 'warning':
         return <FiAlertCircle size={48} style={{ color: '#f59e0b' }} />;
       case 'confirm':
-        return <FiAlertCircle size={48} style={{ color: '#3b82f6' }} />;
+        return <FiAlertCircle size={48} style={{ color: '#d4af37' }} />;
       default:
-        return <FiInfo size={48} style={{ color: '#3b82f6' }} />;
+        return <FiInfo size={48} style={{ color: '#d4af37' }} />;
     }
   };
 
   const getHeaderColor = () => {
     switch (type) {
       case 'success':
-        return '#10b981';
+        return '#d4af37';
       case 'error':
         return '#ef4444';
       case 'warning':
@@ -91,10 +91,11 @@ function NotificationModal({
           }}
         >
           <h2 style={{
-            color: '#1a1a1a',
+            color: '#ffffff',
             fontSize: '18px',
             fontWeight: '600',
-            margin: 0
+            margin: 0,
+            textShadow: '0 1px 2px rgba(0,0,0,0.1)'
           }}>
             {title || (type === 'success' ? 'Success' : type === 'error' ? 'Error' : type === 'warning' ? 'Warning' : type === 'confirm' ? 'Confirm' : 'Information')}
           </h2>
@@ -128,10 +129,11 @@ function NotificationModal({
           </div>
           <p style={{
             fontSize: '15px',
-            color: '#4b5563',
+            color: '#1f2937',
             lineHeight: '1.6',
             margin: 0,
-            whiteSpace: 'pre-line'
+            whiteSpace: 'pre-line',
+            fontWeight: '500'
           }}>
             {message}
           </p>
