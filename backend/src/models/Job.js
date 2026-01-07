@@ -302,7 +302,7 @@ jobSchema.index({ scheduledDate: 1 });
 jobSchema.index({ 'costs.finalTotal': -1 }); // For sorting by payment amount
 
 // Pre-save middleware to calculate totals
-jobSchema.pre('save', function(next) {
+jobSchema.pre('save', function() {
   // Calculate quoted costs totals
   this.costs.laborTotal = this.costs.laborHours * this.costs.laborRate;
 
@@ -357,8 +357,6 @@ jobSchema.pre('save', function(next) {
   // Calculate payment balance
   this.payment.balance = this.costs.finalTotal - this.payment.amountPaid;
   this.payment.paidInFull = this.payment.balance <= 0;
-
-  next();
 });
 
 // Method to generate job number
