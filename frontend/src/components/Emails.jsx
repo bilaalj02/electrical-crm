@@ -13,6 +13,7 @@ function Emails() {
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [showComposeModal, setShowComposeModal] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
   const [composeData, setComposeData] = useState({
     fromAccount: '',
     to: '',
@@ -826,26 +827,61 @@ function Emails() {
               <button
                 type="button"
                 className="btn-primary"
-                onClick={() => {
-                  // TODO: Implement send email functionality
-                  alert('Email sending functionality will be implemented soon!');
-                  setShowComposeModal(false);
-                  setComposeData({ fromAccount: '', to: '', cc: '', subject: '', body: '' });
+                onClick={async () => {
+                  // Validation
+                  if (!composeData.fromAccount) {
+                    alert('Please select an email account to send from');
+                    return;
+                  }
+                  if (!composeData.to) {
+                    alert('Please enter a recipient email address');
+                    return;
+                  }
+                  if (!composeData.subject) {
+                    alert('Please enter an email subject');
+                    return;
+                  }
+                  if (!composeData.body) {
+                    alert('Please enter an email body');
+                    return;
+                  }
+
+                  setSendingEmail(true);
+                  try {
+                    await axios.post(`${API_URL}/emails/send`, {
+                      accountId: composeData.fromAccount,
+                      to: composeData.to,
+                      cc: composeData.cc,
+                      subject: composeData.subject,
+                      body: composeData.body
+                    });
+
+                    alert('Email sent successfully!');
+                    setShowComposeModal(false);
+                    setComposeData({ fromAccount: '', to: '', cc: '', subject: '', body: '' });
+                  } catch (error) {
+                    console.error('Error sending email:', error);
+                    alert(`Failed to send email: ${error.response?.data?.details || error.message}`);
+                  } finally {
+                    setSendingEmail(false);
+                  }
                 }}
+                disabled={sendingEmail}
                 style={{
                   padding: '10px 24px',
-                  background: '#d4af37',
+                  background: sendingEmail ? '#9e9e9e' : '#d4af37',
                   border: 'none',
                   borderRadius: '8px',
                   color: 'white',
                   fontWeight: '600',
-                  cursor: 'pointer',
+                  cursor: sendingEmail ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px'
+                  gap: '8px',
+                  opacity: sendingEmail ? 0.7 : 1
                 }}
               >
-                <FiSend /> Send
+                <FiSend /> {sendingEmail ? 'Sending...' : 'Send'}
               </button>
             </div>
           </div>
