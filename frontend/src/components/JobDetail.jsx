@@ -1,6 +1,13 @@
+import { useState } from 'react';
+import axios from 'axios';
 import { FiX, FiEdit, FiTrash2, FiDollarSign, FiCalendar, FiAlertCircle } from 'react-icons/fi';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+
 function JobDetail({ job, onClose, onEdit, onDelete, onEnterExpenses }) {
+  const [syncingCalendar, setSyncingCalendar] = useState(false);
+  const [calendarMessage, setCalendarMessage] = useState('');
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -15,6 +22,62 @@ function JobDetail({ job, onClose, onEdit, onDelete, onEnterExpenses }) {
       day: 'numeric',
       year: 'numeric'
     });
+  };
+
+  const syncToCalendar = async () => {
+    if (!job.scheduledDate) {
+      setCalendarMessage('Please set a scheduled date first');
+      setTimeout(() => setCalendarMessage(''), 3000);
+      return;
+    }
+
+    setSyncingCalendar(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        `${API_URL}/automation/sync-to-calendar/${job._id}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.success) {
+        setCalendarMessage('Synced to Google Calendar!');
+        setTimeout(() => setCalendarMessage(''), 3000);
+
+        // Open the calendar event in a new tab
+        if (response.data.eventLink) {
+          window.open(response.data.eventLink, '_blank');
+        }
+      }
+    } catch (error) {
+      console.error('Error syncing to calendar:', error);
+      setCalendarMessage(error.response?.data?.message || 'Failed to sync. Make sure you have a Google account connected.');
+      setTimeout(() => setCalendarMessage(''), 5000);
+    } finally {
+      setSyncingCalendar(false);
+    }
+  };
+
+  const removeFromCalendar = async () => {
+    setSyncingCalendar(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.delete(
+        `${API_URL}/automation/remove-from-calendar/${job._id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.success) {
+        setCalendarMessage('Removed from Google Calendar');
+        setTimeout(() => setCalendarMessage(''), 3000);
+      }
+    } catch (error) {
+      console.error('Error removing from calendar:', error);
+      setCalendarMessage(error.response?.data?.message || 'Failed to remove from calendar');
+      setTimeout(() => setCalendarMessage(''), 5000);
+    } finally {
+      setSyncingCalendar(false);
+    }
   };
 
   return (
@@ -54,6 +117,17 @@ function JobDetail({ job, onClose, onEdit, onDelete, onEnterExpenses }) {
                 <span className="label">Phone:</span>
                 <span className="value">{job.client?.phone || 'N/A'}</span>
               </div>
+              {job.client?.address && (
+                <div className="detail-item full-width">
+                  <span className="label">Address:</span>
+                  <span className="value">
+                    {job.client.address.street && `${job.client.address.street}, `}
+                    {job.client.address.city && `${job.client.address.city}, `}
+                    {job.client.address.state && `${job.client.address.state} `}
+                    {job.client.address.zipCode}
+                  </span>
+                </div>
+              )}
             </div>
           </section>
 
@@ -81,6 +155,93 @@ function JobDetail({ job, onClose, onEdit, onDelete, onEnterExpenses }) {
               <div className="detail-item full-width">
                 <span className="label">Description:</span>
                 <p className="value">{job.description}</p>
+              </div>
+            )}
+
+            {/* Calendar Sync Section */}
+            {job.scheduledDate && (
+              <div style={{ marginTop: '16px', padding: '12px', background: '#f9fafb', borderRadius: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <FiCalendar style={{ color: '#d4af37' }} />
+                    <span style={{ fontSize: '14px', color: '#374151', fontWeight: '500' }}>
+                      {job.calendarEventId ? 'Synced to Google Calendar' : 'Sync to Calendar'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    {calendarMessage && (
+                      <span style={{
+                        fontSize: '13px',
+                        color: calendarMessage.includes('Failed') || calendarMessage.includes('Please') ? '#dc2626' : '#10b981',
+                        fontWeight: '500'
+                      }}>
+                        {calendarMessage}
+                      </span>
+                    )}
+                    {job.calendarEventId ? (
+                      <>
+                        <button
+                          onClick={syncToCalendar}
+                          disabled={syncingCalendar}
+                          style={{
+                            padding: '6px 12px',
+                            background: '#6b7280',
+                            border: 'none',
+                            borderRadius: '6px',
+                            color: 'white',
+                            fontSize: '13px',
+                            fontWeight: '500',
+                            cursor: syncingCalendar ? 'not-allowed' : 'pointer',
+                            opacity: syncingCalendar ? 0.7 : 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          <FiCalendar /> {syncingCalendar ? 'Updating...' : 'Update Event'}
+                        </button>
+                        <button
+                          onClick={removeFromCalendar}
+                          disabled={syncingCalendar}
+                          style={{
+                            padding: '6px 12px',
+                            background: '#dc2626',
+                            border: 'none',
+                            borderRadius: '6px',
+                            color: 'white',
+                            fontSize: '13px',
+                            fontWeight: '500',
+                            cursor: syncingCalendar ? 'not-allowed' : 'pointer',
+                            opacity: syncingCalendar ? 0.7 : 1
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={syncToCalendar}
+                        disabled={syncingCalendar}
+                        style={{
+                          padding: '6px 12px',
+                          background: '#d4af37',
+                          border: 'none',
+                          borderRadius: '6px',
+                          color: 'white',
+                          fontSize: '13px',
+                          fontWeight: '500',
+                          cursor: syncingCalendar ? 'not-allowed' : 'pointer',
+                          opacity: syncingCalendar ? 0.7 : 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <FiCalendar /> {syncingCalendar ? 'Adding...' : 'Add to Calendar'}
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </section>

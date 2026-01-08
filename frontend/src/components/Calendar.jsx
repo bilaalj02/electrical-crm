@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FiCalendar, FiChevronLeft, FiChevronRight, FiBriefcase, FiClock, FiDollarSign } from 'react-icons/fi';
+import { FiCalendar, FiChevronLeft, FiChevronRight, FiBriefcase, FiClock, FiDollarSign, FiRefreshCw } from 'react-icons/fi';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
@@ -9,6 +9,8 @@ function Calendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedJob, setSelectedJob] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState('');
 
   const fetchJobs = async () => {
     setLoading(true);
@@ -88,6 +90,83 @@ function Calendar() {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
   };
 
+  const syncAllToCalendar = async () => {
+    setSyncing(true);
+    setSyncMessage('');
+    try {
+      const token = localStorage.getItem('token');
+
+      // Get all scheduled jobs that aren't cancelled
+      const scheduledJobs = jobs.filter(job =>
+        job.scheduledDate && job.status !== 'cancelled'
+      );
+
+      if (scheduledJobs.length === 0) {
+        setSyncMessage('No scheduled jobs to sync');
+        setTimeout(() => setSyncMessage(''), 3000);
+        setSyncing(false);
+        return;
+      }
+
+      const jobIds = scheduledJobs.map(job => job._id);
+
+      const response = await axios.post(
+        `${API_URL}/automation/bulk-sync-calendar`,
+        { jobIds },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.success) {
+        const successCount = response.data.results.success.length;
+        const failCount = response.data.results.failed.length;
+
+        setSyncMessage(
+          `Synced ${successCount} jobs to Google Calendar` +
+          (failCount > 0 ? ` (${failCount} failed)` : '')
+        );
+        setTimeout(() => setSyncMessage(''), 5000);
+
+        // Refresh jobs to get updated calendar event IDs
+        await fetchJobs();
+      }
+    } catch (error) {
+      console.error('Error syncing to calendar:', error);
+      setSyncMessage(
+        error.response?.data?.message ||
+        'Failed to sync. Make sure you have a Google account connected.'
+      );
+      setTimeout(() => setSyncMessage(''), 5000);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const syncJobToCalendar = async (jobId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        `${API_URL}/automation/sync-to-calendar/${jobId}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.success) {
+        setSyncMessage('Job synced to Google Calendar!');
+        setTimeout(() => setSyncMessage(''), 3000);
+        await fetchJobs();
+
+        // Open calendar event if available
+        if (response.data.eventLink) {
+          window.open(response.data.eventLink, '_blank');
+        }
+      }
+    } catch (error) {
+      console.error('Error syncing job:', error);
+      setSyncMessage(error.response?.data?.message || 'Failed to sync job');
+      setTimeout(() => setSyncMessage(''), 5000);
+    }
+  };
+
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const days = getDaysInMonth();
@@ -96,6 +175,31 @@ function Calendar() {
     <div className="calendar-page">
       <div className="page-header">
         <h1><FiCalendar /> Calendar</h1>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          {syncMessage && (
+            <span style={{
+              fontSize: '14px',
+              color: syncMessage.includes('Failed') || syncMessage.includes('No') ? '#dc2626' : '#10b981',
+              fontWeight: '500'
+            }}>
+              {syncMessage}
+            </span>
+          )}
+          <button
+            onClick={syncAllToCalendar}
+            disabled={syncing}
+            className="btn-primary"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              opacity: syncing ? 0.7 : 1
+            }}
+          >
+            <FiRefreshCw className={syncing ? 'spinning' : ''} />
+            {syncing ? 'Syncing...' : 'Sync All to Calendar'}
+          </button>
+        </div>
       </div>
 
       <div className="filters-section" style={{ background: 'linear-gradient(135deg, #fef9e7 0%, #fef5d4 100%)', padding: '20px 24px', borderRadius: '16px', marginBottom: '24px', boxShadow: '0 4px 12px rgba(212, 175, 55, 0.15)', border: '2px solid rgba(212, 175, 55, 0.3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -175,11 +279,51 @@ function Calendar() {
                 </div>
               </div>
               {selectedJob.description && (
-                <div>
+                <div style={{ marginBottom: '16px' }}>
                   <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '4px' }}>Description</div>
                   <div style={{ fontSize: '14px', lineHeight: '1.6' }}>{selectedJob.description}</div>
                 </div>
               )}
+
+              {/* Calendar Sync Status */}
+              <div style={{
+                padding: '12px',
+                background: selectedJob.calendarEventId ? '#d1fae5' : '#fef3c7',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <FiCalendar style={{ color: selectedJob.calendarEventId ? '#10b981' : '#f59e0b' }} />
+                  <span style={{ fontSize: '14px', fontWeight: '500', color: '#374151' }}>
+                    {selectedJob.calendarEventId ? 'Synced to Google Calendar' : 'Not synced to calendar'}
+                  </span>
+                </div>
+                {!selectedJob.calendarEventId && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      syncJobToCalendar(selectedJob._id);
+                    }}
+                    style={{
+                      padding: '6px 12px',
+                      background: '#d4af37',
+                      border: 'none',
+                      borderRadius: '6px',
+                      color: 'white',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <FiCalendar /> Sync Now
+                  </button>
+                )}
+              </div>
             </div>
             <div className="modal-footer">
               <button className="btn-secondary" onClick={() => setSelectedJob(null)}>Close</button>

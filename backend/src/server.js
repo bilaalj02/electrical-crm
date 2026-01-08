@@ -8,6 +8,7 @@ const clientRoutes = require('./routes/clientRoutes');
 const authRoutes = require('./routes/authRoutes');
 const oauthRoutes = require('./routes/oauth');
 const emailApiRoutes = require('./routes/emails');
+const automationRoutes = require('./routes/automation');
 // const emailSyncService = require('./services/emailSyncService'); // Disabled - using new OAuth system
 
 const app = express();
@@ -69,6 +70,7 @@ app.use('/api/jobs', jobRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/oauth', oauthRoutes);
 app.use('/api/email-sync', emailApiRoutes);
+app.use('/api/automation', automationRoutes);
 
 // OAuth callback routes (for future implementation)
 app.get('/auth/gmail/callback', async (req, res) => {

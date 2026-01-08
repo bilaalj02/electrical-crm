@@ -22,6 +22,10 @@ function Emails() {
     subject: '',
     body: ''
   });
+  const [classifyingEmails, setClassifyingEmails] = useState(false);
+  const [extractingJob, setExtractingJob] = useState(false);
+  const [showJobModal, setShowJobModal] = useState(false);
+  const [extractedJobData, setExtractedJobData] = useState(null);
 
   // Notification modal state
   const [notification, setNotification] = useState({
@@ -245,6 +249,105 @@ function Emails() {
     }
   };
 
+  const autoClassifyEmails = async () => {
+    setClassifyingEmails(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        `${API_URL}/automation/auto-classify-emails`,
+        { limit: 50 },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setNotification({
+        isOpen: true,
+        type: 'success',
+        title: 'Classification Complete',
+        message: `Classified ${response.data.results.classified} emails (${response.data.results.workRelated} work-related, ${response.data.results.personal} personal)`,
+        onConfirm: null
+      });
+
+      await fetchEmails();
+      await fetchStats();
+    } catch (error) {
+      console.error('Error auto-classifying emails:', error);
+      setNotification({
+        isOpen: true,
+        type: 'error',
+        title: 'Classification Error',
+        message: error.response?.data?.message || 'Failed to auto-classify emails. Make sure OpenAI API key is configured.',
+        onConfirm: null
+      });
+    } finally {
+      setClassifyingEmails(false);
+    }
+  };
+
+  const extractJobFromEmail = async () => {
+    setExtractingJob(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        `${API_URL}/automation/extract-job/${selectedEmail._id}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.success) {
+        setExtractedJobData(response.data.jobData);
+        setShowJobModal(true);
+      }
+    } catch (error) {
+      console.error('Error extracting job from email:', error);
+      setNotification({
+        isOpen: true,
+        type: 'error',
+        title: 'Extraction Error',
+        message: error.response?.data?.message || 'Failed to extract job details from email.',
+        onConfirm: null
+      });
+    } finally {
+      setExtractingJob(false);
+    }
+  };
+
+  const createJobFromEmail = async (createCalendar = false) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        `${API_URL}/automation/create-job-from-email`,
+        {
+          emailId: selectedEmail._id,
+          jobData: extractedJobData,
+          createCalendarEvent: createCalendar
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.success) {
+        setNotification({
+          isOpen: true,
+          type: 'success',
+          title: 'Job Created',
+          message: `Job ${response.data.job.jobNumber} created successfully!`,
+          onConfirm: null
+        });
+        setShowJobModal(false);
+        setExtractedJobData(null);
+        await fetchEmails();
+      }
+    } catch (error) {
+      console.error('Error creating job from email:', error);
+      setNotification({
+        isOpen: true,
+        type: 'error',
+        title: 'Job Creation Error',
+        message: error.response?.data?.message || 'Failed to create job from email.',
+        onConfirm: null
+      });
+    }
+  };
+
   useEffect(() => {
     fetchEmails();
     fetchStats();
@@ -299,6 +402,16 @@ function Emails() {
           </button>
           <button type="button" onClick={() => setShowComposeModal(true)} className="btn-primary">
             <FiEdit /> Compose
+          </button>
+          <button
+            type="button"
+            onClick={autoClassifyEmails}
+            className="btn-secondary"
+            disabled={classifyingEmails}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <FiFilter className={classifyingEmails ? 'spinning' : ''} />
+            {classifyingEmails ? 'Classifying...' : 'AI Auto-Classify'}
           </button>
           <button type="button" onClick={() => setShowSyncModal(true)} className="btn-sync" disabled={loading || emailAccounts.length === 0}>
             <FiRefreshCw className={loading ? 'spinning' : ''} />
@@ -564,6 +677,32 @@ function Emails() {
               )}
             </div>
             <div className="detail-actions">
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  const replyTo = selectedEmail.from?.email;
+                  const replySubject = selectedEmail.subject?.startsWith('Re:')
+                    ? selectedEmail.subject
+                    : `Re: ${selectedEmail.subject || ''}`;
+
+                  // Find the account this email was received on
+                  const recipientAccount = emailAccounts.find(acc =>
+                    selectedEmail.to?.some(t => t.email === acc.email)
+                  );
+
+                  setComposeData({
+                    fromAccount: recipientAccount?._id || '',
+                    to: replyTo,
+                    cc: '',
+                    subject: replySubject,
+                    body: `\n\n---\nOn ${new Date(selectedEmail.date).toLocaleString()}, ${selectedEmail.from?.name || selectedEmail.from?.email} wrote:\n> ${selectedEmail.body?.text?.split('\n').join('\n> ')}`
+                  });
+                  setShowComposeModal(true);
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
+                <FiSend /> Reply
+              </button>
               <button className="btn" onClick={() => toggleRead(selectedEmail._id, selectedEmail.isRead)}>
                 Mark as {selectedEmail.isRead ? 'Unread' : 'Read'}
               </button>
@@ -576,6 +715,29 @@ function Emails() {
                 <button className="btn" onClick={() => classifyEmail(selectedEmail._id, !selectedEmail.isWorkRelated)}>
                   Reclassify as {selectedEmail.isWorkRelated ? 'Non-Work' : 'Work'}
                 </button>
+              )}
+              {selectedEmail.isWorkRelated && !selectedEmail.linkedJob && (
+                <button
+                  className="btn btn-primary"
+                  onClick={extractJobFromEmail}
+                  disabled={extractingJob}
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                >
+                  <FiPlus />
+                  {extractingJob ? 'Extracting...' : 'Convert to Job'}
+                </button>
+              )}
+              {selectedEmail.linkedJob && (
+                <span style={{
+                  padding: '8px 12px',
+                  background: '#d4af37',
+                  color: 'white',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}>
+                  Linked to Job
+                </span>
               )}
             </div>
           </div>
@@ -1000,6 +1162,268 @@ function Emails() {
                 }}
               >
                 <FiSend /> {sendingEmail ? 'Sending...' : 'Send'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Job Creation Modal */}
+      {showJobModal && extractedJobData && (
+        <div className="modal-overlay" onClick={() => setShowJobModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px' }}>
+            <div className="modal-header">
+              <h2><FiPlus /> Create Job from Email</h2>
+              <button className="icon-btn" onClick={() => setShowJobModal(false)}>×</button>
+            </div>
+            <div className="modal-body" style={{ padding: '24px' }}>
+              <p style={{ marginBottom: '20px', color: '#6b7280' }}>
+                Review the AI-extracted job details and make any necessary edits before creating the job:
+              </p>
+
+              <div style={{ display: 'grid', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500', color: '#374151' }}>
+                    Job Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={extractedJobData.title || ''}
+                    onChange={(e) => setExtractedJobData({ ...extractedJobData, title: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500', color: '#374151' }}>
+                    Description
+                  </label>
+                  <textarea
+                    value={extractedJobData.description || ''}
+                    onChange={(e) => setExtractedJobData({ ...extractedJobData, description: e.target.value })}
+                    rows={4}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontFamily: 'inherit'
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500', color: '#374151' }}>
+                      Customer Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={extractedJobData.customerName || ''}
+                      onChange={(e) => setExtractedJobData({ ...extractedJobData, customerName: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500', color: '#374151' }}>
+                      Customer Email *
+                    </label>
+                    <input
+                      type="email"
+                      value={extractedJobData.customerEmail || ''}
+                      onChange={(e) => setExtractedJobData({ ...extractedJobData, customerEmail: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500', color: '#374151' }}>
+                      Customer Phone
+                    </label>
+                    <input
+                      type="tel"
+                      value={extractedJobData.customerPhone || ''}
+                      onChange={(e) => setExtractedJobData({ ...extractedJobData, customerPhone: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500', color: '#374151' }}>
+                      Priority
+                    </label>
+                    <select
+                      value={extractedJobData.priority || 'medium'}
+                      onChange={(e) => setExtractedJobData({ ...extractedJobData, priority: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="urgent">Urgent</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500', color: '#374151' }}>
+                    Address
+                  </label>
+                  <input
+                    type="text"
+                    value={extractedJobData.address || ''}
+                    onChange={(e) => setExtractedJobData({ ...extractedJobData, address: e.target.value })}
+                    placeholder="Street, City, State ZIP"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500', color: '#374151' }}>
+                      Estimated Hours
+                    </label>
+                    <input
+                      type="number"
+                      value={extractedJobData.estimatedHours || ''}
+                      onChange={(e) => setExtractedJobData({ ...extractedJobData, estimatedHours: parseFloat(e.target.value) || 0 })}
+                      min="0"
+                      step="0.5"
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500', color: '#374151' }}>
+                      Preferred Date
+                    </label>
+                    <input
+                      type="date"
+                      value={extractedJobData.preferredDate ? new Date(extractedJobData.preferredDate).toISOString().split('T')[0] : ''}
+                      onChange={(e) => setExtractedJobData({ ...extractedJobData, preferredDate: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500', color: '#374151' }}>
+                    Notes
+                  </label>
+                  <textarea
+                    value={extractedJobData.notes || ''}
+                    onChange={(e) => setExtractedJobData({ ...extractedJobData, notes: e.target.value })}
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontFamily: 'inherit'
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowJobModal(false)}
+                style={{
+                  padding: '10px 24px',
+                  background: 'white',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '8px',
+                  color: '#374151',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => createJobFromEmail(false)}
+                style={{
+                  padding: '10px 24px',
+                  background: '#6b7280',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: 'white',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Create Job
+              </button>
+              <button
+                onClick={() => createJobFromEmail(true)}
+                style={{
+                  padding: '10px 24px',
+                  background: '#d4af37',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: 'white',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <FiPlus /> Create & Add to Calendar
               </button>
             </div>
           </div>

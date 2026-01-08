@@ -257,6 +257,10 @@ const jobSchema = new mongoose.Schema({
     ref: 'Email'
   }],
 
+  // Google Calendar Integration
+  calendarEventId: String,
+  calendarEventLink: String,
+
   // Documents/Photos
   documents: [{
     name: String,
