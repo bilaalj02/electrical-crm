@@ -172,15 +172,45 @@ function App() {
               </button>
             </div>
           )}
-        </div>
 
-        <div className="sidebar-footer">
           <button
             className="dark-mode-toggle"
             onClick={toggleDarkMode}
             title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
           >
-            {darkMode ? <FiSun /> : <FiMoon />}
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px' }}>
+              {darkMode ? (
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  style={{ display: 'block' }}
+                >
+                  <circle cx="12" cy="12" r="5" stroke="#d4af37" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"></circle>
+                  <line x1="12" y1="1" x2="12" y2="3" stroke="#d4af37" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></line>
+                  <line x1="12" y1="21" x2="12" y2="23" stroke="#d4af37" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></line>
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke="#d4af37" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></line>
+                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke="#d4af37" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></line>
+                  <line x1="1" y1="12" x2="3" y2="12" stroke="#d4af37" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></line>
+                  <line x1="21" y1="12" x2="23" y2="12" stroke="#d4af37" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></line>
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke="#d4af37" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></line>
+                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke="#d4af37" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></line>
+                </svg>
+              ) : (
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  style={{ display: 'block' }}
+                >
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="#d4af37" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"></path>
+                </svg>
+              )}
+            </span>
           </button>
         </div>
       </aside>
@@ -263,7 +293,19 @@ function App() {
         onClick={() => setSummarizerOpen(true)}
         title="View potential job opportunities"
       >
-        <FiBell />
+        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '26px', height: '26px' }}>
+          <svg
+            width="26"
+            height="26"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            style={{ display: 'block' }}
+          >
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="#000000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="#000000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+          </svg>
+        </span>
         {potentialJobsCount > 0 && (
           <span className="notification-badge">{potentialJobsCount}</span>
         )}
