@@ -180,8 +180,7 @@ function App() {
             onClick={toggleDarkMode}
             title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
           >
-            {darkMode ? <FiSun className="sidebar-icon" /> : <FiMoon className="sidebar-icon" />}
-            {sidebarOpen && <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>}
+            {darkMode ? <FiSun /> : <FiMoon />}
           </button>
         </div>
       </aside>
@@ -264,7 +263,7 @@ function App() {
         onClick={() => setSummarizerOpen(true)}
         title="View potential job opportunities"
       >
-        <FiMail />
+        <FiBell />
         {potentialJobsCount > 0 && (
           <span className="notification-badge">{potentialJobsCount}</span>
         )}
