@@ -149,34 +149,26 @@ function App() {
           <button
             className="user-menu-trigger"
             onClick={() => setUserMenuOpen(!userMenuOpen)}
+            title={user?.name || 'User menu'}
           >
             <div className="user-avatar">
               <FiUser />
             </div>
-            {sidebarOpen && (
-              <>
-                <div className="user-info">
-                  <div className="user-name">{user?.name}</div>
-                  <div className="user-role">{user?.role}</div>
-                </div>
-                <FiChevronUp className={`user-menu-arrow ${userMenuOpen ? 'open' : ''}`} />
-              </>
-            )}
           </button>
 
-          {userMenuOpen && sidebarOpen && (
+          {userMenuOpen && (
             <div className="user-dropdown">
               <button className="user-dropdown-item" onClick={() => {
                 setCurrentPage('settings');
                 setUserMenuOpen(false);
               }}>
-                <FiSettings /> Settings
+                <FiSettings /> {sidebarOpen && 'Settings'}
               </button>
               <button className="user-dropdown-item logout" onClick={() => {
                 logout();
                 setUserMenuOpen(false);
               }}>
-                <FiLogOut /> Logout
+                <FiLogOut /> {sidebarOpen && 'Logout'}
               </button>
             </div>
           )}
