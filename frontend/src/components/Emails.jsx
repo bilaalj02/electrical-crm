@@ -3,7 +3,7 @@ import axios from 'axios';
 import { FiMail, FiRefreshCw, FiFilter, FiSearch, FiPlus, FiCheck, FiX, FiEdit, FiSend } from 'react-icons/fi';
 import NotificationModal from './NotificationModal';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 function Emails() {
   const [emails, setEmails] = useState([]);
@@ -26,6 +26,10 @@ function Emails() {
   const [extractingJob, setExtractingJob] = useState(false);
   const [showJobModal, setShowJobModal] = useState(false);
   const [extractedJobData, setExtractedJobData] = useState(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [emailContentWidth, setEmailContentWidth] = useState(null); // null means auto flex
+  const [isResizingContent, setIsResizingContent] = useState(false);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   // Notification modal state
   const [notification, setNotification] = useState({
@@ -383,6 +387,72 @@ function Emails() {
     fetchEmails();
   }, [filters]);
 
+  // Handle email content resize
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isResizingContent) return;
+      e.preventDefault();
+
+      const mainContent = document.querySelector('.main-content');
+      const emailList = document.querySelector('.email-list');
+      if (!mainContent || !emailList) return;
+
+      const containerRect = mainContent.getBoundingClientRect();
+      const sidebarRect = emailList.getBoundingClientRect();
+      const mouseX = e.clientX;
+
+      // Get the bounds
+      const sidebarRight = sidebarRect.right;
+      const containerRight = containerRect.right;
+      const containerLeft = containerRect.left;
+
+      // Calculate the new width based on mouse position
+      // Width extends from mouse to right edge of container
+      let calculatedWidth = containerRight - mouseX;
+
+      // Minimum width
+      const minWidth = 300;
+
+      // Maximum width - from just after sidebar to container right
+      const maxWidth = containerRight - sidebarRight - 10;
+
+      // If calculated width is less than min, use min
+      if (calculatedWidth < minWidth) {
+        calculatedWidth = minWidth;
+      }
+
+      // If calculated width is more than max, use max
+      if (calculatedWidth > maxWidth) {
+        calculatedWidth = maxWidth;
+      }
+
+      console.log('Mouse X:', mouseX, 'Sidebar Right:', sidebarRight, 'Container Right:', containerRight, 'Calculated Width:', calculatedWidth, 'Max Width:', maxWidth);
+
+      setEmailContentWidth(calculatedWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingContent(false);
+    };
+
+    if (isResizingContent) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'ew-resize';
+      document.body.style.userSelect = 'none';
+    } else {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizingContent, sidebarCollapsed]);
+
   const formatDate = (date) => {
     return new Date(date).toLocaleString('en-US', {
       month: 'short',
@@ -394,13 +464,13 @@ function Emails() {
 
   return (
     <div className="emails-page">
-      <div className="page-header">
-        <h1><FiMail /> Unified Inbox</h1>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button type="button" onClick={() => setShowAccountModal(true)} className="btn-primary">
+      <div className="page-header" style={{ padding: '0px 24px 0px 24px', marginBottom: '2px' }}>
+        <h1 style={{ margin: 0, fontSize: '22px' }}><FiMail /> Unified Inbox</h1>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button type="button" onClick={() => setShowAccountModal(true)} className="btn-primary" style={{ padding: '6px 12px', fontSize: '13px' }}>
             <FiPlus /> Connect Account
           </button>
-          <button type="button" onClick={() => setShowComposeModal(true)} className="btn-primary">
+          <button type="button" onClick={() => setShowComposeModal(true)} className="btn-primary" style={{ padding: '6px 12px', fontSize: '13px' }}>
             <FiEdit /> Compose
           </button>
           <button
@@ -408,213 +478,237 @@ function Emails() {
             onClick={autoClassifyEmails}
             className="btn-secondary"
             disabled={classifyingEmails}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '13px' }}
           >
             <FiFilter className={classifyingEmails ? 'spinning' : ''} />
             {classifyingEmails ? 'Classifying...' : 'AI Auto-Classify'}
           </button>
-          <button type="button" onClick={() => setShowSyncModal(true)} className="btn-sync" disabled={loading || emailAccounts.length === 0}>
+          <button type="button" onClick={() => setShowSyncModal(true)} className="btn-sync" disabled={loading || emailAccounts.length === 0} style={{ padding: '6px 12px', fontSize: '13px' }}>
             <FiRefreshCw className={loading ? 'spinning' : ''} />
             {loading ? 'Syncing...' : 'Sync Emails'}
           </button>
         </div>
       </div>
 
-      {/* Connected Accounts Section */}
-      {emailAccounts.length > 0 && (
+      {/* Compact Boxes Row with Collapsible Filters */}
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', paddingLeft: '24px', paddingRight: '24px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        {/* Connected Accounts Box */}
+        {emailAccounts.length > 0 && (
+          <div style={{
+            background: 'linear-gradient(135deg, #fef9e7 0%, #fef5d4 100%)',
+            padding: '12px 16px',
+            borderRadius: '12px',
+            boxShadow: '0 2px 8px rgba(212, 175, 55, 0.15)',
+            border: '1px solid rgba(212, 175, 55, 0.3)',
+            flex: '0 0 auto',
+            maxWidth: '400px'
+          }}>
+            <h3 style={{ margin: '0 0 8px 0', color: '#78350f', fontSize: '12px', fontWeight: '600' }}>
+              Connected ({emailAccounts.length})
+            </h3>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {emailAccounts.map((account) => (
+                <div key={account._id} style={{
+                  background: 'white',
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '11px'
+                }}>
+                  <FiCheck style={{ color: '#10b981', fontSize: '10px' }} />
+                  <span style={{ fontWeight: '500', color: '#1f2937' }}>{account.email.split('@')[0]}</span>
+                  <button
+                    onClick={() => syncAccountEmails(account._id)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '2px',
+                      color: '#3b82f6',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                    title="Sync this account"
+                  >
+                    <FiRefreshCw size={10} />
+                  </button>
+                  <button
+                    onClick={() => disconnectAccount(account._id)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '2px',
+                      color: '#ef4444',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                    title="Disconnect account"
+                  >
+                    <FiX size={10} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Filters Box - Collapsible */}
         <div style={{
           background: 'linear-gradient(135deg, #fef9e7 0%, #fef5d4 100%)',
-          padding: '16px 24px',
+          padding: '8px 12px',
           borderRadius: '12px',
-          marginBottom: '20px',
           boxShadow: '0 2px 8px rgba(212, 175, 55, 0.15)',
-          border: '1px solid rgba(212, 175, 55, 0.3)'
+          border: '1px solid rgba(212, 175, 55, 0.3)',
+          flex: '1 1 auto',
+          minWidth: filtersExpanded ? '500px' : 'auto'
         }}>
-          <h3 style={{ margin: '0 0 12px 0', color: '#78350f', fontSize: '14px', fontWeight: '600' }}>
-            Connected Email Accounts ({emailAccounts.length})
-          </h3>
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            {emailAccounts.map((account) => (
-              <div key={account._id} style={{
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: filtersExpanded ? '8px' : '0' }}>
+            <h3 style={{ margin: 0, color: '#78350f', fontSize: '12px', fontWeight: '600' }}>
+              <FiFilter style={{ marginRight: '6px' }} />
+              Filters & Search
+            </h3>
+            <button
+              onClick={() => setFiltersExpanded(!filtersExpanded)}
+              style={{
                 background: 'white',
-                padding: '10px 16px',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-              }}>
-                <FiCheck style={{ color: '#10b981' }} />
-                <span style={{ fontSize: '14px', fontWeight: '500', color: '#1f2937' }}>{account.email}</span>
-                <span style={{
-                  fontSize: '11px',
-                  background: '#eff6ff',
-                  color: '#3b82f6',
-                  padding: '2px 8px',
-                  borderRadius: '4px',
-                  textTransform: 'uppercase',
-                  fontWeight: '600'
-                }}>{account.provider}</span>
-                <button
-                  onClick={() => syncAccountEmails(account._id)}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '4px',
-                    color: '#3b82f6'
-                  }}
-                  title="Sync this account"
-                >
-                  <FiRefreshCw size={14} />
-                </button>
-                <button
-                  onClick={() => disconnectAccount(account._id)}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '4px',
-                    color: '#ef4444'
-                  }}
-                  title="Disconnect account"
-                >
-                  <FiX size={14} />
-                </button>
-              </div>
-            ))}
+                border: 'none',
+                borderRadius: '6px',
+                padding: '4px 8px',
+                cursor: 'pointer',
+                fontSize: '11px',
+                fontWeight: '600',
+                color: '#78350f'
+              }}
+            >
+              {filtersExpanded ? '▲' : '▼'}
+            </button>
           </div>
-        </div>
-      )}
-
-      {stats && (
-        <div className="stats-bar">
-          <div className="stat">
-            <span className="stat-label">Total</span>
-            <span className="stat-value">{stats.total}</span>
+          {filtersExpanded && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px' }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', color: '#78350f', fontSize: '11px' }}>Search</label>
+              <input
+                type="text"
+                placeholder="Search..."
+                value={filters.search}
+                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '6px 8px',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  outline: 'none',
+                  background: 'white',
+                  color: '#333'
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', color: '#78350f', fontSize: '11px' }}>Account</label>
+              <select
+                value={filters.accountType}
+                onChange={(e) => setFilters({ ...filters, accountType: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '6px 8px',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  outline: 'none',
+                  background: 'white',
+                  color: '#333',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="">All</option>
+                <option value="gmail">Gmail</option>
+                <option value="microsoft">Microsoft</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', color: '#78350f', fontSize: '11px' }}>Type</label>
+              <select
+                value={filters.isWorkRelated}
+                onChange={(e) => setFilters({ ...filters, isWorkRelated: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '6px 8px',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  outline: 'none',
+                  background: 'white',
+                  color: '#333',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="">All</option>
+                <option value="inbox">Inbox</option>
+                <option value="sent">Sent</option>
+                <option value="true">Work</option>
+                <option value="false">Personal</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', color: '#78350f', fontSize: '11px' }}>Status</label>
+              <select
+                value={filters.isRead}
+                onChange={(e) => setFilters({ ...filters, isRead: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '6px 8px',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  outline: 'none',
+                  background: 'white',
+                  color: '#333',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="">All</option>
+                <option value="false">Unread</option>
+                <option value="true">Read</option>
+              </select>
+            </div>
           </div>
-          <div className="stat">
-            <span className="stat-label">Unread</span>
-            <span className="stat-value unread">{stats.unread}</span>
-          </div>
-          <div className="stat">
-            <span className="stat-label">Work</span>
-            <span className="stat-value work">{stats.workRelated}</span>
-          </div>
-          <div className="stat">
-            <span className="stat-label">Not Classified</span>
-            <span className="stat-value">{stats.notClassified}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Filters */}
-      <div className="filters-section" style={{
-        background: 'linear-gradient(135deg, #fef9e7 0%, #fef5d4 100%)',
-        padding: '24px',
-        borderRadius: '16px',
-        marginBottom: '24px',
-        boxShadow: '0 4px 12px rgba(212, 175, 55, 0.15)',
-        border: '2px solid rgba(212, 175, 55, 0.3)',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px'
-      }}>
-        <div>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>Search</label>
-          <input
-            type="text"
-            placeholder="Search emails..."
-            value={filters.search}
-            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              border: 'none',
-              borderRadius: '12px',
-              fontSize: '14px',
-              outline: 'none',
-              background: 'white',
-              color: '#333',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-            }}
-          />
-        </div>
-        <div>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>Account</label>
-          <select
-            value={filters.accountType}
-            onChange={(e) => setFilters({ ...filters, accountType: e.target.value })}
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              border: 'none',
-              borderRadius: '12px',
-              fontSize: '14px',
-              outline: 'none',
-              background: 'white',
-              color: '#333',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              cursor: 'pointer'
-            }}
-          >
-            <option value="">All Accounts</option>
-            <option value="gmail">Gmail</option>
-            <option value="microsoft">Microsoft</option>
-          </select>
-        </div>
-        <div>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>Type</label>
-          <select
-            value={filters.isWorkRelated}
-            onChange={(e) => setFilters({ ...filters, isWorkRelated: e.target.value })}
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              border: 'none',
-              borderRadius: '12px',
-              fontSize: '14px',
-              outline: 'none',
-              background: 'white',
-              color: '#333',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              cursor: 'pointer'
-            }}
-          >
-            <option value="">All Emails</option>
-            <option value="inbox">Inbox</option>
-            <option value="sent">Sent</option>
-            <option value="true">Work Related</option>
-            <option value="false">Non-Work</option>
-          </select>
-        </div>
-        <div>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>Status</label>
-          <select
-            value={filters.isRead}
-            onChange={(e) => setFilters({ ...filters, isRead: e.target.value })}
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              border: 'none',
-              borderRadius: '12px',
-              fontSize: '14px',
-              outline: 'none',
-              background: 'white',
-              color: '#333',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              cursor: 'pointer'
-            }}
-          >
-            <option value="">Read & Unread</option>
-            <option value="false">Unread Only</option>
-            <option value="true">Read Only</option>
-          </select>
+          )}
         </div>
       </div>
 
-      <div className="main-content">
-        <div className="email-list">
+      <div className="main-content" style={{ position: 'relative' }}>
+        <div className="email-list" style={{ width: sidebarCollapsed ? '200px' : '400px', position: 'relative', flexShrink: 0, transition: 'width 0.3s ease' }}>
+          {/* Collapse/Expand button */}
+          <button
+            onClick={() => {
+              setSidebarCollapsed(!sidebarCollapsed);
+              // Don't reset email content width - maintain it when toggling
+            }}
+            style={{
+              position: 'absolute',
+              top: '10px',
+              right: '10px',
+              background: '#d4af37',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '6px 10px',
+              cursor: 'pointer',
+              color: 'white',
+              fontSize: '12px',
+              fontWeight: '600',
+              zIndex: 10,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {sidebarCollapsed ? '▶' : '◀'}
+          </button>
           {loading && emails.length === 0 ? (
             <div className="loading">Loading emails...</div>
           ) : emails.length === 0 ? (
@@ -624,41 +718,102 @@ function Emails() {
               <p className="hint">Click "Sync Emails" to fetch your emails</p>
             </div>
           ) : (
-            emails.map((email) => (
-              <div
-                key={email._id}
-                className={`email-item ${!email.isRead ? 'unread' : ''} ${selectedEmail?._id === email._id ? 'selected' : ''}`}
-                onClick={() => setSelectedEmail(email)}
-              >
-                <div className="email-header">
-                  <div className="email-from">{email.from?.name || email.from?.email}</div>
-                  <div className="email-meta">
-                    <span className={`badge ${email.accountType}`}>{email.accountType}</span>
-                    <span className="email-date">{formatDate(email.date)}</span>
+            emails.map((email) => {
+              const isNarrow = sidebarCollapsed;
+              return (
+                <div
+                  key={email._id}
+                  className={`email-item ${!email.isRead ? 'unread' : ''} ${selectedEmail?._id === email._id ? 'selected' : ''}`}
+                  onClick={() => setSelectedEmail(email)}
+                  style={{ padding: isNarrow ? '10px 8px' : undefined }}
+                >
+                  <div className="email-header">
+                    <div className="email-from" style={{ fontSize: isNarrow ? '13px' : undefined }}>
+                      {isNarrow
+                        ? (email.from?.name?.split(' ')[0] || email.from?.email?.split('@')[0])
+                        : (email.from?.name || email.from?.email)
+                      }
+                    </div>
+                    <div className="email-meta">
+                      {!isNarrow && <span className={`badge ${email.accountType}`}>{email.accountType}</span>}
+                      <span className="email-date" style={{ fontSize: isNarrow ? '11px' : undefined }}>
+                        {formatDate(email.date)}
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <div className="email-subject">{email.subject || '(No Subject)'}</div>
-                <div className="email-preview">{email.body?.text?.substring(0, 100)}...</div>
-                <div className="email-actions">
-                  {email.isWorkRelated === null && (
+                  <div className="email-subject" style={{ fontSize: isNarrow ? '12px' : undefined }}>
+                    {email.subject || '(No Subject)'}
+                  </div>
+                  {!isNarrow && (
                     <>
-                      <button className="btn-classify work" onClick={(e) => { e.stopPropagation(); classifyEmail(email._id, true); }}>Work</button>
-                      <button className="btn-classify non-work" onClick={(e) => { e.stopPropagation(); classifyEmail(email._id, false); }}>Non-Work</button>
+                      <div className="email-preview">{email.body?.text?.substring(0, 100)}...</div>
+                      <div className="email-actions">
+                        {email.isWorkRelated === null && (
+                          <>
+                            <button className="btn-classify work" onClick={(e) => { e.stopPropagation(); classifyEmail(email._id, true); }}>Work</button>
+                            <button className="btn-classify non-work" onClick={(e) => { e.stopPropagation(); classifyEmail(email._id, false); }}>Non-Work</button>
+                          </>
+                        )}
+                        {email.isWorkRelated !== null && (
+                          <span className={`classification ${email.isWorkRelated ? 'work' : 'non-work'}`}>
+                            {email.isWorkRelated ? '💼 Work' : '📧 Personal'}
+                          </span>
+                        )}
+                      </div>
                     </>
                   )}
-                  {email.isWorkRelated !== null && (
-                    <span className={`classification ${email.isWorkRelated ? 'work' : 'non-work'}`}>
-                      {email.isWorkRelated ? '💼 Work' : '📧 Personal'}
-                    </span>
-                  )}
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
         {selectedEmail && (
-          <div className="email-detail">
+          <div
+            className="email-detail"
+            style={{
+              width: emailContentWidth ? `${emailContentWidth}px` : 'auto',
+              minWidth: emailContentWidth ? `${emailContentWidth}px` : undefined,
+              maxWidth: emailContentWidth ? `${emailContentWidth}px` : undefined,
+              flex: emailContentWidth ? '0 0 auto' : 1,
+              display: 'flex',
+              flexDirection: 'column',
+              height: '100%',
+              overflow: 'hidden',
+              position: 'absolute',
+              right: 0,
+              top: 0
+            }}
+          >
+            {/* Resize handle for email content - on the left edge closest to sidebar */}
+            <div
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setIsResizingContent(true);
+              }}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '10px',
+                height: '100%',
+                cursor: 'ew-resize',
+                background: isResizingContent ? '#d4af37' : 'transparent',
+                transition: 'background 0.2s',
+                zIndex: 10,
+                borderLeft: '3px solid rgba(212, 175, 55, 0.4)'
+              }}
+              onMouseEnter={(e) => {
+                if (!isResizingContent) {
+                  e.target.style.background = 'rgba(212, 175, 55, 0.3)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isResizingContent) {
+                  e.target.style.background = 'transparent';
+                }
+              }}
+            />
             <div className="detail-header">
               <h2>{selectedEmail.subject || '(No Subject)'}</h2>
               <button className="btn-close" onClick={() => setSelectedEmail(null)}>×</button>
@@ -669,11 +824,21 @@ function Emails() {
               <div className="meta-row"><strong>Date:</strong> {new Date(selectedEmail.date).toLocaleString()}</div>
               <div className="meta-row"><strong>Account:</strong> <span className={`badge ${selectedEmail.accountType}`}>{selectedEmail.accountType}</span></div>
             </div>
-            <div className="detail-body">
+            <div className="detail-body" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               {selectedEmail.body?.html ? (
-                <iframe srcDoc={selectedEmail.body.html} title="Email content" className="email-html" />
+                <iframe
+                  srcDoc={selectedEmail.body.html}
+                  title="Email content"
+                  className="email-html"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    border: 'none',
+                    overflow: 'auto'
+                  }}
+                />
               ) : (
-                <pre>{selectedEmail.body?.text}</pre>
+                <pre style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word', margin: 0, flex: 1, overflow: 'auto' }}>{selectedEmail.body?.text}</pre>
               )}
             </div>
             <div className="detail-actions">

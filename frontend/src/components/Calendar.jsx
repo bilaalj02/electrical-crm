@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FiCalendar, FiChevronLeft, FiChevronRight, FiBriefcase, FiClock, FiDollarSign, FiRefreshCw } from 'react-icons/fi';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 function Calendar() {
   const [jobs, setJobs] = useState([]);
@@ -185,6 +185,32 @@ function Calendar() {
               {syncMessage}
             </span>
           )}
+          <button
+            onClick={() => alert('Google Calendar integration coming soon! This will allow you to sync jobs to your Google Calendar.')}
+            className="btn-secondary"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+            title="Connect Google Calendar"
+          >
+            <FiCalendar />
+            Connect Google
+          </button>
+          <button
+            onClick={() => alert('Outlook Calendar integration coming soon! This will allow you to sync jobs to your Outlook Calendar.')}
+            className="btn-secondary"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+            title="Connect Outlook Calendar"
+          >
+            <FiCalendar />
+            Connect Outlook
+          </button>
           <button
             onClick={syncAllToCalendar}
             disabled={syncing}
