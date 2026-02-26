@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FiPlus, FiUpload, FiImage, FiCalendar, FiFolder, FiTrash2, FiEdit2, FiX, FiFileText, FiFilter, FiSearch } from 'react-icons/fi';
 import NotificationModal from './NotificationModal';
+import ProjectDetail from './ProjectDetail';
 import './Projects.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -15,6 +16,7 @@ export default function Projects() {
   const [selectedProject, setSelectedProject] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadProject, setUploadProject] = useState(null);
+  const [viewingProject, setViewingProject] = useState(null);
 
   // Notification modal
   const [notification, setNotification] = useState({
@@ -348,6 +350,16 @@ export default function Projects() {
     return <div className="loading">Loading projects...</div>;
   }
 
+  // If viewing a project detail, show ProjectDetail component
+  if (viewingProject) {
+    return (
+      <ProjectDetail
+        projectId={viewingProject}
+        onBack={() => setViewingProject(null)}
+      />
+    );
+  }
+
   return (
     <div className="projects-container">
       <div className="projects-header">
@@ -517,7 +529,7 @@ export default function Projects() {
             <div
               key={project._id}
               className="project-card"
-              onClick={() => openProjectModal(project)}
+              onClick={() => setViewingProject(project._id)}
             >
               <div className="project-card-header">
                 {project.photos && project.photos.length > 0 ? (

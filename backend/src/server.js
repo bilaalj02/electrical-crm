@@ -9,6 +9,9 @@ const authRoutes = require('./routes/authRoutes');
 const oauthRoutes = require('./routes/oauth');
 const emailApiRoutes = require('./routes/emails');
 const automationRoutes = require('./routes/automation');
+const invitationRoutes = require('./routes/invitationRoutes');
+const projectRoutes = require('./routes/projectRoutes');
+const photoRoutes = require('./routes/photoRoutes');
 // const emailSyncService = require('./services/emailSyncService'); // Disabled - using new OAuth system
 
 const app = express();
@@ -76,6 +79,12 @@ app.use('/api/clients', clientRoutes);
 app.use('/api/oauth', oauthRoutes);
 app.use('/api/email-sync', emailApiRoutes);
 app.use('/api/automation', automationRoutes);
+app.use('/api/invitations', invitationRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/photos', photoRoutes);
+
+// Serve uploaded files
+app.use('/uploads', express.static('uploads'));
 
 // OAuth callback routes (for future implementation)
 app.get('/auth/gmail/callback', async (req, res) => {
