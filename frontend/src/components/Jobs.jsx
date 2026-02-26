@@ -190,57 +190,20 @@ function Jobs() {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="filters-section" style={{
-        background: 'linear-gradient(135deg, #fef9e7 0%, #fef5d4 100%)',
-        padding: '24px',
-        borderRadius: '16px',
-        marginBottom: '24px',
-        boxShadow: '0 4px 12px rgba(212, 175, 55, 0.15)',
-        border: '2px solid rgba(212, 175, 55, 0.3)',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px'
-      }}>
-        <div>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>Search</label>
-          <input
-            type="text"
-            placeholder="Search jobs..."
-            value={filters.search}
-            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              border: 'none',
-              borderRadius: '12px',
-              fontSize: '14px',
-              outline: 'none',
-              background: 'white',
-              color: '#333',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-            }}
-          />
-        </div>
-
-        <div>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>Status</label>
-          <select
-            value={filters.status}
-            onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              border: 'none',
-              borderRadius: '12px',
-              fontSize: '14px',
-              outline: 'none',
-              background: 'white',
-              color: '#333',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              cursor: 'pointer'
-            }}
-          >
+      {/* Minimal Filters */}
+      <div className="minimal-filters">
+        <input
+          type="text"
+          placeholder="🔍 Search jobs..."
+          value={filters.search}
+          onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+          className="minimal-filter-input"
+        />
+        <select
+          value={filters.status}
+          onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+          className="minimal-filter-select"
+        >
           <option value="">All Status</option>
           <option value="quote">Quote</option>
           <option value="approved">Approved</option>
@@ -250,58 +213,28 @@ function Jobs() {
           <option value="invoiced">Invoiced</option>
           <option value="paid">Paid</option>
           <option value="cancelled">Cancelled</option>
-          </select>
-        </div>
-
-        <div>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>Priority</label>
-          <select
-            value={filters.priority}
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              border: 'none',
-              borderRadius: '12px',
-              fontSize: '14px',
-              outline: 'none',
-              background: 'white',
-              color: '#333',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              cursor: 'pointer'
-            }}
+        </select>
+        <select
+          value={filters.priority}
           onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
+          className="minimal-filter-select"
         >
           <option value="">All Priorities</option>
           <option value="low">Low</option>
           <option value="medium">Medium</option>
           <option value="high">High</option>
           <option value="urgent">Urgent</option>
-          </select>
-        </div>
-
-        <div>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>Sort By</label>
-          <select
-            value={filters.sortBy}
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              border: 'none',
-              borderRadius: '12px',
-              fontSize: '14px',
-              outline: 'none',
-              background: 'white',
-              color: '#333',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              cursor: 'pointer'
-            }}
+        </select>
+        <select
+          value={filters.sortBy}
           onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+          className="minimal-filter-select"
         >
           <option value="scheduledDate">Scheduled Date</option>
           <option value="costs.finalTotal">Payment Amount</option>
           <option value="createdAt">Created Date</option>
-          <option value="priority">Priority</option>          </select>
-        </div>
+          <option value="priority">Priority</option>
+        </select>
       </div>
 
       {/* Jobs List */}

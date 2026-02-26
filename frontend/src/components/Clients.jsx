@@ -129,221 +129,65 @@ function Clients() {
         </button>
       </div>
 
-      {/* Filters Section */}
-      <div className="filters-section" style={{
-        background: 'linear-gradient(135deg, #fef9e7 0%, #fef5d4 100%)',
-        padding: '24px',
-        borderRadius: '16px',
-        marginBottom: '24px',
-        boxShadow: '0 4px 12px rgba(212, 175, 55, 0.15)',
-        border: '2px solid rgba(212, 175, 55, 0.3)',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px'
-      }}>
-        <div>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>Search</label>
-          <input
-            type="text"
-            placeholder="Name, email, company..."
-            value={filters.search}
-            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              border: 'none',
-              borderRadius: '12px',
-              fontSize: '14px',
-              outline: 'none',
-              background: 'white',
-              color: '#333',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-            }}
-          />
-        </div>
-
-        <div>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>Status</label>
-          <select
-            value={filters.status}
-            onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              border: 'none',
-              borderRadius: '12px',
-              fontSize: '14px',
-              outline: 'none',
-              background: 'white',
-              color: '#333',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              cursor: 'pointer'
-            }}
-          >
-            <option value="">All Statuses</option>
-            <option value="new">New</option>
-            <option value="contacted">Contacted</option>
-            <option value="quoted">Quoted</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="prospect">Prospect</option>
-            <option value="won">Won</option>
-            <option value="lost">Lost</option>
-          </select>
-        </div>
-
-        <div>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>Type</label>
-          <select
-            value={filters.clientType}
-            onChange={(e) => setFilters({ ...filters, clientType: e.target.value })}
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              border: 'none',
-              borderRadius: '12px',
-              fontSize: '14px',
-              outline: 'none',
-              background: 'white',
-              color: '#333',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              cursor: 'pointer'
-            }}
-          >
-            <option value="">All Types</option>
-            <option value="residential">Residential</option>
-            <option value="commercial">Commercial</option>
-            <option value="industrial">Industrial</option>
-          </select>
-        </div>
-
-        <div>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>Source</label>
-          <select
-            value={filters.source}
-            onChange={(e) => setFilters({ ...filters, source: e.target.value })}
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              border: 'none',
-              borderRadius: '12px',
-              fontSize: '14px',
-              outline: 'none',
-              background: 'white',
-              color: '#333',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              cursor: 'pointer'
-            }}
-          >
-            <option value="">All Sources</option>
-            <option value="website">Website</option>
-            <option value="referral">Referral</option>
-            <option value="phone">Phone</option>
-            <option value="email">Email</option>
-            <option value="manual">Manual</option>
-          </select>
-        </div>
-
-        <div>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>Service</label>
-          <select
-            value={filters.serviceRequested}
-            onChange={(e) => setFilters({ ...filters, serviceRequested: e.target.value })}
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              border: 'none',
-              borderRadius: '12px',
-              fontSize: '14px',
-              outline: 'none',
-              background: 'white',
-              color: '#333',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              cursor: 'pointer'
-            }}
-          >
-            <option value="">All Services</option>
-            <option value="ev-charging">EV Charging</option>
-            <option value="new-construction">New Construction</option>
-            <option value="smart-home">Smart Home</option>
-            <option value="repair-upgrade">Repair & Upgrade</option>
-            <option value="silver-label">Silver Label</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
-
-        <div>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>From Date</label>
-          <input
-            type="date"
-            value={filters.dateFrom}
-            onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              border: 'none',
-              borderRadius: '12px',
-              fontSize: '14px',
-              outline: 'none',
-              background: 'white',
-              color: '#333',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              cursor: 'pointer'
-            }}
-          />
-        </div>
-
-        <div>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>To Date</label>
-          <input
-            type="date"
-            value={filters.dateTo}
-            onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              border: 'none',
-              borderRadius: '12px',
-              fontSize: '14px',
-              outline: 'none',
-              background: 'white',
-              color: '#333',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              cursor: 'pointer'
-            }}
-          />
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-          <button
-            onClick={clearFilters}
-            style={{
-              padding: '10px 20px',
-              background: 'linear-gradient(135deg, #d4af37, #b8941f)',
-              color: '#000000',
-              border: 'none',
-              borderRadius: '12px',
-              cursor: 'pointer',
-              width: '100%',
-              fontWeight: '700',
-              fontSize: '14px',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 2px 8px rgba(212, 175, 55, 0.3)'
-            }}
-            onMouseOver={(e) => {
-              e.target.style.background = 'linear-gradient(135deg, #b8941f, #9a7a1a)';
-              e.target.style.transform = 'translateY(-2px)';
-              e.target.style.boxShadow = '0 4px 12px rgba(212, 175, 55, 0.5)';
-            }}
-            onMouseOut={(e) => {
-              e.target.style.background = 'linear-gradient(135deg, #d4af37, #b8941f)';
-              e.target.style.transform = 'translateY(0)';
-              e.target.style.boxShadow = '0 2px 8px rgba(212, 175, 55, 0.3)';
-            }}
-          >
-            Clear Filters
-          </button>
-        </div>
+      {/* Minimal Filters */}
+      <div className="minimal-filters">
+        <input
+          type="text"
+          placeholder="🔍 Search clients..."
+          value={filters.search}
+          onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+          className="minimal-filter-input"
+        />
+        <select
+          value={filters.status}
+          onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+          className="minimal-filter-select"
+        >
+          <option value="">All Statuses</option>
+          <option value="new">New</option>
+          <option value="contacted">Contacted</option>
+          <option value="quoted">Quoted</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+          <option value="prospect">Prospect</option>
+          <option value="won">Won</option>
+          <option value="lost">Lost</option>
+        </select>
+        <select
+          value={filters.clientType}
+          onChange={(e) => setFilters({ ...filters, clientType: e.target.value })}
+          className="minimal-filter-select"
+        >
+          <option value="">All Types</option>
+          <option value="residential">Residential</option>
+          <option value="commercial">Commercial</option>
+          <option value="industrial">Industrial</option>
+        </select>
+        <select
+          value={filters.source}
+          onChange={(e) => setFilters({ ...filters, source: e.target.value })}
+          className="minimal-filter-select"
+        >
+          <option value="">All Sources</option>
+          <option value="website">Website</option>
+          <option value="referral">Referral</option>
+          <option value="phone">Phone</option>
+          <option value="email">Email</option>
+          <option value="manual">Manual</option>
+        </select>
+        <select
+          value={filters.serviceRequested}
+          onChange={(e) => setFilters({ ...filters, serviceRequested: e.target.value })}
+          className="minimal-filter-select"
+        >
+          <option value="">All Services</option>
+          <option value="ev-charging">EV Charging</option>
+          <option value="new-construction">New Construction</option>
+          <option value="smart-home">Smart Home</option>
+          <option value="repair-upgrade">Repair & Upgrade</option>
+          <option value="silver-label">Silver Label</option>
+          <option value="other">Other</option>
+        </select>
       </div>
 
       {/* Clients Table */}
