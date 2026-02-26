@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FiMail, FiRefreshCw, FiFilter, FiSearch, FiPlus, FiCheck, FiX, FiEdit, FiSend } from 'react-icons/fi';
+import { FiMail, FiRefreshCw, FiFilter, FiSearch, FiPlus, FiCheck, FiX, FiEdit, FiSend, FiMinus, FiMaximize2 } from 'react-icons/fi';
 import NotificationModal from './NotificationModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -14,6 +14,7 @@ function Emails() {
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [showComposeModal, setShowComposeModal] = useState(false);
+  const [composeMinimized, setComposeMinimized] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [composeData, setComposeData] = useState({
     fromAccount: '',
@@ -47,8 +48,8 @@ function Emails() {
     search: ''
   });
 
-  const fetchEmails = async () => {
-    setLoading(true);
+  const fetchEmails = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const queryParams = new URLSearchParams();
       if (filters.accountType) queryParams.append('accountType', filters.accountType);
@@ -70,7 +71,7 @@ function Emails() {
     } catch (error) {
       console.error('Error fetching emails:', error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -387,6 +388,16 @@ function Emails() {
     fetchEmails();
   }, [filters]);
 
+  // Auto-refresh emails every 10 seconds
+  useEffect(() => {
+    const refreshInterval = setInterval(() => {
+      fetchEmails(true); // Silent refresh without loading state
+      fetchStats(); // Also refresh stats
+    }, 10000); // 10 seconds
+
+    return () => clearInterval(refreshInterval); // Cleanup on unmount
+  }, [filters]); // Re-setup interval when filters change
+
   // Handle email content resize
   useEffect(() => {
     const handleMouseMove = (e) => {
@@ -682,30 +693,13 @@ function Emails() {
 
       <div className="main-content" style={{ position: 'relative' }}>
         <div className="email-list" style={{ width: sidebarCollapsed ? '200px' : '400px', position: 'relative', flexShrink: 0, transition: 'width 0.3s ease' }}>
-          {/* Collapse/Expand button */}
+          {/* Minimalist Toggle */}
           <button
             onClick={() => {
               setSidebarCollapsed(!sidebarCollapsed);
-              // Don't reset email content width - maintain it when toggling
             }}
-            style={{
-              position: 'absolute',
-              top: '10px',
-              right: '10px',
-              background: '#d4af37',
-              border: 'none',
-              borderRadius: '6px',
-              padding: '6px 10px',
-              cursor: 'pointer',
-              color: 'white',
-              fontSize: '12px',
-              fontWeight: '600',
-              zIndex: 10,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}
-            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="email-list-toggle-btn"
+            title={sidebarCollapsed ? "Expand" : "Minimize"}
           >
             {sidebarCollapsed ? '▶' : '◀'}
           </button>
@@ -719,49 +713,60 @@ function Emails() {
             </div>
           ) : (
             emails.map((email) => {
-              const isNarrow = sidebarCollapsed;
+              const isCompact = sidebarCollapsed;
+
+              if (isCompact) {
+                // Compact professional view
+                return (
+                  <div
+                    key={email._id}
+                    className={`email-item-compact ${!email.isRead ? 'unread' : ''} ${selectedEmail?._id === email._id ? 'selected' : ''}`}
+                    onClick={() => setSelectedEmail(email)}
+                  >
+                    <div className="compact-header">
+                      <div className="compact-indicator">
+                        {!email.isRead && <div className="unread-dot"></div>}
+                        {email.isWorkRelated && <div className="work-badge">💼</div>}
+                      </div>
+                      <div className="compact-time">{new Date(email.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</div>
+                    </div>
+                    <div className="compact-from">{email.from?.name?.split(' ')[0] || email.from?.email?.split('@')[0]}</div>
+                    <div className="compact-subject">{(email.subject || 'No Subject').substring(0, 30)}{email.subject?.length > 30 ? '...' : ''}</div>
+                  </div>
+                );
+              }
+
+              // Full view
               return (
                 <div
                   key={email._id}
                   className={`email-item ${!email.isRead ? 'unread' : ''} ${selectedEmail?._id === email._id ? 'selected' : ''}`}
                   onClick={() => setSelectedEmail(email)}
-                  style={{ padding: isNarrow ? '10px 8px' : undefined }}
                 >
                   <div className="email-header">
-                    <div className="email-from" style={{ fontSize: isNarrow ? '13px' : undefined }}>
-                      {isNarrow
-                        ? (email.from?.name?.split(' ')[0] || email.from?.email?.split('@')[0])
-                        : (email.from?.name || email.from?.email)
-                      }
-                    </div>
+                    <div className="email-from">{email.from?.name || email.from?.email}</div>
                     <div className="email-meta">
-                      {!isNarrow && <span className={`badge ${email.accountType}`}>{email.accountType}</span>}
-                      <span className="email-date" style={{ fontSize: isNarrow ? '11px' : undefined }}>
-                        {formatDate(email.date)}
-                      </span>
+                      <span className={`badge ${email.accountType}`}>{email.accountType}</span>
+                      <span className="email-date">{formatDate(email.date)}</span>
                     </div>
                   </div>
-                  <div className="email-subject" style={{ fontSize: isNarrow ? '12px' : undefined }}>
+                  <div className="email-subject">
                     {email.subject || '(No Subject)'}
                   </div>
-                  {!isNarrow && (
-                    <>
-                      <div className="email-preview">{email.body?.text?.substring(0, 100)}...</div>
-                      <div className="email-actions">
-                        {email.isWorkRelated === null && (
-                          <>
-                            <button className="btn-classify work" onClick={(e) => { e.stopPropagation(); classifyEmail(email._id, true); }}>Work</button>
-                            <button className="btn-classify non-work" onClick={(e) => { e.stopPropagation(); classifyEmail(email._id, false); }}>Non-Work</button>
-                          </>
-                        )}
-                        {email.isWorkRelated !== null && (
-                          <span className={`classification ${email.isWorkRelated ? 'work' : 'non-work'}`}>
-                            {email.isWorkRelated ? '💼 Work' : '📧 Personal'}
-                          </span>
-                        )}
-                      </div>
-                    </>
-                  )}
+                  <div className="email-preview">{email.body?.text?.substring(0, 100)}...</div>
+                  <div className="email-actions">
+                    {email.isWorkRelated === null && (
+                      <>
+                        <button className="btn-classify work" onClick={(e) => { e.stopPropagation(); classifyEmail(email._id, true); }}>Work</button>
+                        <button className="btn-classify non-work" onClick={(e) => { e.stopPropagation(); classifyEmail(email._id, false); }}>Non-Work</button>
+                      </>
+                    )}
+                    {email.isWorkRelated !== null && (
+                      <span className={`classification ${email.isWorkRelated ? 'work' : 'non-work'}`}>
+                        {email.isWorkRelated ? '💼 Work' : '📧 Personal'}
+                      </span>
+                    )}
+                  </div>
                 </div>
               );
             })
@@ -1091,151 +1096,95 @@ function Emails() {
         </div>
       )}
 
-      {/* Compose Email Modal */}
+      {/* Gmail-Style Compose Panel */}
       {showComposeModal && (
-        <div className="modal-overlay" onClick={() => setShowComposeModal(false)} style={{ zIndex: 9999 }}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', background: 'white', pointerEvents: 'auto', position: 'relative', zIndex: 10000 }}>
-            <div className="modal-header" style={{ background: 'linear-gradient(135deg, #fef9e7 0%, #fef5d4 100%)', borderBottom: '2px solid #d4af37' }}>
-              <h2 style={{ color: '#1a1a1a', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <FiEdit style={{ color: '#d4af37' }} />
-                Compose Email
-              </h2>
-              <button className="icon-btn" onClick={() => setShowComposeModal(false)} style={{ fontSize: '28px', color: '#6b7280' }}>×</button>
+        <div className={`gmail-compose-panel ${composeMinimized ? 'minimized' : ''}`}>
+          <div className="compose-header">
+            <span className="compose-title">New Message</span>
+            <div className="compose-actions">
+              <button
+                className="compose-icon-btn"
+                onClick={() => setComposeMinimized(!composeMinimized)}
+                title={composeMinimized ? "Maximize" : "Minimize"}
+              >
+                {composeMinimized ? <FiMaximize2 size={14} /> : <FiMinus size={14} />}
+              </button>
+              <button
+                className="compose-icon-btn"
+                onClick={() => {
+                  if (window.confirm('Discard this draft?')) {
+                    setShowComposeModal(false);
+                    setComposeData({ fromAccount: '', to: '', cc: '', subject: '', body: '' });
+                  }
+                }}
+                title="Close"
+              >
+                <FiX size={16} />
+              </button>
             </div>
-            <div className="modal-body" style={{ padding: '24px' }}>
-              <div className="form-group" style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#1a1a1a' }}>From:</label>
+          </div>
+          {!composeMinimized && (
+            <div className="compose-body">
+              <div className="compose-field">
                 <select
+                  className="compose-select"
                   value={composeData.fromAccount}
                   onChange={(e) => setComposeData({...composeData, fromAccount: e.target.value})}
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '8px',
-                    fontSize: '15px',
-                    color: '#1a1a1a',
-                    backgroundColor: 'white',
-                    cursor: 'pointer'
-                  }}
                 >
-                  <option value="">Select email account...</option>
+                  <option value="">From: Select account...</option>
                   {emailAccounts.map((account) => (
                     <option key={account._id} value={account._id}>
-                      {account.email} ({account.provider})
+                      {account.email}
                     </option>
                   ))}
                 </select>
               </div>
-              <div className="form-group" style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#1a1a1a' }}>To:</label>
+              <div className="compose-field">
                 <input
                   type="email"
+                  className="compose-input"
                   value={composeData.to}
                   onChange={(e) => setComposeData({...composeData, to: e.target.value})}
-                  placeholder="recipient@example.com"
+                  placeholder="To"
                   autoComplete="off"
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '8px',
-                    fontSize: '15px',
-                    transition: 'border-color 0.2s',
-                    userSelect: 'text',
-                    pointerEvents: 'auto',
-                    cursor: 'text',
-                    color: '#1a1a1a'
-                  }}
                 />
               </div>
-              <div className="form-group" style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#1a1a1a' }}>CC:</label>
+              <div className="compose-field">
                 <input
                   type="email"
+                  className="compose-input"
                   value={composeData.cc}
                   onChange={(e) => setComposeData({...composeData, cc: e.target.value})}
-                  placeholder="cc@example.com (optional)"
+                  placeholder="Cc"
                   autoComplete="off"
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '8px',
-                    fontSize: '15px',
-                    transition: 'border-color 0.2s',
-                    userSelect: 'text',
-                    pointerEvents: 'auto',
-                    cursor: 'text',
-                    color: '#1a1a1a'
-                  }}
                 />
               </div>
-              <div className="form-group" style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#1a1a1a' }}>Subject:</label>
+              <div className="compose-field">
                 <input
                   type="text"
+                  className="compose-input"
                   value={composeData.subject}
                   onChange={(e) => setComposeData({...composeData, subject: e.target.value})}
-                  placeholder="Email subject"
+                  placeholder="Subject"
                   autoComplete="off"
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '8px',
-                    fontSize: '15px',
-                    transition: 'border-color 0.2s',
-                    userSelect: 'text',
-                    pointerEvents: 'auto',
-                    cursor: 'text',
-                    color: '#1a1a1a'
-                  }}
                 />
               </div>
-              <div className="form-group" style={{ marginBottom: '0' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#1a1a1a' }}>Body:</label>
+              <div className="compose-field compose-textarea-container">
                 <textarea
+                  className="compose-textarea"
                   value={composeData.body}
                   onChange={(e) => setComposeData({...composeData, body: e.target.value})}
                   placeholder="Write your message..."
                   rows="10"
-                  style={{
-                    width: '100%',
-                    minHeight: '200px',
-                    padding: '10px 14px',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '8px',
-                    fontSize: '15px',
-                    resize: 'vertical',
-                    fontFamily: 'inherit',
-                    userSelect: 'text',
-                    pointerEvents: 'auto',
-                    cursor: 'text',
-                    color: '#1a1a1a'
-                  }}
                 />
               </div>
             </div>
-            <div className="modal-footer" style={{ padding: '20px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+          )}
+          {!composeMinimized && (
+            <div className="compose-footer">
               <button
                 type="button"
-                className="btn-secondary"
-                onClick={() => setShowComposeModal(false)}
-                style={{
-                  padding: '10px 24px',
-                  border: '2px solid #e5e7eb',
-                  background: 'white',
-                  borderRadius: '8px',
-                  fontWeight: '600',
-                  cursor: 'pointer'
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn-primary"
+                className="compose-send-btn"
                 onClick={async () => {
                   // Validation
                   if (!composeData.fromAccount) {
@@ -1290,6 +1239,7 @@ function Emails() {
                     });
 
                     setShowComposeModal(false);
+                    setComposeMinimized(false);
                     setComposeData({ fromAccount: '', to: '', cc: '', subject: '', body: '' });
                     setNotification({
                       isOpen: true,
@@ -1312,24 +1262,11 @@ function Emails() {
                   }
                 }}
                 disabled={sendingEmail}
-                style={{
-                  padding: '10px 24px',
-                  background: sendingEmail ? '#9e9e9e' : '#d4af37',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: 'white',
-                  fontWeight: '600',
-                  cursor: sendingEmail ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  opacity: sendingEmail ? 0.7 : 1
-                }}
               >
                 <FiSend /> {sendingEmail ? 'Sending...' : 'Send'}
               </button>
             </div>
-          </div>
+          )}
         </div>
       )}
 
