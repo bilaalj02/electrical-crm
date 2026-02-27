@@ -11,6 +11,7 @@ function Calendar() {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
+  const [toast, setToast] = useState({ show: false, message: '', type: '' });
 
   const fetchJobs = async () => {
     setLoading(true);
@@ -141,6 +142,47 @@ function Calendar() {
     }
   };
 
+  const showToast = (message, type = 'info') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: '' }), 4000);
+  };
+
+  const connectGoogleCalendar = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/oauth/google/auth-url`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.data.authUrl) {
+        // Open OAuth flow in new window
+        window.open(response.data.authUrl, '_blank', 'width=600,height=700');
+        showToast('Please complete the Google Calendar authorization in the new window', 'info');
+      }
+    } catch (error) {
+      console.error('Error connecting Google Calendar:', error);
+      showToast('Failed to connect Google Calendar. Please try again.', 'error');
+    }
+  };
+
+  const connectOutlookCalendar = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/oauth/microsoft/auth-url`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.data.authUrl) {
+        // Open OAuth flow in new window
+        window.open(response.data.authUrl, '_blank', 'width=600,height=700');
+        showToast('Please complete the Outlook Calendar authorization in the new window', 'info');
+      }
+    } catch (error) {
+      console.error('Error connecting Outlook Calendar:', error);
+      showToast('Failed to connect Outlook Calendar. Please try again.', 'error');
+    }
+  };
+
   const syncJobToCalendar = async (jobId) => {
     try {
       const token = localStorage.getItem('token');
@@ -151,8 +193,7 @@ function Calendar() {
       );
 
       if (response.data.success) {
-        setSyncMessage('Job synced to Google Calendar!');
-        setTimeout(() => setSyncMessage(''), 3000);
+        showToast('Job synced to Google Calendar!', 'success');
         await fetchJobs();
 
         // Open calendar event if available
@@ -162,8 +203,7 @@ function Calendar() {
       }
     } catch (error) {
       console.error('Error syncing job:', error);
-      setSyncMessage(error.response?.data?.message || 'Failed to sync job');
-      setTimeout(() => setSyncMessage(''), 5000);
+      showToast(error.response?.data?.message || 'Failed to sync job', 'error');
     }
   };
 
@@ -186,7 +226,7 @@ function Calendar() {
             </span>
           )}
           <button
-            onClick={() => alert('Google Calendar integration coming soon! This will allow you to sync jobs to your Google Calendar.')}
+            onClick={connectGoogleCalendar}
             className="btn-secondary"
             style={{
               display: 'flex',
@@ -199,7 +239,7 @@ function Calendar() {
             Connect Google
           </button>
           <button
-            onClick={() => alert('Outlook Calendar integration coming soon! This will allow you to sync jobs to your Outlook Calendar.')}
+            onClick={connectOutlookCalendar}
             className="btn-secondary"
             style={{
               display: 'flex',
@@ -269,6 +309,55 @@ function Calendar() {
           })}
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {toast.show && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          background: toast.type === 'error' ? '#fee2e2' : toast.type === 'success' ? '#d1fae5' : '#dbeafe',
+          border: `2px solid ${toast.type === 'error' ? '#dc2626' : toast.type === 'success' ? '#10b981' : '#3b82f6'}`,
+          borderRadius: '12px',
+          padding: '16px 20px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          zIndex: 10000,
+          maxWidth: '400px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          animation: 'slideInRight 0.3s ease-out'
+        }}>
+          <div style={{
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            background: toast.type === 'error' ? '#dc2626' : toast.type === 'success' ? '#10b981' : '#3b82f6'
+          }} />
+          <span style={{
+            fontSize: '14px',
+            fontWeight: '500',
+            color: '#374151',
+            flex: 1
+          }}>
+            {toast.message}
+          </span>
+          <button
+            onClick={() => setToast({ show: false, message: '', type: '' })}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '20px',
+              color: '#6b7280',
+              cursor: 'pointer',
+              padding: '0',
+              lineHeight: '1'
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {selectedJob && (
         <div className="modal-overlay" onClick={() => setSelectedJob(null)}>
