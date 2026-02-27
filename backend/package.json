@@ -24,6 +24,7 @@
     "jsonwebtoken": "^9.0.3",
     "mailparser": "^3.9.1",
     "mongoose": "^9.1.1",
+    "multer": "^2.0.2",
     "nodemailer": "^7.0.12",
     "openai": "^6.15.0"
   }
