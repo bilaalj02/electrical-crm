@@ -2,16 +2,24 @@ const express = require('express');
 const router = express.Router();
 const Invitation = require('../models/Invitation');
 const User = require('../models/User');
-const { protect, adminOnly } = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 const GmailService = require('../services/gmailService');
 
 // Initialize Gmail service (using Gmail account 1)
 const gmailService = new GmailService(1);
 
+// Admin check middleware
+const requireAdmin = async (req, res, next) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Access denied. Admin privileges required.' });
+  }
+  next();
+};
+
 // @route   POST /api/invitations
 // @desc    Send employee invitation (admin only)
 // @access  Private/Admin
-router.post('/', protect, adminOnly, async (req, res) => {
+router.post('/', auth, requireAdmin, async (req, res) => {
   try {
     const { email, role } = req.body;
 
@@ -110,7 +118,7 @@ router.post('/', protect, adminOnly, async (req, res) => {
 // @route   GET /api/invitations
 // @desc    Get all invitations (admin only)
 // @access  Private/Admin
-router.get('/', protect, adminOnly, async (req, res) => {
+router.get('/', auth, requireAdmin, async (req, res) => {
   try {
     const invitations = await Invitation.find()
       .populate('invitedBy', 'name email')
@@ -155,7 +163,7 @@ router.get('/verify/:token', async (req, res) => {
 // @route   DELETE /api/invitations/:id
 // @desc    Delete/revoke an invitation (admin only)
 // @access  Private/Admin
-router.delete('/:id', protect, adminOnly, async (req, res) => {
+router.delete('/:id', auth, requireAdmin, async (req, res) => {
   try {
     const invitation = await Invitation.findById(req.params.id);
 
