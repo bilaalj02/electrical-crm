@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Project = require('../models/Project');
 const Job = require('../models/Job');
-const { protect } = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
@@ -44,7 +44,7 @@ const upload = multer({
 // @route   GET /api/projects
 // @desc    Get all projects with filters
 // @access  Private
-router.get('/', protect, async (req, res) => {
+router.get('/', auth, async (req, res) => {
   try {
     const { jobId, status, startDate, endDate, search } = req.query;
     const filter = {};
@@ -87,7 +87,7 @@ router.get('/', protect, async (req, res) => {
 // @route   GET /api/projects/:id
 // @desc    Get single project
 // @access  Private
-router.get('/:id', protect, async (req, res) => {
+router.get('/:id', auth, async (req, res) => {
   try {
     const project = await Project.findById(req.params.id)
       .populate('job')
@@ -116,7 +116,7 @@ router.get('/:id', protect, async (req, res) => {
 // @route   POST /api/projects
 // @desc    Create new project
 // @access  Private
-router.post('/', protect, async (req, res) => {
+router.post('/', auth, async (req, res) => {
   try {
     const { title, description, jobId, projectDate } = req.body;
 
@@ -155,7 +155,7 @@ router.post('/', protect, async (req, res) => {
 // @route   PATCH /api/projects/:id
 // @desc    Update project
 // @access  Private
-router.patch('/:id', protect, async (req, res) => {
+router.patch('/:id', auth, async (req, res) => {
   try {
     const { title, description, projectDate, status } = req.body;
     const updates = {};
@@ -190,7 +190,7 @@ router.patch('/:id', protect, async (req, res) => {
 // @route   POST /api/projects/:id/photos
 // @desc    Upload photos to project
 // @access  Private
-router.post('/:id/photos', protect, upload.array('photos', 10), async (req, res) => {
+router.post('/:id/photos', auth, upload.array('photos', 10), async (req, res) => {
   try {
     const project = await Project.findById(req.params.id);
 
@@ -239,7 +239,7 @@ router.post('/:id/photos', protect, upload.array('photos', 10), async (req, res)
 // @route   DELETE /api/projects/:id/photos/:photoId
 // @desc    Delete a photo from project
 // @access  Private
-router.delete('/:id/photos/:photoId', protect, async (req, res) => {
+router.delete('/:id/photos/:photoId', auth, async (req, res) => {
   try {
     const project = await Project.findById(req.params.id);
 
@@ -276,7 +276,7 @@ router.delete('/:id/photos/:photoId', protect, async (req, res) => {
 // @route   PATCH /api/projects/:id/photos/:photoId
 // @desc    Update photo metadata (caption, tags, etc.)
 // @access  Private
-router.patch('/:id/photos/:photoId', protect, async (req, res) => {
+router.patch('/:id/photos/:photoId', auth, async (req, res) => {
   try {
     const project = await Project.findById(req.params.id);
 
@@ -312,7 +312,7 @@ router.patch('/:id/photos/:photoId', protect, async (req, res) => {
 // @route   POST /api/projects/:id/notes
 // @desc    Add note to project
 // @access  Private
-router.post('/:id/notes', protect, async (req, res) => {
+router.post('/:id/notes', auth, async (req, res) => {
   try {
     const project = await Project.findById(req.params.id);
 
@@ -352,7 +352,7 @@ router.post('/:id/notes', protect, async (req, res) => {
 // @route   PATCH /api/projects/:id/notes/:noteId
 // @desc    Update a note
 // @access  Private
-router.patch('/:id/notes/:noteId', protect, async (req, res) => {
+router.patch('/:id/notes/:noteId', auth, async (req, res) => {
   try {
     const project = await Project.findById(req.params.id);
 
@@ -392,7 +392,7 @@ router.patch('/:id/notes/:noteId', protect, async (req, res) => {
 // @route   DELETE /api/projects/:id/notes/:noteId
 // @desc    Delete a note
 // @access  Private
-router.delete('/:id/notes/:noteId', protect, async (req, res) => {
+router.delete('/:id/notes/:noteId', auth, async (req, res) => {
   try {
     const project = await Project.findById(req.params.id);
 
@@ -424,7 +424,7 @@ router.delete('/:id/notes/:noteId', protect, async (req, res) => {
 // @route   DELETE /api/projects/:id
 // @desc    Delete project
 // @access  Private (Admin only)
-router.delete('/:id', protect, async (req, res) => {
+router.delete('/:id', auth, async (req, res) => {
   try {
     // Only admin can delete projects
     if (req.user.role !== 'admin') {
