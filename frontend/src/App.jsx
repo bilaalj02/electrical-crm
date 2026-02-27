@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import './App.css';
-import { FiMail, FiBriefcase, FiUsers, FiMenu, FiX, FiHome, FiBarChart2, FiSend, FiCalendar, FiChevronDown, FiChevronUp, FiChevronLeft, FiChevronRight, FiPlus, FiUser, FiLogOut, FiSettings, FiMoon, FiSun, FiBell } from 'react-icons/fi';
+import { FiMail, FiBriefcase, FiUsers, FiMenu, FiX, FiHome, FiBarChart2, FiSend, FiCalendar, FiChevronDown, FiChevronUp, FiChevronLeft, FiChevronRight, FiPlus, FiUser, FiLogOut, FiSettings as FiSettingsIcon, FiMoon, FiSun, FiBell, FiFolder } from 'react-icons/fi';
 import { useAuth } from './context/AuthContext';
 import Login from './components/Login';
 import Home from './components/Home';
@@ -11,6 +11,8 @@ import Analytics from './components/Analytics';
 import MarketingOutreach from './components/MarketingOutreach';
 import EmailJobSummarizer from './components/EmailJobSummarizer';
 import Calendar from './components/Calendar';
+import Projects from './components/Projects';
+import Settings from './components/Settings';
 import mesLogo from './assets/mes-logo.png';
 import axios from 'axios';
 
@@ -93,14 +95,17 @@ function App() {
             {sidebarOpen && <span>Home</span>}
           </button>
 
-          <button
-            className={`sidebar-link ${currentPage === 'emails' ? 'active' : ''}`}
-            onClick={() => setCurrentPage('emails')}
-            title="Emails"
-          >
-            <FiMail className="sidebar-icon" />
-            {sidebarOpen && <span>Emails</span>}
-          </button>
+          {/* Admin only pages */}
+          {user?.role === 'admin' && (
+            <button
+              className={`sidebar-link ${currentPage === 'emails' ? 'active' : ''}`}
+              onClick={() => setCurrentPage('emails')}
+              title="Emails"
+            >
+              <FiMail className="sidebar-icon" />
+              {sidebarOpen && <span>Emails</span>}
+            </button>
+          )}
 
           <button
             className={`sidebar-link ${currentPage === 'jobs' ? 'active' : ''}`}
@@ -110,14 +115,19 @@ function App() {
             <FiBriefcase className="sidebar-icon" />
             {sidebarOpen && <span>Jobs</span>}
           </button>
-          <button
-            className={`sidebar-link ${currentPage === 'clients' ? 'active' : ''}`}
-            onClick={() => setCurrentPage('clients')}
-            title="Clients"
-          >
-            <FiUsers className="sidebar-icon" />
-            {sidebarOpen && <span>Clients</span>}
-          </button>
+
+          {/* Admin only pages */}
+          {user?.role === 'admin' && (
+            <button
+              className={`sidebar-link ${currentPage === 'clients' ? 'active' : ''}`}
+              onClick={() => setCurrentPage('clients')}
+              title="Clients"
+            >
+              <FiUsers className="sidebar-icon" />
+              {sidebarOpen && <span>Clients</span>}
+            </button>
+          )}
+
           <button
             className={`sidebar-link ${currentPage === 'calendar' ? 'active' : ''}`}
             onClick={() => setCurrentPage('calendar')}
@@ -126,22 +136,37 @@ function App() {
             <FiCalendar className="sidebar-icon" />
             {sidebarOpen && <span>Calendar</span>}
           </button>
+
           <button
-            className={`sidebar-link ${currentPage === 'analytics' ? 'active' : ''}`}
-            onClick={() => setCurrentPage('analytics')}
-            title="Analytics"
+            className={`sidebar-link ${currentPage === 'projects' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('projects')}
+            title="Projects"
           >
-            <FiBarChart2 className="sidebar-icon" />
-            {sidebarOpen && <span>Analytics</span>}
+            <FiFolder className="sidebar-icon" />
+            {sidebarOpen && <span>Projects</span>}
           </button>
-          <button
-            className={`sidebar-link ${currentPage === 'marketing' ? 'active' : ''}`}
-            onClick={() => setCurrentPage('marketing')}
-            title="Marketing"
-          >
-            <FiSend className="sidebar-icon" />
-            {sidebarOpen && <span>Marketing</span>}
-          </button>
+
+          {/* Admin only pages */}
+          {user?.role === 'admin' && (
+            <>
+              <button
+                className={`sidebar-link ${currentPage === 'analytics' ? 'active' : ''}`}
+                onClick={() => setCurrentPage('analytics')}
+                title="Analytics"
+              >
+                <FiBarChart2 className="sidebar-icon" />
+                {sidebarOpen && <span>Analytics</span>}
+              </button>
+              <button
+                className={`sidebar-link ${currentPage === 'marketing' ? 'active' : ''}`}
+                onClick={() => setCurrentPage('marketing')}
+                title="Marketing"
+              >
+                <FiSend className="sidebar-icon" />
+                {sidebarOpen && <span>Marketing</span>}
+              </button>
+            </>
+          )}
         </nav>
 
         {/* User Menu */}
@@ -158,12 +183,14 @@ function App() {
 
           {userMenuOpen && (
             <div className="user-dropdown">
-              <button className="user-dropdown-item" onClick={() => {
-                setCurrentPage('settings');
-                setUserMenuOpen(false);
-              }}>
-                <FiSettings /> {sidebarOpen && 'Settings'}
-              </button>
+              {user?.role === 'admin' && (
+                <button className="user-dropdown-item" onClick={() => {
+                  setCurrentPage('settings');
+                  setUserMenuOpen(false);
+                }}>
+                  <FiSettingsIcon /> {sidebarOpen && 'Settings'}
+                </button>
+              )}
               <button className="user-dropdown-item logout" onClick={() => {
                 logout();
                 setUserMenuOpen(false);
@@ -255,12 +282,14 @@ function App() {
       <main className={`main-content ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
         <div className="content-wrapper">
           {currentPage === 'home' && <Home />}
-          {currentPage === 'emails' && <Emails />}
+          {currentPage === 'emails' && user?.role === 'admin' && <Emails />}
           {currentPage === 'jobs' && <Jobs />}
-          {currentPage === 'clients' && <Clients />}
+          {currentPage === 'clients' && user?.role === 'admin' && <Clients />}
           {currentPage === 'calendar' && <Calendar />}
-          {currentPage === 'analytics' && <Analytics />}
-          {currentPage === 'marketing' && <MarketingOutreach />}
+          {currentPage === 'projects' && <Projects />}
+          {currentPage === 'analytics' && user?.role === 'admin' && <Analytics />}
+          {currentPage === 'marketing' && user?.role === 'admin' && <MarketingOutreach />}
+          {currentPage === 'settings' && user?.role === 'admin' && <Settings />}
         </div>
       </main>
 
