@@ -16,52 +16,9 @@ const photoRoutes = require('./routes/photoRoutes');
 
 const app = express();
 
-// CORS Configuration
-const allowedOrigins = [
-  'http://localhost:5174',
-  'http://localhost:5175',
-  'http://localhost:5176',
-  'http://localhost:5177',
-  'http://localhost:3000',
-  'https://electrical-crm-beta.vercel.app',
-  'https://meselectrical-crm.vercel.app',
-  'https://meselectrical.vercel.app',
-  'https://electrical-crm-git-main-bilaal-jangikhan-s-projects.vercel.app',
-  process.env.FRONTEND_URL
-].filter(Boolean);
+// Middleware - Enable CORS for all origins (development mode)
+app.use(cors());
 
-const corsOptions = {
-  origin: function (origin, callback) {
-    console.log('CORS request from origin:', origin);
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) {
-      callback(null, true);
-      return;
-    }
-    // Check if origin is in allowed list
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-      return;
-    }
-    // Allow all Vercel preview deployments
-    if (origin.includes('vercel.app')) {
-      callback(null, true);
-      return;
-    }
-    console.log('CORS rejected origin:', origin);
-    callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['Content-Length', 'X-Requested-With'],
-  maxAge: 86400, // 24 hours
-  preflightContinue: false,
-  optionsSuccessStatus: 204
-};
-
-// Middleware
-app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

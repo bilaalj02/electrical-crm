@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FiArrowLeft, FiUpload, FiX, FiEdit2, FiTrash2, FiDownload, FiZoomIn, FiTag, FiFileText, FiCalendar, FiUser, FiImage, FiPlus } from 'react-icons/fi';
+import {
+  FiArrowLeft, FiUpload, FiX, FiEdit2, FiTrash2, FiDownload, FiZoomIn,
+  FiTag, FiFileText, FiCalendar, FiUser, FiImage, FiPlus, FiMessageSquare,
+  FiGrid, FiList, FiClock, FiFilter, FiSearch, FiSend, FiMoreVertical,
+  FiCheckCircle, FiAlertCircle, FiActivity
+} from 'react-icons/fi';
 import './ProjectDetail.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -8,6 +13,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 function ProjectDetail({ projectId, onBack }) {
   const [project, setProject] = useState(null);
   const [photos, setPhotos] = useState([]);
+  const [allPhotos, setAllPhotos] = useState([]); // Store all photos for filtering
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
@@ -15,6 +21,21 @@ function ProjectDetail({ projectId, onBack }) {
   const [editingPhoto, setEditingPhoto] = useState(null);
   const [filterCategory, setFilterCategory] = useState('all');
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [currentView, setCurrentView] = useState('grid'); // 'grid', 'timeline', 'feed'
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Team communication state
+  const [showCommentSection, setShowCommentSection] = useState(true);
+  const [newComment, setNewComment] = useState('');
+  const [comments, setComments] = useState([]);
+
+  // Activity feed state
+  const [activities, setActivities] = useState([]);
+
+  // Before/After comparison
+  const [showBeforeAfter, setShowBeforeAfter] = useState(false);
+  const [selectedBeforePhoto, setSelectedBeforePhoto] = useState(null);
+  const [selectedAfterPhoto, setSelectedAfterPhoto] = useState(null);
 
   // Upload form state
   const [uploadFiles, setUploadFiles] = useState([]);
@@ -23,7 +44,28 @@ function ProjectDetail({ projectId, onBack }) {
   useEffect(() => {
     fetchProjectDetails();
     fetchPhotos();
+    fetchComments();
+    fetchActivities();
   }, [projectId]);
+
+  useEffect(() => {
+    // Filter photos based on category and search
+    let filtered = [...allPhotos];
+
+    if (filterCategory !== 'all') {
+      filtered = filtered.filter(p => p.category === filterCategory);
+    }
+
+    if (searchTerm) {
+      filtered = filtered.filter(p =>
+        p.label?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+    }
+
+    setPhotos(filtered);
+  }, [filterCategory, searchTerm, allPhotos]);
 
   const fetchProjectDetails = async () => {
     try {
@@ -31,7 +73,7 @@ function ProjectDetail({ projectId, onBack }) {
       const response = await axios.get(`${API_URL}/projects/${projectId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setProject(response.data.project);
+      setProject(response.data.project || response.data);
     } catch (error) {
       console.error('Error fetching project:', error);
     }
@@ -41,21 +83,58 @@ function ProjectDetail({ projectId, onBack }) {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const params = filterCategory !== 'all' ? `?category=${filterCategory}` : '';
-      const response = await axios.get(`${API_URL}/photos/project/${projectId}${params}`, {
+      const response = await axios.get(`${API_URL}/photos/project/${projectId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setPhotos(response.data.photos);
+      setAllPhotos(response.data.photos || []);
+      setPhotos(response.data.photos || []);
     } catch (error) {
       console.error('Error fetching photos:', error);
+      setAllPhotos([]);
+      setPhotos([]);
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchComments = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/projects/${projectId}/notes`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setComments(response.data.notes || project?.notes || []);
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+      setComments(project?.notes || []);
+    }
+  };
+
+  const fetchActivities = async () => {
+    // Build activity feed from photos, comments, and project updates
+    const photoActivities = allPhotos.map(photo => ({
+      type: 'photo_upload',
+      timestamp: photo.uploadedAt,
+      user: photo.uploadedBy,
+      data: photo
+    }));
+
+    const commentActivities = (comments || []).map(comment => ({
+      type: 'comment',
+      timestamp: comment.createdAt,
+      user: comment.author,
+      data: comment
+    }));
+
+    const combined = [...photoActivities, ...commentActivities]
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    setActivities(combined);
+  };
+
   useEffect(() => {
-    fetchPhotos();
-  }, [filterCategory]);
+    fetchActivities();
+  }, [allPhotos, comments]);
 
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files);
@@ -67,7 +146,8 @@ function ProjectDetail({ projectId, onBack }) {
       preview: URL.createObjectURL(file),
       label: file.name,
       notes: '',
-      category: 'other'
+      category: 'other',
+      tags: []
     }));
     setUploadPreviews(previews);
     setShowUploadModal(true);
@@ -81,6 +161,7 @@ function ProjectDetail({ projectId, onBack }) {
 
   const removePreview = (index) => {
     const updated = [...uploadPreviews];
+    URL.revokeObjectURL(updated[index].preview);
     updated.splice(index, 1);
     setUploadPreviews(updated);
 
@@ -117,6 +198,7 @@ function ProjectDetail({ projectId, onBack }) {
       setUploadFiles([]);
       setUploadPreviews([]);
       fetchPhotos();
+      fetchActivities();
     } catch (error) {
       console.error('Error uploading photos:', error);
       alert('Failed to upload photos');
@@ -158,6 +240,26 @@ function ProjectDetail({ projectId, onBack }) {
     }
   };
 
+  const handleAddComment = async () => {
+    if (!newComment.trim()) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(`${API_URL}/projects/${projectId}/notes`, {
+        content: newComment
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setNewComment('');
+      fetchComments();
+      fetchActivities();
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      alert('Failed to add comment');
+    }
+  };
+
   const openLightbox = (photo) => {
     setSelectedPhoto(photo);
     setLightboxOpen(true);
@@ -172,19 +274,32 @@ function ProjectDetail({ projectId, onBack }) {
     return API_URL.replace('/api', '');
   };
 
+  const formatDate = (date) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   if (!project) {
     return <div className="loading">Loading project...</div>;
   }
 
   const categories = [
-    { value: 'all', label: 'All Photos' },
-    { value: 'before', label: 'Before' },
-    { value: 'during', label: 'During' },
-    { value: 'after', label: 'After' },
-    { value: 'inspection', label: 'Inspection' },
-    { value: 'documentation', label: 'Documentation' },
-    { value: 'other', label: 'Other' }
+    { value: 'all', label: 'All Photos', icon: FiImage },
+    { value: 'before', label: 'Before', icon: FiAlertCircle },
+    { value: 'during', label: 'During', icon: FiActivity },
+    { value: 'after', label: 'After', icon: FiCheckCircle },
+    { value: 'inspection', label: 'Inspection', icon: FiFileText },
+    { value: 'documentation', label: 'Documentation', icon: FiFileText },
+    { value: 'other', label: 'Other', icon: FiMoreVertical }
   ];
+
+  const beforePhotos = allPhotos.filter(p => p.category === 'before');
+  const afterPhotos = allPhotos.filter(p => p.category === 'after');
 
   return (
     <div className="project-detail-page">
@@ -194,116 +309,352 @@ function ProjectDetail({ projectId, onBack }) {
           <FiArrowLeft /> Back to Projects
         </button>
         <div className="header-content">
-          <h1>{project.name}</h1>
+          <h1>{project.name || project.title}</h1>
           <p className="project-description">{project.description}</p>
           <div className="project-meta">
             <span className="meta-item">
-              <FiCalendar /> Created: {new Date(project.createdAt).toLocaleDateString()}
+              <FiCalendar /> {formatDate(project.createdAt || project.projectDate)}
             </span>
             <span className={`status-badge status-${project.status}`}>
               {project.status}
+            </span>
+            <span className="meta-item">
+              <FiImage /> {allPhotos.length} Photos
+            </span>
+            <span className="meta-item">
+              <FiMessageSquare /> {comments.length} Comments
             </span>
           </div>
         </div>
       </div>
 
-      {/* Photo Gallery Section */}
-      <div className="gallery-section">
-        <div className="gallery-toolbar">
-          <div className="toolbar-left">
-            <h2><FiImage /> Project Photos ({photos.length})</h2>
-            <div className="category-filter">
-              {categories.map(cat => (
-                <button
-                  key={cat.value}
-                  className={`filter-btn ${filterCategory === cat.value ? 'active' : ''}`}
-                  onClick={() => setFilterCategory(cat.value)}
-                >
-                  {cat.label}
-                  {cat.value !== 'all' && (
-                    <span className="count">
-                      ({photos.filter(p => p.category === cat.value).length})
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="toolbar-right">
-            <label className="btn-upload">
-              <FiUpload /> Upload Photos
-              <input
-                type="file"
-                multiple
-                accept="image/*"
-                onChange={handleFileSelect}
-                style={{ display: 'none' }}
-              />
-            </label>
-          </div>
-        </div>
+      {/* View Tabs */}
+      <div className="view-tabs">
+        <button
+          className={`view-tab ${currentView === 'grid' ? 'active' : ''}`}
+          onClick={() => setCurrentView('grid')}
+        >
+          <FiGrid /> Gallery
+        </button>
+        <button
+          className={`view-tab ${currentView === 'timeline' ? 'active' : ''}`}
+          onClick={() => setCurrentView('timeline')}
+        >
+          <FiClock /> Timeline
+        </button>
+        <button
+          className={`view-tab ${currentView === 'feed' ? 'active' : ''}`}
+          onClick={() => setCurrentView('feed')}
+        >
+          <FiActivity /> Activity Feed
+        </button>
+        {beforePhotos.length > 0 && afterPhotos.length > 0 && (
+          <button
+            className={`view-tab ${showBeforeAfter ? 'active' : ''}`}
+            onClick={() => setShowBeforeAfter(!showBeforeAfter)}
+          >
+            <FiCheckCircle /> Before/After
+          </button>
+        )}
+      </div>
 
-        {/* Photo Grid */}
-        {loading ? (
-          <div className="loading">Loading photos...</div>
-        ) : photos.length === 0 ? (
-          <div className="empty-state">
-            <FiImage size={64} />
-            <h3>No photos yet</h3>
-            <p>Upload photos to document your project progress</p>
-            <label className="btn-primary">
-              <FiPlus /> Upload First Photo
-              <input
-                type="file"
-                multiple
-                accept="image/*"
-                onChange={handleFileSelect}
-                style={{ display: 'none' }}
-              />
-            </label>
-          </div>
-        ) : (
-          <div className="photo-grid">
-            {photos.map(photo => (
-              <div key={photo._id} className="photo-card">
-                <div className="photo-thumbnail" onClick={() => openLightbox(photo)}>
-                  <img src={`${getServerUrl()}${photo.url}`} alt={photo.label} />
-                  <div className="photo-overlay">
-                    <FiZoomIn size={24} />
+      {/* Main Content Area */}
+      <div className="detail-content">
+        {/* Left Section - Photos */}
+        <div className="content-main">
+          {showBeforeAfter ? (
+            /* Before/After Comparison */
+            <div className="before-after-section">
+              <h2>Before & After Comparison</h2>
+              <div className="before-after-grid">
+                <div className="before-column">
+                  <h3>Before ({beforePhotos.length})</h3>
+                  <div className="comparison-photos">
+                    {beforePhotos.map(photo => (
+                      <div
+                        key={photo._id}
+                        className={`comparison-photo ${selectedBeforePhoto?._id === photo._id ? 'selected' : ''}`}
+                        onClick={() => setSelectedBeforePhoto(photo)}
+                      >
+                        <img src={`${getServerUrl()}${photo.url}`} alt={photo.label} />
+                        <p>{photo.label}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <div className="photo-info">
-                  <div className="photo-label">{photo.label}</div>
-                  {photo.notes && <div className="photo-notes">{photo.notes}</div>}
-                  <div className="photo-meta">
-                    <span className={`category-badge category-${photo.category}`}>
-                      {photo.category}
-                    </span>
-                    <span className="photo-date">
-                      {new Date(photo.uploadedAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <div className="photo-actions">
-                    <button
-                      className="btn-icon"
-                      onClick={() => setEditingPhoto(photo)}
-                      title="Edit"
-                    >
-                      <FiEdit2 />
-                    </button>
-                    <button
-                      className="btn-icon btn-danger"
-                      onClick={() => handleDeletePhoto(photo._id)}
-                      title="Delete"
-                    >
-                      <FiTrash2 />
-                    </button>
+                <div className="after-column">
+                  <h3>After ({afterPhotos.length})</h3>
+                  <div className="comparison-photos">
+                    {afterPhotos.map(photo => (
+                      <div
+                        key={photo._id}
+                        className={`comparison-photo ${selectedAfterPhoto?._id === photo._id ? 'selected' : ''}`}
+                        onClick={() => setSelectedAfterPhoto(photo)}
+                      >
+                        <img src={`${getServerUrl()}${photo.url}`} alt={photo.label} />
+                        <p>{photo.label}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
-            ))}
+              {selectedBeforePhoto && selectedAfterPhoto && (
+                <div className="comparison-viewer">
+                  <div className="comparison-side">
+                    <h4>Before</h4>
+                    <img src={`${getServerUrl()}${selectedBeforePhoto.url}`} alt="Before" />
+                  </div>
+                  <div className="comparison-side">
+                    <h4>After</h4>
+                    <img src={`${getServerUrl()}${selectedAfterPhoto.url}`} alt="After" />
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : currentView === 'feed' ? (
+            /* Activity Feed */
+            <div className="activity-feed">
+              <h2><FiActivity /> Project Activity</h2>
+              <div className="activities-list">
+                {activities.map((activity, index) => (
+                  <div key={index} className="activity-item">
+                    <div className="activity-icon">
+                      {activity.type === 'photo_upload' ? <FiImage /> : <FiMessageSquare />}
+                    </div>
+                    <div className="activity-content">
+                      <div className="activity-header">
+                        <strong>{activity.user?.name || 'Unknown User'}</strong>
+                        <span className="activity-type">
+                          {activity.type === 'photo_upload' ? 'uploaded a photo' : 'added a comment'}
+                        </span>
+                      </div>
+                      <div className="activity-body">
+                        {activity.type === 'photo_upload' ? (
+                          <div className="activity-photo" onClick={() => openLightbox(activity.data)}>
+                            <img src={`${getServerUrl()}${activity.data.url}`} alt={activity.data.label} />
+                            <p>{activity.data.label}</p>
+                          </div>
+                        ) : (
+                          <p>{activity.data.content}</p>
+                        )}
+                      </div>
+                      <div className="activity-time">
+                        <FiClock /> {formatDate(activity.timestamp)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            /* Photo Gallery/Timeline */
+            <>
+              <div className="gallery-toolbar">
+                <div className="toolbar-left">
+                  <h2><FiImage /> Project Photos ({photos.length})</h2>
+                  <div className="search-bar">
+                    <FiSearch />
+                    <input
+                      type="text"
+                      placeholder="Search photos..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="toolbar-right">
+                  <label className="btn-upload">
+                    <FiUpload /> Upload Photos
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleFileSelect}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="category-filter">
+                {categories.map(cat => {
+                  const Icon = cat.icon;
+                  const count = cat.value === 'all' ? allPhotos.length : allPhotos.filter(p => p.category === cat.value).length;
+                  return (
+                    <button
+                      key={cat.value}
+                      className={`filter-btn ${filterCategory === cat.value ? 'active' : ''}`}
+                      onClick={() => setFilterCategory(cat.value)}
+                    >
+                      <Icon /> {cat.label}
+                      <span className="count">({count})</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {loading ? (
+                <div className="loading">Loading photos...</div>
+              ) : photos.length === 0 ? (
+                <div className="empty-state">
+                  <FiImage size={64} />
+                  <h3>No photos {searchTerm ? 'found' : 'yet'}</h3>
+                  <p>{searchTerm ? 'Try a different search term' : 'Upload photos to document your project progress'}</p>
+                  {!searchTerm && (
+                    <label className="btn-primary">
+                      <FiPlus /> Upload First Photo
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={handleFileSelect}
+                        style={{ display: 'none' }}
+                      />
+                    </label>
+                  )}
+                </div>
+              ) : currentView === 'timeline' ? (
+                /* Timeline View */
+                <div className="timeline-view">
+                  {Object.entries(
+                    photos.reduce((acc, photo) => {
+                      const date = new Date(photo.uploadedAt).toLocaleDateString();
+                      if (!acc[date]) acc[date] = [];
+                      acc[date].push(photo);
+                      return acc;
+                    }, {})
+                  ).map(([date, dayPhotos]) => (
+                    <div key={date} className="timeline-day">
+                      <div className="timeline-date">
+                        <FiCalendar />
+                        <h3>{date}</h3>
+                        <span className="photo-count">{dayPhotos.length} photos</span>
+                      </div>
+                      <div className="timeline-photos">
+                        {dayPhotos.map(photo => (
+                          <div key={photo._id} className="timeline-photo-card">
+                            <div className="photo-thumbnail" onClick={() => openLightbox(photo)}>
+                              <img src={`${getServerUrl()}${photo.url}`} alt={photo.label} />
+                            </div>
+                            <div className="photo-info">
+                              <div className="photo-label">{photo.label}</div>
+                              {photo.notes && <div className="photo-notes">{photo.notes}</div>}
+                              <div className="photo-meta">
+                                <span className={`category-badge category-${photo.category}`}>
+                                  {photo.category}
+                                </span>
+                                <span className="photo-time">
+                                  <FiClock /> {new Date(photo.uploadedAt).toLocaleTimeString()}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                /* Grid View */
+                <div className="photo-grid">
+                  {photos.map(photo => (
+                    <div key={photo._id} className="photo-card">
+                      <div className="photo-thumbnail" onClick={() => openLightbox(photo)}>
+                        <img src={`${getServerUrl()}${photo.url}`} alt={photo.label} />
+                        <div className="photo-overlay">
+                          <FiZoomIn size={24} />
+                        </div>
+                      </div>
+                      <div className="photo-info">
+                        <div className="photo-label">{photo.label}</div>
+                        {photo.notes && <div className="photo-notes">{photo.notes}</div>}
+                        <div className="photo-meta">
+                          <span className={`category-badge category-${photo.category}`}>
+                            {photo.category}
+                          </span>
+                          <span className="photo-date">
+                            {new Date(photo.uploadedAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <div className="photo-actions">
+                          <button
+                            className="btn-icon"
+                            onClick={() => setEditingPhoto(photo)}
+                            title="Edit"
+                          >
+                            <FiEdit2 />
+                          </button>
+                          <button
+                            className="btn-icon btn-danger"
+                            onClick={() => handleDeletePhoto(photo._id)}
+                            title="Delete"
+                          >
+                            <FiTrash2 />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Right Sidebar - Team Communication */}
+        <div className="content-sidebar">
+          <div className="communication-panel">
+            <div className="panel-header">
+              <h3><FiMessageSquare /> Team Communication</h3>
+              <button onClick={() => setShowCommentSection(!showCommentSection)}>
+                {showCommentSection ? <FiX /> : <FiPlus />}
+              </button>
+            </div>
+
+            {showCommentSection && (
+              <>
+                <div className="add-comment">
+                  <textarea
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    placeholder="Add a note or comment..."
+                    rows={3}
+                  />
+                  <button
+                    className="btn-primary btn-send"
+                    onClick={handleAddComment}
+                    disabled={!newComment.trim()}
+                  >
+                    <FiSend /> Send
+                  </button>
+                </div>
+
+                <div className="comments-list">
+                  <h4>Comments ({comments.length})</h4>
+                  {comments.map(comment => (
+                    <div key={comment._id} className="comment-item">
+                      <div className="comment-avatar">
+                        <FiUser />
+                      </div>
+                      <div className="comment-content">
+                        <div className="comment-header">
+                          <strong>{comment.author?.name || 'Unknown'}</strong>
+                          <span className="comment-time">
+                            {formatDate(comment.createdAt)}
+                          </span>
+                        </div>
+                        <p>{comment.content}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {comments.length === 0 && (
+                    <p className="no-comments">No comments yet. Start the conversation!</p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
       {/* Upload Modal */}
@@ -453,7 +804,7 @@ function ProjectDetail({ projectId, onBack }) {
                   {selectedPhoto.category}
                 </span>
                 <span>
-                  <FiCalendar /> {new Date(selectedPhoto.uploadedAt).toLocaleString()}
+                  <FiCalendar /> {formatDate(selectedPhoto.uploadedAt)}
                 </span>
                 <span>
                   <FiUser /> {selectedPhoto.uploadedBy?.name || 'Unknown'}
