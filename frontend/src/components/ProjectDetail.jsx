@@ -44,8 +44,6 @@ function ProjectDetail({ projectId, onBack }) {
   useEffect(() => {
     fetchProjectDetails();
     fetchPhotos();
-    fetchComments();
-    fetchActivities();
   }, [projectId]);
 
   useEffect(() => {
@@ -73,7 +71,10 @@ function ProjectDetail({ projectId, onBack }) {
       const response = await axios.get(`${API_URL}/projects/${projectId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setProject(response.data.project || response.data);
+      const projectData = response.data.project || response.data;
+      setProject(projectData);
+      // Set comments from project data
+      setComments(projectData.notes || []);
     } catch (error) {
       console.error('Error fetching project:', error);
     }
@@ -98,15 +99,16 @@ function ProjectDetail({ projectId, onBack }) {
   };
 
   const fetchComments = async () => {
+    // Re-fetch project to get updated notes
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/projects/${projectId}/notes`, {
+      const response = await axios.get(`${API_URL}/projects/${projectId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setComments(response.data.notes || project?.notes || []);
+      const projectData = response.data.project || response.data;
+      setComments(projectData.notes || []);
     } catch (error) {
       console.error('Error fetching comments:', error);
-      setComments(project?.notes || []);
     }
   };
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FiPlus, FiUpload, FiImage, FiCalendar, FiFolder, FiTrash2, FiEdit2, FiX, FiFileText, FiFilter, FiSearch } from 'react-icons/fi';
+import { FiPlus, FiUpload, FiImage, FiCalendar, FiFolder, FiTrash2, FiEdit2, FiX, FiFileText, FiFilter, FiSearch, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import NotificationModal from './NotificationModal';
 import ProjectDetail from './ProjectDetail';
 import './Projects.css';
@@ -34,6 +34,7 @@ export default function Projects() {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
   const [sortBy, setSortBy] = useState('date-desc'); // 'date-desc', 'date-asc', 'name'
+  const [showFilters, setShowFilters] = useState(false); // Collapsible filters
 
   // Form states
   const [formData, setFormData] = useState({
@@ -372,18 +373,45 @@ export default function Projects() {
       {/* Filters and Search */}
       <div style={{
         background: 'linear-gradient(135deg, #fef9e7 0%, #fef5d4 100%)',
-        padding: '24px',
+        padding: '16px 24px',
         borderRadius: '16px',
         marginBottom: '24px',
         boxShadow: '0 4px 12px rgba(212, 175, 55, 0.15)',
         border: '2px solid rgba(212, 175, 55, 0.3)'
       }}>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px',
-          marginBottom: '16px'
-        }}>
+        {/* Filter Toggle Button */}
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'transparent',
+            border: 'none',
+            padding: '8px 0',
+            cursor: 'pointer',
+            fontSize: '16px',
+            fontWeight: '600',
+            color: '#78350f',
+            marginBottom: showFilters ? '16px' : '0'
+          }}
+        >
+          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <FiFilter /> Filters & Search
+          </span>
+          {showFilters ? <FiChevronUp size={20} /> : <FiChevronDown size={20} />}
+        </button>
+
+        {/* Collapsible Filter Content */}
+        {showFilters && (
+          <>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '16px',
+              marginBottom: '16px'
+            }}>
           <div>
             <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>
               Search
@@ -514,6 +542,8 @@ export default function Projects() {
             List View
           </button>
         </div>
+          </>
+        )}
       </div>
 
       {/* Projects Grid/List */}

@@ -732,10 +732,12 @@
 
 .search-bar input {
   padding: 10px 12px 10px 40px;
-  border: 1px solid #d1d5db;
+  border: 1px solid #000;
   border-radius: 8px;
   font-size: 14px;
   width: 250px;
+  background-color: #fff;
+  color: #000;
   transition: all 0.3s;
 }
 
@@ -1043,13 +1045,15 @@
 .add-comment textarea {
   width: 100%;
   padding: 12px;
-  border: 1px solid #d1d5db;
+  border: 1px solid #000;
   border-radius: 8px;
   font-size: 14px;
   font-family: inherit;
   resize: vertical;
   margin-bottom: 8px;
   min-height: 80px;
+  background-color: #fff;
+  color: #000;
 }
 
 .add-comment textarea:focus {
