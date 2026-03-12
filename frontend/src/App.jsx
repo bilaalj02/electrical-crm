@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import './App.css';
-import { FiMail, FiBriefcase, FiUsers, FiMenu, FiX, FiHome, FiBarChart2, FiSend, FiCalendar, FiChevronDown, FiChevronUp, FiChevronLeft, FiChevronRight, FiPlus, FiUser, FiLogOut, FiSettings as FiSettingsIcon, FiMoon, FiSun, FiBell, FiFolder } from 'react-icons/fi';
+import { FiMail, FiBriefcase, FiUsers, FiMenu, FiX, FiHome, FiBarChart2, FiSend, FiCalendar, FiChevronDown, FiChevronUp, FiChevronLeft, FiChevronRight, FiPlus, FiUser, FiLogOut, FiSettings as FiSettingsIcon, FiMoon, FiSun, FiBell, FiFolder, FiZap } from 'react-icons/fi';
 import { useAuth } from './context/AuthContext';
 import Login from './components/Login';
 import Home from './components/Home';
@@ -13,6 +13,7 @@ import EmailJobSummarizer from './components/EmailJobSummarizer';
 import Calendar from './components/Calendar';
 import Projects from './components/Projects';
 import Settings from './components/Settings';
+const DiagramEditor = lazy(() => import('./components/DiagramEditor/DiagramEditor'));
 import mesLogo from './assets/mes-logo.png';
 import axios from 'axios';
 
@@ -144,6 +145,15 @@ function App() {
           >
             <FiFolder className="sidebar-icon" />
             {sidebarOpen && <span>Projects</span>}
+          </button>
+
+          <button
+            className={`sidebar-link ${currentPage === 'diagrams' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('diagrams')}
+            title="Diagrams"
+          >
+            <FiZap className="sidebar-icon" />
+            {sidebarOpen && <span>Diagrams</span>}
           </button>
 
           {/* Admin only pages */}
@@ -279,18 +289,25 @@ function App() {
       </button>
 
       {/* Main Content Area */}
-      <main className={`main-content ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
-        <div className="content-wrapper">
-          {currentPage === 'home' && <Home />}
-          {currentPage === 'emails' && user?.role === 'admin' && <Emails />}
-          {currentPage === 'jobs' && <Jobs />}
-          {currentPage === 'clients' && user?.role === 'admin' && <Clients />}
-          {currentPage === 'calendar' && <Calendar />}
-          {currentPage === 'projects' && <Projects />}
-          {currentPage === 'analytics' && user?.role === 'admin' && <Analytics />}
-          {currentPage === 'marketing' && user?.role === 'admin' && <MarketingOutreach />}
-          {currentPage === 'settings' && user?.role === 'admin' && <Settings />}
-        </div>
+      <main className={`main-content ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}
+        style={currentPage === 'diagrams' ? { display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', padding: 0, minHeight: 'unset' } : {}}>
+        {currentPage === 'diagrams' ? (
+          <Suspense fallback={<div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'#1a1a2e',color:'#c9a84c',fontSize:'18px'}}>Loading Diagram Editor…</div>}>
+            <DiagramEditor />
+          </Suspense>
+        ) : (
+          <div className="content-wrapper">
+            {currentPage === 'home' && <Home />}
+            {currentPage === 'emails' && user?.role === 'admin' && <Emails />}
+            {currentPage === 'jobs' && <Jobs />}
+            {currentPage === 'clients' && user?.role === 'admin' && <Clients />}
+            {currentPage === 'calendar' && <Calendar />}
+            {currentPage === 'projects' && <Projects />}
+            {currentPage === 'analytics' && user?.role === 'admin' && <Analytics />}
+            {currentPage === 'marketing' && user?.role === 'admin' && <MarketingOutreach />}
+            {currentPage === 'settings' && user?.role === 'admin' && <Settings />}
+          </div>
+        )}
       </main>
 
       {/* Custom Modal */}
