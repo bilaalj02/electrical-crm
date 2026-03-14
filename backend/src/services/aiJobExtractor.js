@@ -1,13 +1,23 @@
 const OpenAI = require('openai');
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+// Initialize OpenAI only if API key is available
+let openai = null;
+if (process.env.OPENAI_API_KEY) {
+  openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY
+  });
+}
 
 /**
  * Extract job details from email content using AI
  */
 async function extractJobDetailsFromEmail(emailContent, senderEmail, senderName) {
+  // Return null if OpenAI is not configured
+  if (!openai) {
+    console.warn('OpenAI API key not configured. AI job extraction disabled.');
+    return null;
+  }
+
   try {
     const prompt = `You are an AI assistant helping to extract electrical service job information from customer emails.
 

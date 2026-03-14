@@ -37,4 +37,17 @@ const authorize = (...roles) => {
   };
 };
 
-module.exports = { auth, authorize };
+// Admin only middleware
+const adminOnly = (req, res, next) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({
+      error: 'Access denied. Admin privileges required.'
+    });
+  }
+  next();
+};
+
+// Protect routes (alias for auth)
+const protect = auth;
+
+module.exports = { auth, authorize, protect, adminOnly };

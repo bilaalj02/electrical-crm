@@ -160,12 +160,54 @@ class GmailService {
   }
 
   /**
+   * Send email via Gmail API
+   */
+  async sendEmail({ to, subject, html, text }) {
+    try {
+      // Create email in RFC 2822 format
+      const emailLines = [
+        `To: ${to}`,
+        `From: ${this.email}`,
+        `Subject: ${subject}`,
+        'MIME-Version: 1.0',
+        'Content-Type: text/html; charset=utf-8',
+        '',
+        html || text
+      ];
+
+      const email = emailLines.join('\r\n');
+
+      // Encode email in base64url format
+      const encodedEmail = Buffer.from(email)
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+
+      // Send email
+      const response = await this.gmail.users.messages.send({
+        userId: 'me',
+        requestBody: {
+          raw: encodedEmail
+        }
+      });
+
+      console.log(`Email sent successfully via Gmail API to ${to}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error sending email via Gmail API:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get OAuth URL for authorization
    */
   getAuthUrl() {
     const scopes = [
       'https://www.googleapis.com/auth/gmail.readonly',
-      'https://www.googleapis.com/auth/gmail.modify'
+      'https://www.googleapis.com/auth/gmail.modify',
+      'https://www.googleapis.com/auth/gmail.send'
     ];
 
     return this.oauth2Client.generateAuthUrl({

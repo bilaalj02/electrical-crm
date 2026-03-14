@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Invitation = require('../models/Invitation');
 const { auth, authorize } = require('../middleware/auth');
 
 // Generate JWT token
@@ -233,6 +234,78 @@ router.delete('/users/:id', auth, authorize('admin'), async (req, res) => {
 
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Employee signup with invitation token
+router.post('/signup', async (req, res) => {
+  try {
+    const { name, email, password, token } = req.body;
+
+    if (!name || !email || !password || !token) {
+      return res.status(400).json({ error: 'Name, email, password, and invitation token are required' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    // Find and validate invitation
+    const invitation = await Invitation.findOne({ token });
+
+    if (!invitation) {
+      return res.status(404).json({ error: 'Invalid invitation token' });
+    }
+
+    if (!invitation.isValid()) {
+      return res.status(400).json({ error: 'This invitation has expired or has already been used' });
+    }
+
+    // Verify email matches invitation
+    if (invitation.email.toLowerCase() !== email.toLowerCase()) {
+      return res.status(400).json({ error: 'Email does not match invitation' });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      return res.status(400).json({ error: 'Email already in use' });
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create user
+    const user = new User({
+      name,
+      email: email.toLowerCase(),
+      password: hashedPassword,
+      role: invitation.role,
+      createdBy: invitation.invitedBy
+    });
+
+    await user.save();
+
+    // Mark invitation as accepted
+    invitation.status = 'accepted';
+    invitation.acceptedAt = new Date();
+    await invitation.save();
+
+    // Generate token
+    const authToken = generateToken(user._id);
+
+    // Return user without password
+    const userResponse = user.toObject();
+    delete userResponse.password;
+
+    res.status(201).json({
+      message: 'Account created successfully',
+      token: authToken,
+      user: userResponse
+    });
+  } catch (error) {
+    console.error('Signup error:', error);
     res.status(500).json({ error: error.message });
   }
 });
