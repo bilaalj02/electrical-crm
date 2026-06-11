@@ -29,6 +29,15 @@ function App() {
   const [modalContent, setModalContent] = useState({ title: '', message: '' });
   const [summarizerOpen, setSummarizerOpen] = useState(false);
   const [potentialJobsCount, setPotentialJobsCount] = useState(0);
+  // Deep-link navigation from Home shortcuts
+  const [pendingJobId, setPendingJobId]       = useState(null);
+  const [pendingClientId, setPendingClientId] = useState(null);
+
+  const navigate = (page, options = {}) => {
+    setCurrentPage(page);
+    if (options.jobId)    setPendingJobId(options.jobId);
+    if (options.clientId) setPendingClientId(options.clientId);
+  };
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('darkMode');
     return saved ? JSON.parse(saved) : false;
@@ -297,10 +306,20 @@ function App() {
           </Suspense>
         ) : (
           <div className="content-wrapper">
-            {currentPage === 'home' && <Home />}
+            {currentPage === 'home' && <Home onNavigate={navigate} />}
             {currentPage === 'emails' && user?.role === 'admin' && <Emails />}
-            {currentPage === 'jobs' && <Jobs />}
-            {currentPage === 'clients' && user?.role === 'admin' && <Clients />}
+            {currentPage === 'jobs' && (
+              <Jobs
+                initialJobId={pendingJobId}
+                onConsumeInitial={() => setPendingJobId(null)}
+              />
+            )}
+            {currentPage === 'clients' && user?.role === 'admin' && (
+              <Clients
+                initialClientId={pendingClientId}
+                onConsumeInitial={() => setPendingClientId(null)}
+              />
+            )}
             {currentPage === 'calendar' && <Calendar />}
             {currentPage === 'projects' && <Projects />}
             {currentPage === 'analytics' && user?.role === 'admin' && <Analytics />}

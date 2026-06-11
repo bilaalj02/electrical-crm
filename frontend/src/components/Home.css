@@ -1,0 +1,329 @@
+/* ==========================================================
+   Home / Dashboard — restrained, monochrome, gold accent only.
+   Style reference: Linear / Stripe / Vercel admin dashboards.
+   ========================================================== */
+
+:root {
+  --mes-gold:        #c9a548;
+  --mes-gold-soft:   #c9a54822;
+  --mes-gold-line:   #c9a54833;
+  --mes-ink:         #0d1117;
+  --mes-ink-2:       #161b22;
+  --mes-text:        #1f2328;
+  --mes-text-dim:    #6b7177;
+  --mes-text-mute:   #9aa0a6;
+  --mes-surface:     #ffffff;
+  --mes-surface-2:   #f7f7f5;
+  --mes-border:      #e6e6e0;
+  --mes-border-soft: #f0efe9;
+}
+
+.home-page {
+  padding: 28px 36px 56px;
+  background: var(--mes-surface-2);
+  min-height: 100%;
+  animation: pageFadeIn 0.4s ease both;
+}
+
+@keyframes pageFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Header ── */
+.page-header { margin-bottom: 28px; }
+.hero-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--mes-text);
+  letter-spacing: -0.01em;
+}
+.page-subtitle {
+  color: var(--mes-text-dim);
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+/* ── Section labels ── */
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--mes-text-dim);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0 0 14px;
+}
+
+.dashboard-section {
+  margin-bottom: 32px;
+  opacity: 0;
+  animation: gentleRise 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes gentleRise {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── KPI cards — clean, no rainbow icons ── */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin-bottom: 32px;
+}
+
+.dashboard-card {
+  background: var(--mes-surface);
+  border: 1px solid var(--mes-border);
+  border-radius: 10px;
+  padding: 18px 20px;
+  position: relative;
+  opacity: 0;
+  animation: gentleRise 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+.dashboard-card:hover {
+  border-color: var(--mes-gold-line);
+  box-shadow: 0 1px 0 var(--mes-border-soft), 0 8px 24px -12px rgba(13, 17, 23, 0.08);
+  transform: translateY(-1px);
+}
+
+.card-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mes-text-dim);
+  letter-spacing: 0.02em;
+  margin-bottom: 10px;
+}
+.card-value {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--mes-text);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.card-meta {
+  font-size: 11px;
+  color: var(--mes-text-mute);
+  margin-top: 8px;
+}
+
+/* ── Quick Actions ── */
+.quick-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+.quick-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--mes-surface);
+  border: 1px solid var(--mes-border);
+  border-radius: 9px;
+  cursor: pointer;
+  color: var(--mes-text);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+.quick-action:hover {
+  border-color: var(--mes-gold-line);
+  background: var(--mes-gold-soft);
+  transform: translateY(-1px);
+}
+.quick-action-icon {
+  font-size: 16px;
+  color: var(--mes-gold);
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+.quick-action:hover .quick-action-icon {
+  transform: scale(1.05);
+}
+
+/* ── Shortcut blocks (Recent Jobs / Recent Clients / Today's) ── */
+.shortcut-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+.shortcut-block {
+  background: var(--mes-surface);
+  border: 1px solid var(--mes-border);
+  border-radius: 10px;
+  padding: 16px 8px 8px;
+  opacity: 0;
+  animation: gentleRise 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.shortcut-block:hover {
+  border-color: var(--mes-gold-line);
+  box-shadow: 0 1px 0 var(--mes-border-soft), 0 8px 24px -14px rgba(13, 17, 23, 0.08);
+}
+
+.shortcut-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px 10px;
+  border-bottom: 1px solid var(--mes-border-soft);
+  margin-bottom: 4px;
+}
+.shortcut-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--mes-text);
+}
+.header-icon {
+  color: var(--mes-gold);
+  font-size: 14px;
+}
+
+.shortcut-see-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: var(--mes-text-dim);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+.shortcut-see-all:hover {
+  color: var(--mes-gold);
+  background: var(--mes-gold-soft);
+}
+
+.shortcut-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 4px 4px 8px;
+}
+
+.shortcut-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  padding: 10px 12px;
+  cursor: pointer;
+  color: inherit;
+  transition: background 0.18s ease, transform 0.18s ease;
+}
+.shortcut-item:hover {
+  background: var(--mes-gold-soft);
+  transform: translateX(2px);
+}
+
+.shortcut-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.shortcut-item-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mes-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.shortcut-item-sub {
+  font-size: 11px;
+  color: var(--mes-text-mute);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shortcut-item-status {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--mes-border);
+  background: var(--mes-surface-2);
+  color: var(--mes-text-dim);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.empty {
+  color: var(--mes-text-mute);
+  font-size: 12px;
+  font-style: italic;
+  padding: 16px 12px;
+  text-align: center;
+}
+
+/* ── Loading state ── */
+.dashboard-loading {
+  text-align: center;
+  padding: 80px 20px;
+  color: var(--mes-text-dim);
+}
+.loading-pulse {
+  width: 28px;
+  height: 28px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  border: 2px solid var(--mes-border);
+  border-top-color: var(--mes-gold);
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Dark mode ── */
+body.dark-mode .home-page { background: var(--mes-ink); }
+body.dark-mode .hero-title { color: #f0e8d4; }
+body.dark-mode .dashboard-card,
+body.dark-mode .shortcut-block,
+body.dark-mode .quick-action {
+  background: var(--mes-ink-2);
+  border-color: #262c36;
+}
+body.dark-mode .card-value,
+body.dark-mode .shortcut-item-title,
+body.dark-mode .shortcut-header h2 { color: #e6e8eb; }
+body.dark-mode .card-label,
+body.dark-mode .card-meta,
+body.dark-mode .shortcut-item-sub,
+body.dark-mode .shortcut-see-all,
+body.dark-mode .page-subtitle,
+body.dark-mode .section-title { color: #8b9099; }
+body.dark-mode .shortcut-item:hover,
+body.dark-mode .shortcut-see-all:hover,
+body.dark-mode .quick-action:hover { background: rgba(201, 165, 72, 0.10); }
+body.dark-mode .shortcut-item-status { background: #1f242c; border-color: #2a3038; color: #8b9099; }
+body.dark-mode .shortcut-header { border-bottom-color: #262c36; }

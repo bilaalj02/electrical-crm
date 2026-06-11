@@ -5,10 +5,11 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { auth, authorize } = require('../middleware/auth');
 
-// Generate JWT token
+// Generate JWT token — 90 days so users stay signed in across sessions
+// until they explicitly log out. Configurable via JWT_EXPIRES_IN env var.
 const generateToken = (userId) => {
   return jwt.sign({ userId }, process.env.JWT_SECRET, {
-    expiresIn: '7d'
+    expiresIn: process.env.JWT_EXPIRES_IN || '90d'
   });
 };
 

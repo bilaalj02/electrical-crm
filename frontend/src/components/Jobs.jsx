@@ -7,12 +7,30 @@ import ExpenseEntryModal from './ExpenseEntryModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
-function Jobs() {
+function Jobs({ initialJobId, onConsumeInitial }) {
   const [jobs, setJobs] = useState([]);
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState(null);
   const [selectedJob, setSelectedJob] = useState(null);
+
+  // If Home asked us to open a specific job, fetch + open it on mount
+  useEffect(() => {
+    if (!initialJobId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await axios.get(`${API_URL}/jobs/${initialJobId}`);
+        if (!cancelled) {
+          setSelectedJob(res.data);
+          if (onConsumeInitial) onConsumeInitial();
+        }
+      } catch (e) {
+        console.error('Failed to open initial job', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [initialJobId]);
   const [showJobForm, setShowJobForm] = useState(false);
   const [editingJob, setEditingJob] = useState(null);
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);

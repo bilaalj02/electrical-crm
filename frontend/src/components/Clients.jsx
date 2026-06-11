@@ -4,11 +4,30 @@ import { FiUsers, FiPlus, FiEdit, FiTrash2, FiMail, FiPhone } from 'react-icons/
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
-function Clients() {
+function Clients({ initialClientId, onConsumeInitial }) {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingClient, setEditingClient] = useState(null);
+
+  // If Home asked us to open a specific client for editing, do so on mount
+  useEffect(() => {
+    if (!initialClientId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await axios.get(`${API_URL}/clients/${initialClientId}`);
+        if (!cancelled) {
+          setEditingClient(res.data);
+          setShowForm(true);
+          if (onConsumeInitial) onConsumeInitial();
+        }
+      } catch (e) {
+        console.error('Failed to open initial client', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [initialClientId]);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
