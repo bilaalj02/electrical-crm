@@ -1,63 +1,78 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FiDollarSign, FiClock, FiBriefcase, FiUsers, FiMail, FiCheckCircle } from 'react-icons/fi';
+import {
+  FiBriefcase, FiUsers, FiMail, FiCheckCircle,
+  FiPlus, FiArrowRight, FiCalendar, FiSend, FiActivity
+} from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
+import './Home.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
-function Home() {
-  const { user } = useAuth();
+function Home({ onNavigate }) {
+  const { user, isAdmin } = useAuth();
   const [stats, setStats] = useState({
-    totalRevenue: 0,
-    pendingRevenue: 0,
     activeJobs: 0,
     totalClients: 0,
     unreadEmails: 0,
-    completedJobs: 0
+    completedJobs: 0,
+  });
+  const [dashboard, setDashboard] = useState({
+    recentJobs: [],
+    recentClients: [],
+    todayScheduled: [],
   });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchAllStats();
+    let mounted = true;
+    (async () => {
+      setLoading(true);
+      try {
+        const [jobsRes, clientsRes, emailsRes, dashRes] = await Promise.all([
+          axios.get(`${API_URL}/jobs/stats`),
+          axios.get(`${API_URL}/clients/stats`),
+          axios.get(`${API_URL}/emails/stats/summary`),
+          axios.get(`${API_URL}/dashboard`),
+        ]);
+        if (!mounted) return;
+        setStats({
+          activeJobs:     jobsRes.data.activeJobs     || 0,
+          completedJobs:  jobsRes.data.completedJobs  || 0,
+          totalClients:   clientsRes.data.total       || 0,
+          unreadEmails:   emailsRes.data.unread       || 0,
+        });
+        setDashboard({
+          recentJobs:     dashRes.data.recentJobs     || [],
+          recentClients:  dashRes.data.recentClients  || [],
+          todayScheduled: dashRes.data.todayScheduled || [],
+        });
+      } catch (e) {
+        console.error('Dashboard load error:', e);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
   }, []);
 
-  const fetchAllStats = async () => {
-    setLoading(true);
-    try {
-      const [jobsRes, clientsRes, emailsRes] = await Promise.all([
-        axios.get(`${API_URL}/jobs/stats`),
-        axios.get(`${API_URL}/clients/stats`),
-        axios.get(`${API_URL}/emails/stats/summary`)
-      ]);
-
-      setStats({
-        totalRevenue: jobsRes.data.totalRevenue || 0,
-        pendingRevenue: jobsRes.data.pendingRevenue || 0,
-        activeJobs: jobsRes.data.activeJobs || 0,
-        completedJobs: jobsRes.data.completedJobs || 0,
-        totalClients: clientsRes.data.total || 0,
-        unreadEmails: emailsRes.data.unread || 0
-      });
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    } finally {
-      setLoading(false);
-    }
+  const formatTime = (iso) => {
+    if (!iso) return '';
+    return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
+  const formatDate = (iso) => {
+    if (!iso) return '';
+    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
   if (loading) {
     return (
       <div className="home-page">
-        <div className="loading">Loading dashboard...</div>
+        <div className="dashboard-loading">
+          <div className="loading-pulse"></div>
+          <p>Loading dashboard</p>
+        </div>
       </div>
     );
   }
@@ -65,114 +80,163 @@ function Home() {
   return (
     <div className="home-page">
       <div className="page-header">
-        <div>
-          <h1>Dashboard</h1>
-          <p className="page-subtitle">Welcome {user?.name || 'User'}</p>
+        <h1 className="hero-title">Dashboard</h1>
+        <p className="page-subtitle">Welcome back{user?.name ? `, ${user.name}` : ''}</p>
+      </div>
+
+      {/* ── KPI ROW — operational only, no financials ─────────────── */}
+      <div className="dashboard-grid">
+        <div className="dashboard-card" style={{ animationDelay: '0ms' }}>
+          <div className="card-label">Active Jobs</div>
+          <div className="card-value">{stats.activeJobs}</div>
+          <div className="card-meta">In progress</div>
+        </div>
+
+        <div className="dashboard-card" style={{ animationDelay: '50ms' }}>
+          <div className="card-label">Total Clients</div>
+          <div className="card-value">{stats.totalClients}</div>
+          <div className="card-meta">In database</div>
+        </div>
+
+        <div className="dashboard-card" style={{ animationDelay: '100ms' }}>
+          <div className="card-label">Unread Emails</div>
+          <div className="card-value">{stats.unreadEmails}</div>
+          <div className="card-meta">Awaiting review</div>
+        </div>
+
+        <div className="dashboard-card" style={{ animationDelay: '150ms' }}>
+          <div className="card-label">Completed Jobs</div>
+          <div className="card-value">{stats.completedJobs}</div>
+          <div className="card-meta">All time</div>
         </div>
       </div>
 
-      <div className="dashboard-grid">
-        {/* Total Revenue */}
-        <div className="dashboard-card">
-          <div className="card-header">
-            <div className="card-icon gold">
-              <FiDollarSign />
-            </div>
-            <div className="card-title">
-              <h3>Total Revenue</h3>
-              <p>All Time</p>
-            </div>
+      {/* ── QUICK ACTIONS ───────────────────────────────────────── */}
+      <div className="dashboard-section" style={{ animationDelay: '220ms' }}>
+        <h2 className="section-title">Quick Actions</h2>
+        <div className="quick-actions-grid">
+          <button className="quick-action" onClick={() => onNavigate('jobs')}>
+            <FiPlus className="quick-action-icon" />
+            <span>New Job</span>
+          </button>
+          {isAdmin && (
+            <button className="quick-action" onClick={() => onNavigate('clients')}>
+              <FiUsers className="quick-action-icon" />
+              <span>New Client</span>
+            </button>
+          )}
+          {isAdmin && (
+            <button className="quick-action" onClick={() => onNavigate('emails')}>
+              <FiSend className="quick-action-icon" />
+              <span>Compose Email</span>
+            </button>
+          )}
+          <button className="quick-action" onClick={() => onNavigate('calendar')}>
+            <FiCalendar className="quick-action-icon" />
+            <span>Calendar</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── SHORTCUT BLOCKS ─────────────────────────────────────── */}
+      <div className="shortcut-row">
+
+        {/* RECENT JOBS */}
+        <div className="shortcut-block" style={{ animationDelay: '280ms' }}>
+          <div className="shortcut-header">
+            <h2><FiBriefcase className="header-icon" /> Recent Jobs</h2>
+            <button className="shortcut-see-all" onClick={() => onNavigate('jobs')}>
+              View all <FiArrowRight />
+            </button>
           </div>
-          <div className="card-value">{formatCurrency(stats.totalRevenue)}</div>
-          <div className="card-footer">
-            <span>Revenue from all jobs</span>
+          <div className="shortcut-list">
+            {dashboard.recentJobs.length === 0 && <p className="empty">No jobs yet.</p>}
+            {dashboard.recentJobs.map((j) => (
+              <button
+                key={j._id}
+                className="shortcut-item"
+                onClick={() => onNavigate('jobs', { jobId: j._id })}
+              >
+                <div className="shortcut-item-main">
+                  <span className="shortcut-item-title">
+                    {j.jobNumber ? `${j.jobNumber} · ` : ''}{j.title || 'Untitled job'}
+                  </span>
+                  <span className="shortcut-item-sub">
+                    {(j.client?.companyName || j.client?.name) || 'No client'}
+                  </span>
+                </div>
+                <span className="shortcut-item-status">{j.status}</span>
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Pending Payments */}
-        <div className="dashboard-card">
-          <div className="card-header">
-            <div className="card-icon orange">
-              <FiClock />
+        {/* RECENT CLIENTS */}
+        {isAdmin && (
+          <div className="shortcut-block" style={{ animationDelay: '330ms' }}>
+            <div className="shortcut-header">
+              <h2><FiUsers className="header-icon" /> Recent Clients</h2>
+              <button className="shortcut-see-all" onClick={() => onNavigate('clients')}>
+                View all <FiArrowRight />
+              </button>
             </div>
-            <div className="card-title">
-              <h3>Pending Payments</h3>
-              <p>Outstanding</p>
+            <div className="shortcut-list">
+              {dashboard.recentClients.length === 0 && <p className="empty">No clients yet.</p>}
+              {dashboard.recentClients.map((c) => (
+                <button
+                  key={c._id}
+                  className="shortcut-item"
+                  onClick={() => onNavigate('clients', { clientId: c._id })}
+                >
+                  <div className="shortcut-item-main">
+                    <span className="shortcut-item-title">
+                      {c.companyName || c.name || 'Unnamed'}
+                    </span>
+                    <span className="shortcut-item-sub">
+                      {c.email || c.phone || '—'}
+                    </span>
+                  </div>
+                  <span className="shortcut-item-status">
+                    {formatDate(c.createdAt)}
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
-          <div className="card-value">{formatCurrency(stats.pendingRevenue)}</div>
-          <div className="card-footer">
-            <span>Awaiting payment</span>
+        )}
+
+        {/* TODAY'S SCHEDULED */}
+        <div className="shortcut-block" style={{ animationDelay: '380ms' }}>
+          <div className="shortcut-header">
+            <h2><FiActivity className="header-icon" /> Today's Schedule</h2>
+            <button className="shortcut-see-all" onClick={() => onNavigate('calendar')}>
+              Calendar <FiArrowRight />
+            </button>
+          </div>
+          <div className="shortcut-list">
+            {dashboard.todayScheduled.length === 0 && (
+              <p className="empty">Nothing scheduled today.</p>
+            )}
+            {dashboard.todayScheduled.map((j) => (
+              <button
+                key={j._id}
+                className="shortcut-item"
+                onClick={() => onNavigate('jobs', { jobId: j._id })}
+              >
+                <div className="shortcut-item-main">
+                  <span className="shortcut-item-title">
+                    {formatTime(j.scheduledDate)} · {j.title || 'Untitled'}
+                  </span>
+                  <span className="shortcut-item-sub">
+                    {(j.client?.companyName || j.client?.name) || 'No client'}
+                  </span>
+                </div>
+                <span className="shortcut-item-status">{j.status}</span>
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Active Jobs */}
-        <div className="dashboard-card">
-          <div className="card-header">
-            <div className="card-icon blue">
-              <FiBriefcase />
-            </div>
-            <div className="card-title">
-              <h3>Active Jobs</h3>
-              <p>In Progress</p>
-            </div>
-          </div>
-          <div className="card-value">{stats.activeJobs}</div>
-          <div className="card-footer">
-            <span>Currently active</span>
-          </div>
-        </div>
-
-        {/* Total Clients */}
-        <div className="dashboard-card">
-          <div className="card-header">
-            <div className="card-icon purple">
-              <FiUsers />
-            </div>
-            <div className="card-title">
-              <h3>Total Clients</h3>
-              <p>All Clients</p>
-            </div>
-          </div>
-          <div className="card-value">{stats.totalClients}</div>
-          <div className="card-footer">
-            <span>In database</span>
-          </div>
-        </div>
-
-        {/* Unread Emails */}
-        <div className="dashboard-card">
-          <div className="card-header">
-            <div className="card-icon teal">
-              <FiMail />
-            </div>
-            <div className="card-title">
-              <h3>Unread Emails</h3>
-              <p>Inbox</p>
-            </div>
-          </div>
-          <div className="card-value">{stats.unreadEmails}</div>
-          <div className="card-footer">
-            <span>Requires attention</span>
-          </div>
-        </div>
-
-        {/* Completed Jobs */}
-        <div className="dashboard-card">
-          <div className="card-header">
-            <div className="card-icon green">
-              <FiCheckCircle />
-            </div>
-            <div className="card-title">
-              <h3>Completed Jobs</h3>
-              <p>Finished</p>
-            </div>
-          </div>
-          <div className="card-value">{stats.completedJobs}</div>
-          <div className="card-footer">
-            <span>Successfully completed</span>
-          </div>
-        </div>
       </div>
     </div>
   );

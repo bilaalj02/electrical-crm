@@ -4708,3 +4708,119 @@ body {
   border-color: #d4af37;
   box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
 }
+
+
+/* ============================================================
+   SIDEBAR — Dark charcoal + gold. No blue. Premium SaaS feel.
+   ============================================================ */
+
+.sidebar {
+  background: linear-gradient(180deg, #0d1117 0%, #11161f 50%, #0d1117 100%);
+  border-right: 1px solid rgba(201, 165, 72, 0.08);
+  transition:
+    width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.3s ease;
+  box-shadow: 2px 0 16px rgba(0, 0, 0, 0.20);
+  color: rgba(230, 232, 235, 0.78);
+}
+
+/* Remove any colorful auras */
+.sidebar::after { content: none; }
+
+.sidebar-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.sidebar-logo {
+  transition: filter 0.2s ease, transform 0.2s ease;
+}
+.sidebar-logo:hover {
+  transform: none;
+  filter: drop-shadow(0 0 6px rgba(201, 165, 72, 0.55));
+}
+
+.sidebar-nav {
+  padding: 8px 0;
+}
+
+.sidebar-link {
+  position: relative;
+  margin: 1px 8px;
+  padding: 9px 14px;
+  border-radius: 7px;
+  border-left: none;
+  color: rgba(230, 232, 235, 0.72);
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease;
+  overflow: visible;
+}
+
+.sidebar-link::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 18%;
+  bottom: 18%;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: var(--mes-gold, #c9a548);
+  opacity: 0;
+  transform: scaleY(0.4);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.sidebar-link:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: #ffffff;
+  transform: none;
+}
+
+.sidebar-link.active {
+  background: rgba(201, 165, 72, 0.10);
+  color: #f0e8d4;
+  font-weight: 600;
+  border-left-color: transparent;
+}
+.sidebar-link.active::before { opacity: 1; transform: scaleY(1); }
+
+.sidebar-icon {
+  font-size: 16px;
+  color: rgba(230, 232, 235, 0.55);
+  transition: color 0.18s ease;
+}
+.sidebar-link:hover .sidebar-icon { color: rgba(230, 232, 235, 0.95); }
+.sidebar-link.active .sidebar-icon { color: var(--mes-gold, #c9a548); }
+
+.sidebar-toggle {
+  margin: 12px 16px 16px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(230, 232, 235, 0.7);
+  border-radius: 7px;
+  font-size: 14px;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+.sidebar-toggle:hover {
+  background: rgba(201, 165, 72, 0.12);
+  color: #f0e8d4;
+  transform: none;
+  box-shadow: none;
+}
+
+.main-content {
+  transition: margin-left 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+              width 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Subtle route fade — no slide */
+.content-wrapper > * {
+  animation: routeFade 0.22s ease;
+}
+@keyframes routeFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}

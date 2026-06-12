@@ -3,6 +3,58 @@ import axios from 'axios';
 
 const AuthContext = createContext();
 
+// ── Persistent token storage ─────────────────────────────────────────
+// We persist the JWT in BOTH localStorage AND a long-lived cookie.
+// localStorage is primary; the cookie is a backup so the user stays
+// signed in even if a browser clears localStorage (e.g. some private
+// modes, some extensions, or aggressive cache cleaners).
+const TOKEN_KEY      = 'token';
+const COOKIE_NAME    = 'mes_session';
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 90;   // 90 days, matches backend JWT TTL
+
+const setCookie = (name, value, maxAgeSec) => {
+  try {
+    const isHttps = (typeof window !== 'undefined' && window.location.protocol === 'https:');
+    const secure  = isHttps ? '; Secure' : '';
+    document.cookie =
+      `${name}=${encodeURIComponent(value)}; Max-Age=${maxAgeSec}; Path=/; SameSite=Lax${secure}`;
+  } catch (_) { /* ignore */ }
+};
+
+const getCookie = (name) => {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.split('; ').find(c => c.startsWith(name + '='));
+  if (!match) return null;
+  try { return decodeURIComponent(match.split('=')[1]); }
+  catch { return null; }
+};
+
+const clearCookie = (name) => {
+  document.cookie = `${name}=; Max-Age=0; Path=/; SameSite=Lax`;
+};
+
+const readPersistedToken = () => {
+  // Try localStorage first; if missing, fall back to cookie and restore.
+  const ls = localStorage.getItem(TOKEN_KEY);
+  if (ls) return ls;
+  const ck = getCookie(COOKIE_NAME);
+  if (ck) {
+    localStorage.setItem(TOKEN_KEY, ck);
+    return ck;
+  }
+  return null;
+};
+
+const persistToken = (newToken) => {
+  localStorage.setItem(TOKEN_KEY, newToken);
+  setCookie(COOKIE_NAME, newToken, COOKIE_MAX_AGE);
+};
+
+const wipeToken = () => {
+  localStorage.removeItem(TOKEN_KEY);
+  clearCookie(COOKIE_NAME);
+};
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -13,7 +65,7 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [token, setToken] = useState(readPersistedToken());
   const [loading, setLoading] = useState(true);
 
   const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api') + '/auth';
@@ -45,7 +97,7 @@ export const AuthProvider = ({ children }) => {
       const response = await axios.post(`${API_URL}/login`, { email, password });
       const { token: newToken, user: userData } = response.data;
 
-      localStorage.setItem('token', newToken);
+      persistToken(newToken);
       setToken(newToken);
       setUser(userData);
       axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
@@ -60,7 +112,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    wipeToken();
     setToken(null);
     setUser(null);
     delete axios.defaults.headers.common['Authorization'];
@@ -71,7 +123,7 @@ export const AuthProvider = ({ children }) => {
       const response = await axios.post(`${API_URL}/setup-admin`, { name, email, password });
       const { token: newToken, user: userData } = response.data;
 
-      localStorage.setItem('token', newToken);
+      persistToken(newToken);
       setToken(newToken);
       setUser(userData);
       axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
