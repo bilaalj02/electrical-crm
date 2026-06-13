@@ -303,27 +303,3 @@
   animation: spin 0.9s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-
-/* ── Dark mode ── */
-body.dark-mode .home-page { background: var(--mes-ink); }
-body.dark-mode .hero-title { color: #f0e8d4; }
-body.dark-mode .dashboard-card,
-body.dark-mode .shortcut-block,
-body.dark-mode .quick-action {
-  background: var(--mes-ink-2);
-  border-color: #262c36;
-}
-body.dark-mode .card-value,
-body.dark-mode .shortcut-item-title,
-body.dark-mode .shortcut-header h2 { color: #e6e8eb; }
-body.dark-mode .card-label,
-body.dark-mode .card-meta,
-body.dark-mode .shortcut-item-sub,
-body.dark-mode .shortcut-see-all,
-body.dark-mode .page-subtitle,
-body.dark-mode .section-title { color: #8b9099; }
-body.dark-mode .shortcut-item:hover,
-body.dark-mode .shortcut-see-all:hover,
-body.dark-mode .quick-action:hover { background: rgba(201, 165, 72, 0.10); }
-body.dark-mode .shortcut-item-status { background: #1f242c; border-color: #2a3038; color: #8b9099; }
-body.dark-mode .shortcut-header { border-bottom-color: #262c36; }

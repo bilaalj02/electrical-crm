@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FiUsers, FiPlus, FiEdit, FiTrash2, FiMail, FiPhone } from 'react-icons/fi';
+import { FiUsers, FiPlus, FiEdit, FiTrash2, FiMail, FiPhone, FiFilter } from 'react-icons/fi';
+import { showToast } from './Toast';
+import NotificationModal from './NotificationModal';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 function Clients({ initialClientId, onConsumeInitial }) {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingClient, setEditingClient] = useState(null);
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
 
   // If Home asked us to open a specific client for editing, do so on mount
   useEffect(() => {
@@ -36,6 +39,8 @@ function Clients({ initialClientId, onConsumeInitial }) {
     clientType: 'residential',
     status: 'active'
   });
+
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -102,21 +107,29 @@ function Clients({ initialClientId, onConsumeInitial }) {
       setEditingClient(null);
       setFormData({ name: '', email: '', phone: '', company: '', clientType: 'residential', status: 'active' });
       fetchClients();
+      showToast(editingClient ? 'Client updated successfully!' : 'Client created successfully!', 'success');
     } catch (error) {
       console.error('Error saving client:', error);
-      alert('Error saving client');
+      showToast(error.response?.data?.error || 'Error saving client', 'error');
     }
   };
 
   const deleteClient = async (id) => {
-    if (!confirm('Are you sure you want to delete this client?')) return;
-    try {
-      await axios.delete(`${API_URL}/clients/${id}`);
-      fetchClients();
-    } catch (error) {
-      console.error('Error deleting client:', error);
-      alert(error.response?.data?.error || 'Error deleting client');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Client',
+      message: 'Are you sure you want to delete this client? This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          await axios.delete(`${API_URL}/clients/${id}`);
+          fetchClients();
+          showToast('Client deleted', 'success');
+        } catch (error) {
+          console.error('Error deleting client:', error);
+          showToast(error.response?.data?.error || 'Error deleting client', 'error');
+        }
+      }
+    });
   };
 
   useEffect(() => {
@@ -148,65 +161,103 @@ function Clients({ initialClientId, onConsumeInitial }) {
         </button>
       </div>
 
-      {/* Minimal Filters */}
-      <div className="minimal-filters">
-        <input
-          type="text"
-          placeholder="🔍 Search clients..."
-          value={filters.search}
-          onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-          className="minimal-filter-input"
-        />
-        <select
-          value={filters.status}
-          onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-          className="minimal-filter-select"
-        >
-          <option value="">All Statuses</option>
-          <option value="new">New</option>
-          <option value="contacted">Contacted</option>
-          <option value="quoted">Quoted</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="prospect">Prospect</option>
-          <option value="won">Won</option>
-          <option value="lost">Lost</option>
-        </select>
-        <select
-          value={filters.clientType}
-          onChange={(e) => setFilters({ ...filters, clientType: e.target.value })}
-          className="minimal-filter-select"
-        >
-          <option value="">All Types</option>
-          <option value="residential">Residential</option>
-          <option value="commercial">Commercial</option>
-          <option value="industrial">Industrial</option>
-        </select>
-        <select
-          value={filters.source}
-          onChange={(e) => setFilters({ ...filters, source: e.target.value })}
-          className="minimal-filter-select"
-        >
-          <option value="">All Sources</option>
-          <option value="website">Website</option>
-          <option value="referral">Referral</option>
-          <option value="phone">Phone</option>
-          <option value="email">Email</option>
-          <option value="manual">Manual</option>
-        </select>
-        <select
-          value={filters.serviceRequested}
-          onChange={(e) => setFilters({ ...filters, serviceRequested: e.target.value })}
-          className="minimal-filter-select"
-        >
-          <option value="">All Services</option>
-          <option value="ev-charging">EV Charging</option>
-          <option value="new-construction">New Construction</option>
-          <option value="smart-home">Smart Home</option>
-          <option value="repair-upgrade">Repair & Upgrade</option>
-          <option value="silver-label">Silver Label</option>
-          <option value="other">Other</option>
-        </select>
+      {/* Filters */}
+      <div className="filter-box" style={{
+        background: 'linear-gradient(135deg, #fef9e7 0%, #fef5d4 100%)',
+        padding: '8px 12px',
+        borderRadius: '12px',
+        boxShadow: '0 2px 8px rgba(212, 175, 55, 0.15)',
+        border: '1px solid rgba(212, 175, 55, 0.3)',
+        marginBottom: '20px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: filtersExpanded ? '8px' : '0' }}>
+          <h3 style={{ margin: 0, color: '#78350f', fontSize: '12px', fontWeight: '600' }}>
+            <FiFilter style={{ marginRight: '6px' }} />
+            Filters & Search
+          </h3>
+          <button
+            onClick={() => setFiltersExpanded(!filtersExpanded)}
+            style={{ background: 'white', border: 'none', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', fontSize: '11px', fontWeight: '600', color: '#78350f' }}
+          >
+            {filtersExpanded ? '▲' : '▼'}
+          </button>
+        </div>
+        {filtersExpanded && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px' }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', color: '#78350f', fontSize: '11px' }}>Search</label>
+              <input
+                type="text"
+                placeholder="Search..."
+                value={filters.search}
+                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                style={{ width: '100%', padding: '6px 8px', border: 'none', borderRadius: '6px', fontSize: '12px', outline: 'none', background: 'white', color: '#333', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', color: '#78350f', fontSize: '11px' }}>Status</label>
+              <select
+                value={filters.status}
+                onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                style={{ width: '100%', padding: '6px 8px', border: 'none', borderRadius: '6px', fontSize: '12px', outline: 'none', background: 'white', color: '#333', cursor: 'pointer' }}
+              >
+                <option value="">All</option>
+                <option value="new">New</option>
+                <option value="contacted">Contacted</option>
+                <option value="quoted">Quoted</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="prospect">Prospect</option>
+                <option value="won">Won</option>
+                <option value="lost">Lost</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', color: '#78350f', fontSize: '11px' }}>Type</label>
+              <select
+                value={filters.clientType}
+                onChange={(e) => setFilters({ ...filters, clientType: e.target.value })}
+                style={{ width: '100%', padding: '6px 8px', border: 'none', borderRadius: '6px', fontSize: '12px', outline: 'none', background: 'white', color: '#333', cursor: 'pointer' }}
+              >
+                <option value="">All</option>
+                <option value="residential">Residential</option>
+                <option value="commercial">Commercial</option>
+                <option value="industrial">Industrial</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', color: '#78350f', fontSize: '11px' }}>Source</label>
+              <select
+                value={filters.source}
+                onChange={(e) => setFilters({ ...filters, source: e.target.value })}
+                style={{ width: '100%', padding: '6px 8px', border: 'none', borderRadius: '6px', fontSize: '12px', outline: 'none', background: 'white', color: '#333', cursor: 'pointer' }}
+              >
+                <option value="">All</option>
+                <option value="website">Website</option>
+                <option value="referral">Referral</option>
+                <option value="phone">Phone</option>
+                <option value="email">Email</option>
+                <option value="manual">Manual</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', color: '#78350f', fontSize: '11px' }}>Service</label>
+              <select
+                value={filters.serviceRequested}
+                onChange={(e) => setFilters({ ...filters, serviceRequested: e.target.value })}
+                style={{ width: '100%', padding: '6px 8px', border: 'none', borderRadius: '6px', fontSize: '12px', outline: 'none', background: 'white', color: '#333', cursor: 'pointer' }}
+              >
+                <option value="">All</option>
+                <option value="ev-charging">EV Charging</option>
+                <option value="new-construction">New Construction</option>
+                <option value="smart-home">Smart Home</option>
+                <option value="repair-upgrade">Repair & Upgrade</option>
+                <option value="silver-label">Silver Label</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Clients Table */}
@@ -240,22 +291,19 @@ function Clients({ initialClientId, onConsumeInitial }) {
             </thead>
             <tbody>
               {filteredClients.map((client) => (
-                <tr key={client._id} style={{ borderBottom: '1px solid #dee2e6', transition: 'background 0.2s' }}
-                  onMouseOver={(e) => e.currentTarget.style.background = '#f8f9fa'}
-                  onMouseOut={(e) => e.currentTarget.style.background = 'white'}
-                >
+                <tr key={client._id} className="client-table-row">
                   <td style={{ padding: '12px' }}>
-                    <div style={{ fontWeight: '500', color: '#212529' }}>{client.name}</div>
+                    <div style={{ fontWeight: '500' }}>{client.name}</div>
                     {client.company && <div style={{ fontSize: '12px', color: '#6c757d' }}>{client.company}</div>}
                   </td>
                   <td style={{ padding: '12px' }}>
-                    <div style={{ fontSize: '14px', color: '#495057' }}>
-                      <FiMail style={{ marginRight: '5px', fontSize: '12px', color: '#6c757d' }} />
+                    <div style={{ fontSize: '14px' }}>
+                      <FiMail style={{ marginRight: '5px', fontSize: '12px' }} />
                       {client.email}
                     </div>
                     {client.phone && (
-                      <div style={{ fontSize: '14px', marginTop: '4px', color: '#495057' }}>
-                        <FiPhone style={{ marginRight: '5px', fontSize: '12px', color: '#6c757d' }} />
+                      <div style={{ fontSize: '14px', marginTop: '4px' }}>
+                        <FiPhone style={{ marginRight: '5px', fontSize: '12px' }} />
                         {client.phone}
                       </div>
                     )}
@@ -297,44 +345,10 @@ function Clients({ initialClientId, onConsumeInitial }) {
                         setEditingClient(client);
                         setFormData(client);
                         setShowForm(true);
-                      }} style={{
-                        padding: '8px 12px',
-                        border: '1px solid #ddd',
-                        borderRadius: '8px',
-                        background: 'white',
-                        cursor: 'pointer',
-                        color: '#495057',
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseOver={(e) => {
-                        e.target.style.background = '#f8f9fa';
-                        e.target.style.borderColor = '#667eea';
-                      }}
-                      onMouseOut={(e) => {
-                        e.target.style.background = 'white';
-                        e.target.style.borderColor = '#ddd';
-                      }}
-                      >
+                      }}>
                         <FiEdit />
                       </button>
-                      <button className="icon-btn delete" onClick={() => deleteClient(client._id)} style={{
-                        padding: '8px 12px',
-                        border: '1px solid #dc3545',
-                        borderRadius: '8px',
-                        background: 'white',
-                        color: '#dc3545',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseOver={(e) => {
-                        e.target.style.background = '#dc3545';
-                        e.target.style.color = 'white';
-                      }}
-                      onMouseOut={(e) => {
-                        e.target.style.background = 'white';
-                        e.target.style.color = '#dc3545';
-                      }}
-                      >
+                      <button className="icon-btn delete" onClick={() => deleteClient(client._id)}>
                         <FiTrash2 />
                       </button>
                     </div>
@@ -414,6 +428,17 @@ function Clients({ initialClientId, onConsumeInitial }) {
           </div>
         </div>
       )}
+
+      <NotificationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        type="confirm"
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
     </div>
   );
 }

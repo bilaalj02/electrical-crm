@@ -692,7 +692,7 @@
 /* Content Layout - NEW */
 .detail-content {
   display: grid;
-  grid-template-columns: 1fr 350px;
+  grid-template-columns: 1fr 240px;
   gap: 24px;
 }
 

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FiX, FiSave, FiPlus, FiTrash2, FiTrendingUp } from 'react-icons/fi';
+import { showToast } from './Toast';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 function JobForm({ job, clients, onClose, onSave }) {
   const [recommendations, setRecommendations] = useState(null);
@@ -79,7 +80,7 @@ function JobForm({ job, clients, onClose, onSave }) {
       onSave();
     } catch (error) {
       console.error('Error saving job:', error);
-      alert('Error saving job');
+      showToast(error.response?.data?.error || 'Error saving job', 'error');
     } finally {
       setLoading(false);
     }

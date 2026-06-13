@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FiX, FiMail, FiCheckCircle, FiXCircle, FiCalendar, FiAlertCircle, FiChevronDown, FiChevronUp } from 'react-icons/fi';
+import { showToast } from './Toast';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 function EmailJobSummarizer({ isOpen, onClose }) {
   const [emails, setEmails] = useState([]);
@@ -90,25 +91,21 @@ function EmailJobSummarizer({ isOpen, onClose }) {
   const handleAction = async (emailId, action) => {
     switch (action) {
       case 'approve':
-        alert('Job approved! Redirecting to schedule...');
-        // TODO: Create job and navigate to scheduling
+        showToast('Job approved! Redirecting to schedule...', 'success');
         break;
       case 'decline':
         await axios.patch(`${API_URL}/emails/${emailId}`, { isRead: true });
-        alert('Job declined. Email marked as read.');
+        showToast('Job declined. Email marked as read.', 'info');
         fetchPotentialJobs();
         break;
       case 'checkSchedule':
-        alert('Opening schedule view...');
-        // TODO: Open calendar/schedule view
+        showToast('Schedule view coming soon!', 'info');
         break;
       case 'requestMoreInfo':
-        alert('Opening email to request more information...');
-        // TODO: Open email compose
+        showToast('Email compose coming soon!', 'info');
         break;
       case 'sendQuote':
-        alert('Opening quote generator...');
-        // TODO: Open quote form
+        showToast('Quote generator coming soon!', 'info');
         break;
       default:
         break;

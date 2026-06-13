@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FiSend, FiMail, FiUsers, FiChevronDown, FiChevronUp, FiTarget, FiBarChart2, FiPlus, FiStar, FiUserPlus, FiSettings, FiCheck } from 'react-icons/fi';
+import { showToast } from './Toast';
+import NotificationModal from './NotificationModal';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 function MarketingOutreach() {
   const [clients, setClients] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
   const [expandedSections, setExpandedSections] = useState({
     overview: true,
     campaigns: false,
@@ -77,57 +80,64 @@ function MarketingOutreach() {
   const sendReviewRequests = async () => {
     const eligible = getEligibleForReviewRequests();
     if (eligible.length === 0) {
-      alert('No eligible jobs for review requests at this time.');
+      showToast('No eligible jobs for review requests at this time.', 'info');
       return;
     }
 
-    if (!confirm(`Send review requests to ${eligible.length} clients?`)) return;
-
-    try {
-      // TODO: Implement actual email sending
-      for (const job of eligible) {
-        await axios.patch(`${API_URL}/jobs/${job._id}`, {
-          reviewRequestSent: true,
-          reviewRequestDate: new Date()
-        });
+    setConfirmModal({
+      isOpen: true,
+      title: 'Send Review Requests',
+      message: `Send review requests to ${eligible.length} client(s)?`,
+      onConfirm: async () => {
+        try {
+          for (const job of eligible) {
+            await axios.patch(`${API_URL}/jobs/${job._id}`, {
+              reviewRequestSent: true,
+              reviewRequestDate: new Date()
+            });
+          }
+          showToast(`Successfully sent ${eligible.length} review request(s)!`, 'success');
+          fetchJobs();
+        } catch (error) {
+          console.error('Error sending review requests:', error);
+          showToast('Failed to send review requests', 'error');
+        }
       }
-      alert(`Successfully sent ${eligible.length} review requests!`);
-      fetchJobs();
-    } catch (error) {
-      console.error('Error sending review requests:', error);
-      alert('Failed to send review requests');
-    }
+    });
   };
 
   const sendReferralRequests = async () => {
     const eligible = getEligibleForReferralRequests();
     if (eligible.length === 0) {
-      alert('No eligible jobs for referral requests at this time.');
+      showToast('No eligible jobs for referral requests at this time.', 'info');
       return;
     }
 
-    if (!confirm(`Send referral requests to ${eligible.length} clients?`)) return;
-
-    try {
-      // TODO: Implement actual email sending
-      for (const job of eligible) {
-        await axios.patch(`${API_URL}/jobs/${job._id}`, {
-          referralRequestSent: true,
-          referralRequestDate: new Date()
-        });
+    setConfirmModal({
+      isOpen: true,
+      title: 'Send Referral Requests',
+      message: `Send referral requests to ${eligible.length} client(s)?`,
+      onConfirm: async () => {
+        try {
+          for (const job of eligible) {
+            await axios.patch(`${API_URL}/jobs/${job._id}`, {
+              referralRequestSent: true,
+              referralRequestDate: new Date()
+            });
+          }
+          showToast(`Successfully sent ${eligible.length} referral request(s)!`, 'success');
+          fetchJobs();
+        } catch (error) {
+          console.error('Error sending referral requests:', error);
+          showToast('Failed to send referral requests', 'error');
+        }
       }
-      alert(`Successfully sent ${eligible.length} referral requests!`);
-      fetchJobs();
-    } catch (error) {
-      console.error('Error sending referral requests:', error);
-      alert('Failed to send referral requests');
-    }
+    });
   };
 
   const saveAutomationSettings = () => {
-    // TODO: Save to backend/localStorage
     localStorage.setItem('marketingAutomation', JSON.stringify(automationSettings));
-    alert('Automation settings saved!');
+    showToast('Automation settings saved!', 'success');
   };
 
   useEffect(() => {
@@ -456,6 +466,17 @@ function MarketingOutreach() {
           </div>
         )}
       </div>
+
+      <NotificationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        type="confirm"
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        confirmText="Send"
+        cancelText="Cancel"
+      />
     </div>
   );
 }

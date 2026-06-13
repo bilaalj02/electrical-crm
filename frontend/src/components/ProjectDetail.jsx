@@ -6,6 +6,8 @@ import {
   FiGrid, FiList, FiClock, FiFilter, FiSearch, FiSend, FiMoreVertical,
   FiCheckCircle, FiAlertCircle, FiActivity
 } from 'react-icons/fi';
+import { showToast } from './Toast';
+import NotificationModal from './NotificationModal';
 import './ProjectDetail.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -36,6 +38,9 @@ function ProjectDetail({ projectId, onBack }) {
   const [showBeforeAfter, setShowBeforeAfter] = useState(false);
   const [selectedBeforePhoto, setSelectedBeforePhoto] = useState(null);
   const [selectedAfterPhoto, setSelectedAfterPhoto] = useState(null);
+
+  // Confirm dialog
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
 
   // Upload form state
   const [uploadFiles, setUploadFiles] = useState([]);
@@ -195,7 +200,7 @@ function ProjectDetail({ projectId, onBack }) {
         }
       });
 
-      alert('Photos uploaded successfully!');
+      showToast('Photos uploaded successfully!', 'success');
       setShowUploadModal(false);
       setUploadFiles([]);
       setUploadPreviews([]);
@@ -203,7 +208,7 @@ function ProjectDetail({ projectId, onBack }) {
       fetchActivities();
     } catch (error) {
       console.error('Error uploading photos:', error);
-      alert('Failed to upload photos');
+      showToast(error.response?.data?.error || 'Failed to upload photos', 'error');
     } finally {
       setUploading(false);
     }
@@ -217,29 +222,36 @@ function ProjectDetail({ projectId, onBack }) {
       });
       fetchPhotos();
       setEditingPhoto(null);
+      showToast('Photo updated successfully!', 'success');
     } catch (error) {
       console.error('Error updating photo:', error);
-      alert('Failed to update photo');
+      showToast(error.response?.data?.error || 'Failed to update photo', 'error');
     }
   };
 
   const handleDeletePhoto = async (photoId) => {
-    if (!confirm('Are you sure you want to delete this photo?')) return;
-
-    try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`${API_URL}/photos/${photoId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      fetchPhotos();
-      if (selectedPhoto?._id === photoId) {
-        setLightboxOpen(false);
-        setSelectedPhoto(null);
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Photo',
+      message: 'Are you sure you want to delete this photo? This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem('token');
+          await axios.delete(`${API_URL}/photos/${photoId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          fetchPhotos();
+          if (selectedPhoto?._id === photoId) {
+            setLightboxOpen(false);
+            setSelectedPhoto(null);
+          }
+          showToast('Photo deleted', 'success');
+        } catch (error) {
+          console.error('Error deleting photo:', error);
+          showToast(error.response?.data?.error || 'Failed to delete photo', 'error');
+        }
       }
-    } catch (error) {
-      console.error('Error deleting photo:', error);
-      alert('Failed to delete photo');
-    }
+    });
   };
 
   const handleAddComment = async () => {
@@ -258,7 +270,7 @@ function ProjectDetail({ projectId, onBack }) {
       fetchActivities();
     } catch (error) {
       console.error('Error adding comment:', error);
-      alert('Failed to add comment');
+      showToast(error.response?.data?.error || 'Failed to add comment', 'error');
     }
   };
 
@@ -464,18 +476,6 @@ function ProjectDetail({ projectId, onBack }) {
                     />
                   </div>
                 </div>
-                <div className="toolbar-right">
-                  <label className="btn-upload">
-                    <FiUpload /> Upload Photos
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      onChange={handleFileSelect}
-                      style={{ display: 'none' }}
-                    />
-                  </label>
-                </div>
               </div>
 
               <div className="category-filter">
@@ -504,7 +504,7 @@ function ProjectDetail({ projectId, onBack }) {
                   <p>{searchTerm ? 'Try a different search term' : 'Upload photos to document your project progress'}</p>
                   {!searchTerm && (
                     <label className="btn-primary">
-                      <FiPlus /> Upload First Photo
+                      <FiPlus /> Upload Photo
                       <input
                         type="file"
                         multiple
@@ -789,6 +789,18 @@ function ProjectDetail({ projectId, onBack }) {
           </div>
         </div>
       )}
+
+      {/* Confirm Modal */}
+      <NotificationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        type="confirm"
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
 
       {/* Lightbox */}
       {lightboxOpen && selectedPhoto && (

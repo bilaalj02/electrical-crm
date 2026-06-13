@@ -127,9 +127,8 @@ function NotificationModal({
           <div style={{ marginBottom: '20px' }}>
             {getIcon()}
           </div>
-          <p style={{
+          <p className="notification-message" style={{
             fontSize: '15px',
-            color: '#1f2937',
             lineHeight: '1.6',
             margin: 0,
             whiteSpace: 'pre-line',
@@ -153,24 +152,15 @@ function NotificationModal({
             <>
               <button
                 onClick={handleCancel}
+                className="btn-secondary"
                 style={{
                   padding: '10px 24px',
                   border: '2px solid #e5e7eb',
-                  background: 'white',
                   borderRadius: '8px',
                   fontWeight: '600',
                   cursor: 'pointer',
                   fontSize: '14px',
-                  color: '#4b5563',
                   transition: 'all 0.2s'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.borderColor = '#d4af37';
-                  e.currentTarget.style.background = '#fef9e7';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.borderColor = '#e5e7eb';
-                  e.currentTarget.style.background = 'white';
                 }}
               >
                 {cancelText}

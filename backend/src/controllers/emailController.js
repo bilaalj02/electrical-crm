@@ -4,6 +4,22 @@ const Email = require('../models/Email');
 const EmailAccount = require('../models/EmailAccount');
 const { getAuthenticatedClient, getAuthenticatedMicrosoftClient } = require('./oauthController');
 
+async function notifyMCPNewEmail(emailId) {
+  const mcpUrl = process.env.MCP_WEBHOOK_URL;
+  const secret = process.env.MCP_WEBHOOK_SECRET;
+  if (!mcpUrl) return;
+  try {
+    await fetch(`${mcpUrl}/webhook/new-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-webhook-secret': secret || '' },
+      body: JSON.stringify({ emailId: emailId.toString() }),
+      signal: AbortSignal.timeout(5000)
+    });
+  } catch (err) {
+    console.warn('[MCP] new-email webhook failed (non-fatal):', err.message);
+  }
+}
+
 // Parse email address string
 const parseEmailAddress = (addressString) => {
   if (!addressString) return null;
@@ -128,7 +144,7 @@ const syncGmailEmails = async (req, res, emailAccount, maxResults) => {
     getAttachments(fullMessage.data.payload);
 
     // Create email record
-    await Email.create({
+    const newEmail = await Email.create({
       userId: req.user._id,
       emailAccountId: emailAccount._id,
       messageId: message.id,
@@ -149,6 +165,11 @@ const syncGmailEmails = async (req, res, emailAccount, maxResults) => {
       hasAttachments: attachments.length > 0,
       attachments
     });
+
+    // Notify MCP for AI classification (non-blocking, inbox only)
+    if (!fullMessage.data.labelIds?.includes('SENT')) {
+      notifyMCPNewEmail(newEmail._id);
+    }
 
     syncedCount++;
   }
@@ -199,7 +220,7 @@ const syncMicrosoftEmails = async (req, res, emailAccount, maxResults) => {
     };
 
     // Create email record
-    await Email.create({
+    const newMsEmail = await Email.create({
       userId: req.user._id,
       emailAccountId: emailAccount._id,
       messageId: message.id,
@@ -223,6 +244,11 @@ const syncMicrosoftEmails = async (req, res, emailAccount, maxResults) => {
       hasAttachments: message.hasAttachments,
       attachments: []
     });
+
+    // Notify MCP for AI classification (non-blocking, inbox only)
+    if (!message.isRead === false) {
+      notifyMCPNewEmail(newMsEmail._id);
+    }
 
     syncedCount++;
   }

@@ -45,7 +45,7 @@ router.post('/upload/:projectId', auth, upload.array('photos', 10), async (req, 
           label: labelsArray[index] || file.originalname,
           notes: notesArray[index] || '',
           category: categoriesArray[index] || 'other',
-          uploadedBy: req.user.userId,
+          uploadedBy: req.user._id,
           job: jobId || null,
           order: index
         });

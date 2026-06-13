@@ -371,85 +371,54 @@ export default function Projects() {
       </div>
 
       {/* Filters and Search */}
-      <div style={{
+      <div className="filter-box" style={{
         background: 'linear-gradient(135deg, #fef9e7 0%, #fef5d4 100%)',
-        padding: '16px 24px',
-        borderRadius: '16px',
+        padding: '8px 12px',
+        borderRadius: '12px',
         marginBottom: '24px',
-        boxShadow: '0 4px 12px rgba(212, 175, 55, 0.15)',
-        border: '2px solid rgba(212, 175, 55, 0.3)'
+        boxShadow: '0 2px 8px rgba(212, 175, 55, 0.15)',
+        border: '1px solid rgba(212, 175, 55, 0.3)'
       }}>
         {/* Filter Toggle Button */}
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            background: 'transparent',
-            border: 'none',
-            padding: '8px 0',
-            cursor: 'pointer',
-            fontSize: '16px',
-            fontWeight: '600',
-            color: '#78350f',
-            marginBottom: showFilters ? '16px' : '0'
-          }}
-        >
-          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <FiFilter /> Filters & Search
-          </span>
-          {showFilters ? <FiChevronUp size={20} /> : <FiChevronDown size={20} />}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: showFilters ? '8px' : '0' }}>
+          <h3 style={{ margin: 0, color: '#78350f', fontSize: '12px', fontWeight: '600' }}>
+            <FiFilter style={{ marginRight: '6px' }} />
+            Filters & Search
+          </h3>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            style={{ background: 'white', border: 'none', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', fontSize: '11px', fontWeight: '600', color: '#78350f' }}
+          >
+            {showFilters ? '▲' : '▼'}
+          </button>
+        </div>
 
         {/* Collapsible Filter Content */}
         {showFilters && (
           <>
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '16px',
-              marginBottom: '16px'
+              gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+              gap: '8px',
+              marginBottom: '8px'
             }}>
           <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>
-              Search
-            </label>
-            <div style={{ position: 'relative' }}>
-              <FiSearch style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#999' }} />
-              <input
-                type="text"
-                placeholder="Search projects..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px 10px 40px',
-                  border: '2px solid rgba(212, 175, 55, 0.3)',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  background: 'white'
-                }}
-              />
-            </div>
+            <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', color: '#78350f', fontSize: '11px' }}>Search</label>
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ width: '100%', padding: '6px 8px', border: 'none', borderRadius: '6px', fontSize: '12px', outline: 'none', background: 'white', color: '#333', boxSizing: 'border-box' }}
+            />
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>
-              Job
-            </label>
+            <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', color: '#78350f', fontSize: '11px' }}>Job</label>
             <select
               value={filterJob}
               onChange={(e) => setFilterJob(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: '2px solid rgba(212, 175, 55, 0.3)',
-                borderRadius: '8px',
-                fontSize: '14px',
-                background: 'white'
-              }}
+              style={{ width: '100%', padding: '6px 8px', border: 'none', borderRadius: '6px', fontSize: '12px', outline: 'none', background: 'white', color: '#333', cursor: 'pointer' }}
             >
               <option value="">All Jobs</option>
               {jobs.map(job => (
@@ -461,22 +430,13 @@ export default function Projects() {
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>
-              Status
-            </label>
+            <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', color: '#78350f', fontSize: '11px' }}>Status</label>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: '2px solid rgba(212, 175, 55, 0.3)',
-                borderRadius: '8px',
-                fontSize: '14px',
-                background: 'white'
-              }}
+              style={{ width: '100%', padding: '6px 8px', border: 'none', borderRadius: '6px', fontSize: '12px', outline: 'none', background: 'white', color: '#333', cursor: 'pointer' }}
             >
-              <option value="">All Statuses</option>
+              <option value="">All</option>
               <option value="active">Active</option>
               <option value="completed">Completed</option>
               <option value="archived">Archived</option>
@@ -484,20 +444,11 @@ export default function Projects() {
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#78350f', fontSize: '13px' }}>
-              Sort By
-            </label>
+            <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', color: '#78350f', fontSize: '11px' }}>Sort By</label>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: '2px solid rgba(212, 175, 55, 0.3)',
-                borderRadius: '8px',
-                fontSize: '14px',
-                background: 'white'
-              }}
+              style={{ width: '100%', padding: '6px 8px', border: 'none', borderRadius: '6px', fontSize: '12px', outline: 'none', background: 'white', color: '#333', cursor: 'pointer' }}
             >
               <option value="date-desc">Newest First</option>
               <option value="date-asc">Oldest First</option>
@@ -506,41 +457,33 @@ export default function Projects() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
           <button
             onClick={() => setViewMode('grid')}
             style={{
-              padding: '8px 16px',
-              border: `2px solid ${viewMode === 'grid' ? '#d4af37' : 'rgba(212, 175, 55, 0.3)'}`,
-              borderRadius: '8px',
+              padding: '4px 10px',
+              border: `1px solid ${viewMode === 'grid' ? '#d4af37' : 'rgba(212, 175, 55, 0.3)'}`,
+              borderRadius: '6px',
               background: viewMode === 'grid' ? '#d4af37' : 'white',
               color: viewMode === 'grid' ? 'white' : '#78350f',
               cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '600',
-              transition: 'all 0.3s'
+              fontSize: '11px',
+              fontWeight: '600'
             }}
-            title="Grid View"
-          >
-            Grid View
-          </button>
+          >Grid View</button>
           <button
             onClick={() => setViewMode('list')}
             style={{
-              padding: '8px 16px',
-              border: `2px solid ${viewMode === 'list' ? '#d4af37' : 'rgba(212, 175, 55, 0.3)'}`,
-              borderRadius: '8px',
+              padding: '4px 10px',
+              border: `1px solid ${viewMode === 'list' ? '#d4af37' : 'rgba(212, 175, 55, 0.3)'}`,
+              borderRadius: '6px',
               background: viewMode === 'list' ? '#d4af37' : 'white',
               color: viewMode === 'list' ? 'white' : '#78350f',
               cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '600',
-              transition: 'all 0.3s'
+              fontSize: '11px',
+              fontWeight: '600'
             }}
-            title="List View"
-          >
-            List View
-          </button>
+          >List View</button>
         </div>
           </>
         )}
@@ -637,88 +580,90 @@ export default function Projects() {
               </button>
             </div>
             <form onSubmit={handleCreateProject}>
-              <div className="form-group">
-                <label>Title *</label>
-                <input
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="form-group" style={{ position: 'relative' }}>
-                <label>Job *</label>
-                <input
-                  type="text"
-                  placeholder="Search or type job..."
-                  value={formData.jobSearch}
-                  onChange={(e) => {
-                    setFormData({ ...formData, jobSearch: e.target.value, jobId: '' });
-                    setShowJobDropdown(true);
-                  }}
-                  onFocus={() => setShowJobDropdown(true)}
-                  required={!formData.jobId}
-                />
-                {showJobDropdown && filteredJobs.length > 0 && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    background: 'white',
-                    border: '1px solid #ddd',
-                    borderRadius: '8px',
-                    maxHeight: '200px',
-                    overflowY: 'auto',
-                    zIndex: 1000,
-                    marginTop: '4px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                  }}>
-                    {filteredJobs.map(job => (
-                      <div
-                        key={job._id}
-                        onClick={() => {
-                          setFormData({
-                            ...formData,
-                            jobId: job._id,
-                            jobSearch: `${job.jobNumber} - ${job.title}`
-                          });
-                          setShowJobDropdown(false);
-                        }}
-                        style={{
-                          padding: '12px',
-                          cursor: 'pointer',
-                          borderBottom: '1px solid #f0f0f0',
-                          transition: 'background 0.2s'
-                        }}
-                        onMouseEnter={(e) => e.target.style.background = '#f9f9f9'}
-                        onMouseLeave={(e) => e.target.style.background = 'white'}
-                      >
-                        <div style={{ fontWeight: '500' }}>{job.jobNumber}</div>
-                        <div style={{ fontSize: '12px', color: '#666' }}>{job.title}</div>
-                        {job.client && (
-                          <div style={{ fontSize: '11px', color: '#999' }}>{job.client.name}</div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="form-group">
-                <label>Description</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={3}
-                />
-              </div>
-              <div className="form-group">
-                <label>Project Date</label>
-                <input
-                  type="date"
-                  value={formData.projectDate}
-                  onChange={(e) => setFormData({ ...formData, projectDate: e.target.value })}
-                />
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>Title *</label>
+                  <input
+                    type="text"
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="form-group" style={{ position: 'relative' }}>
+                  <label>Job *</label>
+                  <input
+                    type="text"
+                    placeholder="Search or type job..."
+                    value={formData.jobSearch}
+                    onChange={(e) => {
+                      setFormData({ ...formData, jobSearch: e.target.value, jobId: '' });
+                      setShowJobDropdown(true);
+                    }}
+                    onFocus={() => setShowJobDropdown(true)}
+                    required={!formData.jobId}
+                  />
+                  {showJobDropdown && filteredJobs.length > 0 && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      background: 'white',
+                      border: '1px solid #ddd',
+                      borderRadius: '8px',
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      zIndex: 1000,
+                      marginTop: '4px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                    }}>
+                      {filteredJobs.map(job => (
+                        <div
+                          key={job._id}
+                          onClick={() => {
+                            setFormData({
+                              ...formData,
+                              jobId: job._id,
+                              jobSearch: `${job.jobNumber} - ${job.title}`
+                            });
+                            setShowJobDropdown(false);
+                          }}
+                          style={{
+                            padding: '12px',
+                            cursor: 'pointer',
+                            borderBottom: '1px solid #f0f0f0',
+                            transition: 'background 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = '#f9f9f9'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                        >
+                          <div style={{ fontWeight: '500' }}>{job.jobNumber}</div>
+                          <div style={{ fontSize: '12px', color: '#666' }}>{job.title}</div>
+                          {job.client && (
+                            <div style={{ fontSize: '11px', color: '#999' }}>{job.client.name}</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="form-group">
+                  <label>Description</label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    rows={3}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Project Date</label>
+                  <input
+                    type="date"
+                    value={formData.projectDate}
+                    onChange={(e) => setFormData({ ...formData, projectDate: e.target.value })}
+                  />
+                </div>
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn-secondary" onClick={() => setShowCreateModal(false)}>

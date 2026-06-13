@@ -1112,10 +1112,16 @@ function Emails() {
               <button
                 className="compose-icon-btn"
                 onClick={() => {
-                  if (window.confirm('Discard this draft?')) {
-                    setShowComposeModal(false);
-                    setComposeData({ fromAccount: '', to: '', cc: '', subject: '', body: '' });
-                  }
+                  setNotification({
+                    isOpen: true,
+                    type: 'confirm',
+                    title: 'Discard Draft',
+                    message: 'Discard this draft?',
+                    onConfirm: () => {
+                      setShowComposeModal(false);
+                      setComposeData({ fromAccount: '', to: '', cc: '', subject: '', body: '' });
+                    }
+                  });
                 }}
                 title="Close"
               >

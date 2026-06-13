@@ -3,6 +3,23 @@ const router = express.Router();
 const Job = require('../models/Job');
 const Client = require('../models/Client');
 
+// Fire-and-forget: notify MCP automation engine
+async function notifyMCP(endpoint, payload) {
+  const mcpUrl = process.env.MCP_WEBHOOK_URL;
+  const secret = process.env.MCP_WEBHOOK_SECRET;
+  if (!mcpUrl) return;
+  try {
+    await fetch(`${mcpUrl}${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-webhook-secret': secret || '' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(5000)
+    });
+  } catch (err) {
+    console.warn(`[MCP] Webhook ${endpoint} failed (non-fatal):`, err.message);
+  }
+}
+
 /**
  * GET /api/jobs
  * Get all jobs with filtering and pagination
@@ -208,6 +225,9 @@ router.post('/', async (req, res) => {
 
     const populatedJob = await Job.findById(job._id).populate('client');
 
+    // Notify MCP — triggers deposit request if job value >= threshold
+    notifyMCP('/webhook/job-created', { jobId: job._id.toString() });
+
     res.status(201).json(populatedJob);
   } catch (error) {
     console.error('Error creating job:', error);
@@ -227,11 +247,31 @@ router.patch('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Job not found' });
     }
 
+    const previousAssigned = JSON.stringify(job.assignedTo || []);
+
     // Update job fields (allows actualExpenses to be included)
     Object.assign(job, req.body);
 
     // Save to trigger pre-save middleware for calculations
     await job.save();
+
+    // If assignedTo changed, notify MCP to send tech briefing SMS
+    const newAssigned = JSON.stringify(job.assignedTo || []);
+    if (req.body.assignedTo && newAssigned !== previousAssigned) {
+      const tech = job.assignedTo?.[0];
+      if (tech?.phone) {
+        notifyMCP('/webhook/tech-assigned', {
+          jobId: job._id.toString(),
+          techName: tech.name,
+          techPhone: tech.phone
+        });
+      }
+    }
+
+    // If payment updated and job is now paid, notify MCP for referral ask
+    if (req.body['payment.paidInFull'] === true || job.payment?.paidInFull) {
+      notifyMCP('/webhook/payment-received', { jobId: job._id.toString() });
+    }
 
     // Populate and return
     const updatedJob = await Job.findById(job._id)
@@ -323,11 +363,17 @@ router.patch('/:id/status', async (req, res) => {
         break;
     }
 
+    const existing = await Job.findById(req.params.id);
+    const oldStatus = existing?.status;
+
     const job = await Job.findByIdAndUpdate(
       req.params.id,
       updateData,
       { new: true }
     ).populate('client');
+
+    // Notify MCP automation engine (non-blocking)
+    notifyMCP('/webhook/job-status', { jobId: req.params.id, newStatus: status, oldStatus });
 
     res.json(job);
   } catch (error) {

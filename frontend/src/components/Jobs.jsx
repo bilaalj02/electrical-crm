@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FiBriefcase, FiPlus, FiEdit, FiTrash2, FiDollarSign, FiClock, FiUser } from 'react-icons/fi';
+import { FiBriefcase, FiPlus, FiEdit, FiTrash2, FiDollarSign, FiClock, FiUser, FiFilter } from 'react-icons/fi';
 import JobForm from './JobForm';
 import JobDetail from './JobDetail';
 import ExpenseEntryModal from './ExpenseEntryModal';
+import { showToast } from './Toast';
+import NotificationModal from './NotificationModal';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 function Jobs({ initialJobId, onConsumeInitial }) {
   const [jobs, setJobs] = useState([]);
@@ -13,6 +15,7 @@ function Jobs({ initialJobId, onConsumeInitial }) {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState(null);
   const [selectedJob, setSelectedJob] = useState(null);
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
 
   // If Home asked us to open a specific job, fetch + open it on mount
   useEffect(() => {
@@ -35,6 +38,8 @@ function Jobs({ initialJobId, onConsumeInitial }) {
   const [editingJob, setEditingJob] = useState(null);
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
   const [jobForExpenses, setJobForExpenses] = useState(null);
+
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   // Filters
   const [filters, setFilters] = useState({
@@ -87,17 +92,23 @@ function Jobs({ initialJobId, onConsumeInitial }) {
 
   // Delete job
   const deleteJob = async (jobId) => {
-    if (!confirm('Are you sure you want to delete this job?')) return;
-
-    try {
-      await axios.delete(`${API_URL}/jobs/${jobId}`);
-      fetchJobs();
-      fetchStats();
-      setSelectedJob(null);
-    } catch (error) {
-      console.error('Error deleting job:', error);
-      alert('Error deleting job');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Job',
+      message: 'Are you sure you want to delete this job? This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          await axios.delete(`${API_URL}/jobs/${jobId}`);
+          fetchJobs();
+          fetchStats();
+          setSelectedJob(null);
+          showToast('Job deleted', 'success');
+        } catch (error) {
+          console.error('Error deleting job:', error);
+          showToast(error.response?.data?.error || 'Error deleting job', 'error');
+        }
+      }
+    });
   };
 
   useEffect(() => {
@@ -208,51 +219,86 @@ function Jobs({ initialJobId, onConsumeInitial }) {
         </div>
       )}
 
-      {/* Minimal Filters */}
-      <div className="minimal-filters">
-        <input
-          type="text"
-          placeholder="🔍 Search jobs..."
-          value={filters.search}
-          onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-          className="minimal-filter-input"
-        />
-        <select
-          value={filters.status}
-          onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-          className="minimal-filter-select"
-        >
-          <option value="">All Status</option>
-          <option value="quote">Quote</option>
-          <option value="approved">Approved</option>
-          <option value="scheduled">Scheduled</option>
-          <option value="in-progress">In Progress</option>
-          <option value="completed">Completed</option>
-          <option value="invoiced">Invoiced</option>
-          <option value="paid">Paid</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
-        <select
-          value={filters.priority}
-          onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
-          className="minimal-filter-select"
-        >
-          <option value="">All Priorities</option>
-          <option value="low">Low</option>
-          <option value="medium">Medium</option>
-          <option value="high">High</option>
-          <option value="urgent">Urgent</option>
-        </select>
-        <select
-          value={filters.sortBy}
-          onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
-          className="minimal-filter-select"
-        >
-          <option value="scheduledDate">Scheduled Date</option>
-          <option value="costs.finalTotal">Payment Amount</option>
-          <option value="createdAt">Created Date</option>
-          <option value="priority">Priority</option>
-        </select>
+      {/* Filters */}
+      <div className="filter-box" style={{
+        background: 'linear-gradient(135deg, #fef9e7 0%, #fef5d4 100%)',
+        padding: '8px 12px',
+        borderRadius: '12px',
+        boxShadow: '0 2px 8px rgba(212, 175, 55, 0.15)',
+        border: '1px solid rgba(212, 175, 55, 0.3)',
+        marginBottom: '20px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: filtersExpanded ? '8px' : '0' }}>
+          <h3 style={{ margin: 0, color: '#78350f', fontSize: '12px', fontWeight: '600' }}>
+            <FiFilter style={{ marginRight: '6px' }} />
+            Filters & Search
+          </h3>
+          <button
+            onClick={() => setFiltersExpanded(!filtersExpanded)}
+            style={{ background: 'white', border: 'none', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', fontSize: '11px', fontWeight: '600', color: '#78350f' }}
+          >
+            {filtersExpanded ? '▲' : '▼'}
+          </button>
+        </div>
+        {filtersExpanded && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px' }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', color: '#78350f', fontSize: '11px' }}>Search</label>
+              <input
+                type="text"
+                placeholder="Search..."
+                value={filters.search}
+                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                style={{ width: '100%', padding: '6px 8px', border: 'none', borderRadius: '6px', fontSize: '12px', outline: 'none', background: 'white', color: '#333', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', color: '#78350f', fontSize: '11px' }}>Status</label>
+              <select
+                value={filters.status}
+                onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                style={{ width: '100%', padding: '6px 8px', border: 'none', borderRadius: '6px', fontSize: '12px', outline: 'none', background: 'white', color: '#333', cursor: 'pointer' }}
+              >
+                <option value="">All</option>
+                <option value="quote">Quote</option>
+                <option value="approved">Approved</option>
+                <option value="scheduled">Scheduled</option>
+                <option value="in-progress">In Progress</option>
+                <option value="completed">Completed</option>
+                <option value="invoiced">Invoiced</option>
+                <option value="paid">Paid</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', color: '#78350f', fontSize: '11px' }}>Priority</label>
+              <select
+                value={filters.priority}
+                onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
+                style={{ width: '100%', padding: '6px 8px', border: 'none', borderRadius: '6px', fontSize: '12px', outline: 'none', background: 'white', color: '#333', cursor: 'pointer' }}
+              >
+                <option value="">All</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', color: '#78350f', fontSize: '11px' }}>Sort By</label>
+              <select
+                value={filters.sortBy}
+                onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                style={{ width: '100%', padding: '6px 8px', border: 'none', borderRadius: '6px', fontSize: '12px', outline: 'none', background: 'white', color: '#333', cursor: 'pointer' }}
+              >
+                <option value="scheduledDate">Scheduled Date</option>
+                <option value="costs.finalTotal">Payment Amount</option>
+                <option value="createdAt">Created Date</option>
+                <option value="priority">Priority</option>
+              </select>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Jobs List */}
@@ -393,6 +439,17 @@ function Jobs({ initialJobId, onConsumeInitial }) {
           setExpenseModalOpen(false);
           setJobForExpenses(null);
         }}
+      />
+
+      <NotificationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        type="confirm"
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        confirmText="Delete"
+        cancelText="Cancel"
       />
     </div>
   );

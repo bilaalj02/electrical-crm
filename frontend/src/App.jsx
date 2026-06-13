@@ -1,6 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import './App.css';
-import { FiMail, FiBriefcase, FiUsers, FiMenu, FiX, FiHome, FiBarChart2, FiSend, FiCalendar, FiChevronDown, FiChevronUp, FiChevronLeft, FiChevronRight, FiPlus, FiUser, FiLogOut, FiSettings as FiSettingsIcon, FiMoon, FiSun, FiBell, FiFolder, FiZap } from 'react-icons/fi';
+import { FiMail, FiBriefcase, FiUsers, FiHome, FiBarChart2, FiCalendar, FiChevronLeft, FiChevronRight, FiUser, FiLogOut, FiSettings as FiSettingsIcon, FiBell, FiFolder, FiZap, FiSend } from 'react-icons/fi';
+import { ToastContainer } from './components/Toast';
 import { useAuth } from './context/AuthContext';
 import Login from './components/Login';
 import Home from './components/Home';
@@ -17,7 +18,7 @@ const DiagramEditor = lazy(() => import('./components/DiagramEditor/DiagramEdito
 import mesLogo from './assets/mes-logo.png';
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 function App() {
   const { isAuthenticated, user, logout, loading } = useAuth();
@@ -38,20 +39,6 @@ function App() {
     if (options.jobId)    setPendingJobId(options.jobId);
     if (options.clientId) setPendingClientId(options.clientId);
   };
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode');
-    return saved ? JSON.parse(saved) : false;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('darkMode', JSON.stringify(darkMode));
-    if (darkMode) {
-      document.body.classList.add('dark-mode');
-    } else {
-      document.body.classList.remove('dark-mode');
-    }
-  }, [darkMode]);
-
   useEffect(() => {
     if (isAuthenticated) {
       // Fetch potential jobs count on load and every 5 minutes
@@ -68,10 +55,6 @@ function App() {
     } catch (error) {
       console.error('Error fetching potential jobs count:', error);
     }
-  };
-
-  const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
   };
 
   if (loading) {
@@ -219,45 +202,6 @@ function App() {
             </div>
           )}
 
-          <button
-            className="dark-mode-toggle"
-            onClick={toggleDarkMode}
-            title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px' }}>
-              {darkMode ? (
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  style={{ display: 'block' }}
-                >
-                  <circle cx="12" cy="12" r="5" stroke="#d4af37" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"></circle>
-                  <line x1="12" y1="1" x2="12" y2="3" stroke="#d4af37" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></line>
-                  <line x1="12" y1="21" x2="12" y2="23" stroke="#d4af37" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></line>
-                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke="#d4af37" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></line>
-                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke="#d4af37" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></line>
-                  <line x1="1" y1="12" x2="3" y2="12" stroke="#d4af37" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></line>
-                  <line x1="21" y1="12" x2="23" y2="12" stroke="#d4af37" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></line>
-                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke="#d4af37" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></line>
-                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke="#d4af37" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></line>
-                </svg>
-              ) : (
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  style={{ display: 'block' }}
-                >
-                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="#d4af37" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"></path>
-                </svg>
-              )}
-            </span>
-          </button>
         </div>
       </aside>
 
@@ -267,7 +211,7 @@ function App() {
         title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
         style={{
           position: 'fixed',
-          left: sidebarOpen ? '240px' : '70px',
+          left: sidebarOpen ? '188px' : '68px',
           top: '80px',
           background: '#d4af37',
           border: 'none',
@@ -384,6 +328,8 @@ function App() {
           fetchPotentialJobsCount();
         }}
       />
+
+      <ToastContainer />
     </div>
   );
 }

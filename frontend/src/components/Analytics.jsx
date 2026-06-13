@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FiBarChart2, FiTrendingUp, FiDollarSign, FiDownload, FiChevronDown, FiChevronUp, FiBriefcase, FiUsers, FiMail, FiLink, FiRefreshCw, FiCheckCircle, FiXCircle } from 'react-icons/fi';
+import { showToast } from './Toast';
+import NotificationModal from './NotificationModal';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 function Analytics() {
   const [stats, setStats] = useState({
@@ -21,6 +23,7 @@ function Analytics() {
   });
   const [quickbooksConnected, setQuickbooksConnected] = useState(false);
   const [quickbooksLoading, setQuickbooksLoading] = useState(false);
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
 
   useEffect(() => {
     fetchAnalytics();
@@ -59,54 +62,49 @@ function Analytics() {
   const connectQuickBooks = async () => {
     setQuickbooksLoading(true);
     try {
-      // Placeholder for QuickBooks OAuth integration
-      alert('QuickBooks integration coming soon!\n\nThis feature will allow you to:\n• Sync invoices automatically\n• Import expense data\n• Export revenue reports\n• Track payments in real-time\n\nAvailable as optional add-on: $30/month');
-
-      // Simulate connection for demo purposes
-      // In production, this would redirect to QuickBooks OAuth
-      // const response = await axios.get(`${API_URL}/integrations/quickbooks/auth-url`);
-      // window.location.href = response.data.authUrl;
+      showToast('QuickBooks integration coming soon! Available as optional add-on: $30/month', 'info', 6000);
     } catch (error) {
       console.error('Error connecting QuickBooks:', error);
-      alert('Failed to connect QuickBooks. Please try again.');
+      showToast('Failed to connect QuickBooks. Please try again.', 'error');
     } finally {
       setQuickbooksLoading(false);
     }
   };
 
   const disconnectQuickBooks = async () => {
-    if (window.confirm('Are you sure you want to disconnect QuickBooks?')) {
-      setQuickbooksLoading(true);
-      try {
-        // Placeholder for disconnection
-        // await axios.post(`${API_URL}/integrations/quickbooks/disconnect`);
-        setQuickbooksConnected(false);
-        alert('QuickBooks disconnected successfully');
-      } catch (error) {
-        console.error('Error disconnecting QuickBooks:', error);
-        alert('Failed to disconnect QuickBooks');
-      } finally {
-        setQuickbooksLoading(false);
+    setConfirmModal({
+      isOpen: true,
+      title: 'Disconnect QuickBooks',
+      message: 'Are you sure you want to disconnect QuickBooks?',
+      onConfirm: async () => {
+        setQuickbooksLoading(true);
+        try {
+          setQuickbooksConnected(false);
+          showToast('QuickBooks disconnected successfully', 'success');
+        } catch (error) {
+          console.error('Error disconnecting QuickBooks:', error);
+          showToast('Failed to disconnect QuickBooks', 'error');
+        } finally {
+          setQuickbooksLoading(false);
+        }
       }
-    }
+    });
   };
 
   const syncQuickBooks = async () => {
     setQuickbooksLoading(true);
     try {
-      // Placeholder for syncing data
-      alert('Syncing with QuickBooks...\n\nThis will:\n• Import recent invoices\n• Update payment statuses\n• Sync expense data\n• Export new jobs\n\nSync complete!');
-      // await axios.post(`${API_URL}/integrations/quickbooks/sync`);
+      showToast('QuickBooks sync coming soon!', 'info');
     } catch (error) {
       console.error('Error syncing QuickBooks:', error);
-      alert('Failed to sync with QuickBooks');
+      showToast('Failed to sync with QuickBooks', 'error');
     } finally {
       setQuickbooksLoading(false);
     }
   };
 
   const handleDownloadPDF = () => {
-    alert('PDF download functionality will be implemented soon. This will generate a detailed analytics report.');
+    showToast('PDF download will be available soon. It will generate a detailed analytics report.', 'info', 5000);
   };
 
   const formatCurrency = (amount) => {
@@ -555,6 +553,17 @@ function Analytics() {
           </div>
         )}
       </div>
+
+      <NotificationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        type="confirm"
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        confirmText="Disconnect"
+        cancelText="Cancel"
+      />
     </div>
   );
 }

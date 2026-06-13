@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FiUsers, FiMail, FiTrash2, FiUserPlus, FiX, FiRefreshCw, FiSettings as FiSettingsIcon } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
+import NotificationModal from './NotificationModal';
 import './Settings.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 export default function Settings() {
   const { user } = useAuth();
@@ -17,6 +18,7 @@ export default function Settings() {
   const [inviteRole, setInviteRole] = useState('employee');
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
 
   useEffect(() => {
     if (user?.role === 'admin') {
@@ -80,39 +82,49 @@ export default function Settings() {
   };
 
   const handleDeleteInvitation = async (invitationId) => {
-    if (!confirm('Are you sure you want to revoke this invitation?')) return;
-
-    try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`${API_URL}/invitations/${invitationId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setMessage({ type: 'success', text: 'Invitation revoked successfully' });
-      fetchInvitations();
-    } catch (error) {
-      setMessage({
-        type: 'error',
-        text: error.response?.data?.error || 'Failed to revoke invitation'
-      });
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Revoke Invitation',
+      message: 'Are you sure you want to revoke this invitation?',
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem('token');
+          await axios.delete(`${API_URL}/invitations/${invitationId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          setMessage({ type: 'success', text: 'Invitation revoked successfully' });
+          fetchInvitations();
+        } catch (error) {
+          setMessage({
+            type: 'error',
+            text: error.response?.data?.error || 'Failed to revoke invitation'
+          });
+        }
+      }
+    });
   };
 
   const handleDeleteEmployee = async (employeeId) => {
-    if (!confirm('Are you sure you want to delete this employee? This action cannot be undone.')) return;
-
-    try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`${API_URL}/auth/users/${employeeId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setMessage({ type: 'success', text: 'Employee deleted successfully' });
-      fetchEmployees();
-    } catch (error) {
-      setMessage({
-        type: 'error',
-        text: error.response?.data?.error || 'Failed to delete employee'
-      });
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Employee',
+      message: 'Are you sure you want to delete this employee? This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem('token');
+          await axios.delete(`${API_URL}/auth/users/${employeeId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          setMessage({ type: 'success', text: 'Employee deleted successfully' });
+          fetchEmployees();
+        } catch (error) {
+          setMessage({
+            type: 'error',
+            text: error.response?.data?.error || 'Failed to delete employee'
+          });
+        }
+      }
+    });
   };
 
   const handleUpdateEmployeeStatus = async (employeeId, newStatus) => {
@@ -372,6 +384,17 @@ export default function Settings() {
           </div>
         </div>
       )}
+
+      <NotificationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        type="confirm"
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        confirmText="Confirm"
+        cancelText="Cancel"
+      />
     </div>
   );
 }
