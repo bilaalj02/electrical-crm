@@ -3,10 +3,7 @@ const router = express.Router();
 const Invitation = require('../models/Invitation');
 const User = require('../models/User');
 const { auth } = require('../middleware/auth');
-const GmailService = require('../services/gmailService');
-
-// Initialize Gmail service (using Gmail account 1)
-const gmailService = new GmailService(1);
+const { sendInvitationEmail } = require('../services/emailService');
 
 // Admin check middleware
 const requireAdmin = async (req, res, next) => {
@@ -59,31 +56,13 @@ router.post('/', auth, requireAdmin, async (req, res) => {
     // Generate signup link
     const signupLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/signup?token=${token}`;
 
-    // Send email via Gmail API
+    // Send email via Resend
     try {
-      const emailHtml = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #d4af37;">You've been invited!</h2>
-          <p>Hi there,</p>
-          <p>You've been invited to join <strong>${process.env.COMPANY_NAME || 'our team'}</strong> as ${role === 'employee' ? 'an employee' : 'a team member'}.</p>
-          <p>Click the button below to create your account:</p>
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${signupLink}" style="background-color: #d4af37; color: #000; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
-              Create Account
-            </a>
-          </div>
-          <p style="color: #666; font-size: 14px;">Or copy and paste this link in your browser:</p>
-          <p style="color: #666; font-size: 14px; word-break: break-all;">${signupLink}</p>
-          <p style="color: #666; font-size: 14px; margin-top: 30px;">This invitation will expire in 7 days.</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-          <p style="color: #999; font-size: 12px;">If you didn't expect this invitation, you can safely ignore this email.</p>
-        </div>
-      `;
-
-      await gmailService.sendEmail({
+      await sendInvitationEmail({
         to: email,
-        subject: 'You\'re invited to join the team!',
-        html: emailHtml
+        signupLink,
+        role: invitation.role,
+        companyName: process.env.COMPANY_NAME
       });
 
       res.status(201).json({
