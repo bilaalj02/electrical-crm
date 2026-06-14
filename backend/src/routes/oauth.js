@@ -3,6 +3,8 @@ const router = express.Router();
 const {
   getGmailAuthUrl,
   handleGmailCallback,
+  getGoogleAuthUrl,
+  handleGoogleCallback,
   getMicrosoftAuthUrl,
   handleMicrosoftCallback,
   getEmailAccounts,
@@ -10,7 +12,11 @@ const {
 } = require('../controllers/oauthController');
 const { auth } = require('../middleware/auth');
 
-// Gmail OAuth routes
+// Google OAuth routes (Gmail + Calendar combined — used by Calendar page)
+router.get('/google/auth-url', auth, getGoogleAuthUrl);
+router.get('/google/callback', handleGoogleCallback);
+
+// Gmail-only OAuth routes (used by Emails page)
 router.get('/gmail/auth-url', auth, getGmailAuthUrl);
 router.get('/gmail/callback', handleGmailCallback);
 

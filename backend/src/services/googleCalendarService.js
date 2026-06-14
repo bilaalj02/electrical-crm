@@ -1,5 +1,6 @@
 const { google } = require('googleapis');
 const EmailAccount = require('../models/EmailAccount');
+const { decrypt, encrypt } = require('../controllers/oauthController');
 
 /**
  * Get Google Calendar client for a user's connected account
@@ -12,26 +13,28 @@ async function getCalendarClient(userId) {
   });
 
   if (!account) {
-    throw new Error('No active Gmail account found. Please connect a Google account first.');
+    throw new Error('No active Google account found. Please connect a Google account first.');
   }
 
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI
+    process.env.GOOGLE_CALENDAR_REDIRECT_URI || process.env.GOOGLE_REDIRECT_URI
   );
 
   oauth2Client.setCredentials({
-    access_token: account.accessToken,
-    refresh_token: account.refreshToken
+    access_token: decrypt(account.accessToken),
+    refresh_token: account.refreshToken ? decrypt(account.refreshToken) : undefined,
+    expiry_date: account.tokenExpiry ? account.tokenExpiry.getTime() : undefined
   });
 
-  // Handle token refresh
+  // Persist refreshed tokens back to DB
   oauth2Client.on('tokens', async (tokens) => {
     if (tokens.refresh_token) {
-      account.refreshToken = tokens.refresh_token;
+      account.refreshToken = encrypt(tokens.refresh_token);
     }
-    account.accessToken = tokens.access_token;
+    account.accessToken = encrypt(tokens.access_token);
+    if (tokens.expiry_date) account.tokenExpiry = new Date(tokens.expiry_date);
     await account.save();
   });
 
