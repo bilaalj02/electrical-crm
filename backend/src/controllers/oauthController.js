@@ -51,14 +51,11 @@ const getGmailAuthUrl = (req, res) => {
 };
 
 // Generate Google OAuth URL (Gmail + Calendar combined)
+// Reuses the existing GOOGLE_REDIRECT_URI (/gmail/callback) so no new
+// redirect URI needs to be registered in Google Cloud Console.
 const getGoogleAuthUrl = (req, res) => {
   try {
-    // Use a separate redirect URI for the combined Google flow
-    const oauth2Client = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_CALENDAR_REDIRECT_URI || process.env.GOOGLE_REDIRECT_URI
-    );
+    const oauth2Client = getOAuth2Client();
 
     const scopes = [
       'https://www.googleapis.com/auth/gmail.readonly',
@@ -83,62 +80,9 @@ const getGoogleAuthUrl = (req, res) => {
   }
 };
 
-// Handle combined Google OAuth callback (Gmail + Calendar)
-const handleGoogleCallback = async (req, res) => {
-  try {
-    const { code, state, error } = req.query;
-    const userId = state;
-
-    if (error) {
-      console.error('Google OAuth error:', error);
-      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5174'}?error=${error}`);
-    }
-
-    if (!code) {
-      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5174'}?error=no_code`);
-    }
-
-    const oauth2Client = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_CALENDAR_REDIRECT_URI || process.env.GOOGLE_REDIRECT_URI
-    );
-
-    const { tokens } = await oauth2Client.getToken(code);
-    oauth2Client.setCredentials(tokens);
-
-    // Get user email
-    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
-    const profile = await gmail.users.getProfile({ userId: 'me' });
-    const emailAddress = profile.data.emailAddress;
-
-    // Upsert email account
-    let emailAccount = await EmailAccount.findOne({ userId, email: emailAddress });
-
-    if (emailAccount) {
-      emailAccount.accessToken = encrypt(tokens.access_token);
-      if (tokens.refresh_token) emailAccount.refreshToken = encrypt(tokens.refresh_token);
-      emailAccount.tokenExpiry = new Date(tokens.expiry_date);
-      emailAccount.isActive = true;
-      await emailAccount.save();
-    } else {
-      emailAccount = await EmailAccount.create({
-        userId,
-        email: emailAddress,
-        provider: 'gmail',
-        accessToken: encrypt(tokens.access_token),
-        refreshToken: encrypt(tokens.refresh_token || ''),
-        tokenExpiry: new Date(tokens.expiry_date),
-        isActive: true
-      });
-    }
-
-    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5174'}?oauth=success&email=${encodeURIComponent(emailAddress)}`);
-  } catch (error) {
-    console.error('Error handling Google OAuth callback:', error);
-    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5174'}?error=oauth_failed`);
-  }
-};
+// handleGoogleCallback delegates to handleGmailCallback — same token exchange
+// logic, same redirect URI, no new Google Cloud Console entry required.
+const handleGoogleCallback = (req, res) => handleGmailCallback(req, res);
 
 // Handle Gmail OAuth callback
 const handleGmailCallback = async (req, res) => {
