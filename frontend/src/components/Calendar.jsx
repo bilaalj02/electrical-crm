@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FiCalendar, FiChevronLeft, FiChevronRight, FiBriefcase, FiClock, FiDollarSign, FiRefreshCw, FiCheckCircle } from 'react-icons/fi';
+import { FiCalendar, FiChevronLeft, FiChevronRight, FiBriefcase, FiClock, FiDollarSign, FiRefreshCw, FiCheckCircle, FiX } from 'react-icons/fi';
+import NotificationModal from './NotificationModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -13,6 +14,7 @@ function Calendar() {
   const [syncMessage, setSyncMessage] = useState('');
   const [toast, setToast] = useState({ show: false, message: '', type: '' });
   const [connectedAccounts, setConnectedAccounts] = useState({ google: null, microsoft: null });
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
 
   const fetchJobs = async () => {
     setLoading(true);
@@ -205,6 +207,27 @@ function Calendar() {
     }
   };
 
+  const disconnectAccount = (accountId, label) => {
+    setConfirmModal({
+      isOpen: true,
+      title: `Disconnect ${label}`,
+      message: `Are you sure you want to disconnect your ${label} account? You can reconnect it at any time.`,
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem('token');
+          await axios.delete(`${API_URL}/oauth/accounts/${accountId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          showToast(`${label} account disconnected`, 'success');
+          fetchConnectedAccounts();
+        } catch (error) {
+          console.error('Error disconnecting account:', error);
+          showToast('Failed to disconnect account', 'error');
+        }
+      }
+    });
+  };
+
   const syncJobToCalendar = async (jobId) => {
     try {
       const token = localStorage.getItem('token');
@@ -249,7 +272,15 @@ function Calendar() {
           )}
           {connectedAccounts.google ? (
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#10b981', fontWeight: '600', background: '#d1fae5', padding: '6px 12px', borderRadius: '8px', border: '1px solid #10b981' }}>
-              <FiCheckCircle size={14} /> Google Connected
+              <FiCheckCircle size={14} />
+              Google Connected
+              <button
+                onClick={() => disconnectAccount(connectedAccounts.google._id, 'Google')}
+                title="Disconnect Google"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', display: 'flex', alignItems: 'center', padding: '0', marginLeft: '2px' }}
+              >
+                <FiX size={13} />
+              </button>
             </span>
           ) : (
             <button
@@ -263,7 +294,15 @@ function Calendar() {
           )}
           {connectedAccounts.microsoft ? (
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#10b981', fontWeight: '600', background: '#d1fae5', padding: '6px 12px', borderRadius: '8px', border: '1px solid #10b981' }}>
-              <FiCheckCircle size={14} /> Outlook Connected
+              <FiCheckCircle size={14} />
+              Outlook Connected
+              <button
+                onClick={() => disconnectAccount(connectedAccounts.microsoft._id, 'Outlook')}
+                title="Disconnect Outlook"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', display: 'flex', alignItems: 'center', padding: '0', marginLeft: '2px' }}
+              >
+                <FiX size={13} />
+              </button>
             </span>
           ) : (
             <button
@@ -470,6 +509,17 @@ function Calendar() {
           </div>
         </div>
       )}
+
+      <NotificationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        type="confirm"
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        confirmText="Disconnect"
+        cancelText="Cancel"
+      />
     </div>
   );
 }
