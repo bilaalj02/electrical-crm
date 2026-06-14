@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FiCalendar, FiChevronLeft, FiChevronRight, FiBriefcase, FiClock, FiDollarSign, FiRefreshCw } from 'react-icons/fi';
+import { FiCalendar, FiChevronLeft, FiChevronRight, FiBriefcase, FiClock, FiDollarSign, FiRefreshCw, FiCheckCircle } from 'react-icons/fi';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -12,6 +12,7 @@ function Calendar() {
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
   const [toast, setToast] = useState({ show: false, message: '', type: '' });
+  const [connectedAccounts, setConnectedAccounts] = useState({ google: null, microsoft: null });
 
   const fetchJobs = async () => {
     setLoading(true);
@@ -25,8 +26,29 @@ function Calendar() {
     }
   };
 
+  const fetchConnectedAccounts = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/oauth/accounts`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const accounts = response.data.emailAccounts || [];
+      setConnectedAccounts({
+        google: accounts.find(a => a.provider === 'gmail') || null,
+        microsoft: accounts.find(a => a.provider === 'microsoft') || null
+      });
+    } catch (error) {
+      console.error('Error fetching connected accounts:', error);
+    }
+  };
+
   useEffect(() => {
     fetchJobs();
+    fetchConnectedAccounts();
+    // Re-check connection status when window regains focus (after OAuth popup closes)
+    const onFocus = () => fetchConnectedAccounts();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
   }, []);
 
   const previousMonth = () => {
@@ -225,32 +247,34 @@ function Calendar() {
               {syncMessage}
             </span>
           )}
-          <button
-            onClick={connectGoogleCalendar}
-            className="btn-secondary"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-            title="Connect Google Calendar"
-          >
-            <FiCalendar />
-            Connect Google
-          </button>
-          <button
-            onClick={connectOutlookCalendar}
-            className="btn-secondary"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-            title="Connect Outlook Calendar"
-          >
-            <FiCalendar />
-            Connect Outlook
-          </button>
+          {connectedAccounts.google ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#10b981', fontWeight: '600', background: '#d1fae5', padding: '6px 12px', borderRadius: '8px', border: '1px solid #10b981' }}>
+              <FiCheckCircle size={14} /> Google Connected
+            </span>
+          ) : (
+            <button
+              onClick={connectGoogleCalendar}
+              className="btn-secondary"
+              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              title="Connect Google Calendar"
+            >
+              <FiCalendar /> Connect Google
+            </button>
+          )}
+          {connectedAccounts.microsoft ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#10b981', fontWeight: '600', background: '#d1fae5', padding: '6px 12px', borderRadius: '8px', border: '1px solid #10b981' }}>
+              <FiCheckCircle size={14} /> Outlook Connected
+            </span>
+          ) : (
+            <button
+              onClick={connectOutlookCalendar}
+              className="btn-secondary"
+              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              title="Connect Outlook Calendar"
+            >
+              <FiCalendar /> Connect Outlook
+            </button>
+          )}
           <button
             onClick={syncAllToCalendar}
             disabled={syncing}
