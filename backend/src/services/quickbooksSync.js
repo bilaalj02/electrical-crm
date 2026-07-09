@@ -1,14 +1,36 @@
 const Client = require('../models/Client');
 const Job = require('../models/Job');
+const { withRetry } = require('../utils/retry');
 
-// Promise wrapper around node-quickbooks' callback-style find methods
+// node-quickbooks has no retry logic of its own for the Data API (unlike
+// intuit-oauth, which retries the token endpoints internally) — a QBO
+// Fault with an AUTHENTICATION type, or a raw 401/403, means the access
+// token is no good; anything else transient gets retried by withRetry().
+function isAuthFault(err) {
+  if (err?.response?.status === 401 || err?.response?.status === 403) return true;
+  const fault = err?.Fault;
+  if (fault?.type === 'AUTHENTICATION') return true;
+  const faultCode = fault?.Error?.[0]?.code;
+  return faultCode === '3200' || faultCode === '3201'; // QBO's AuthenticationFailed/Authorization codes
+}
+
+// Promise wrapper around node-quickbooks' callback-style find methods, with
+// retry-on-transient-failure and fast-fail-with-a-typed-error on auth faults
+// so the caller can prompt reconnection instead of showing a generic error.
 const qboFind = (qbo, method, criteria = ' ') =>
-  new Promise((resolve, reject) => {
+  withRetry(() => new Promise((resolve, reject) => {
     qbo[method](criteria, (err, result) => {
-      if (err) return reject(err);
+      if (err) {
+        if (isAuthFault(err)) {
+          const authError = new Error('QuickBooks rejected the request — the connection needs to be reconnected.');
+          authError.code = 'QBO_RECONNECT_REQUIRED';
+          return reject(authError);
+        }
+        return reject(err);
+      }
       resolve(result?.QueryResponse || {});
     });
-  });
+  }));
 
 /**
  * Pull QuickBooks Customers into the Client collection.
@@ -144,6 +166,10 @@ async function runSync(qbo, enabledDataTypes) {
     }
   } catch (error) {
     console.error('QuickBooks sync error:', error);
+    // Auth failures need the route/frontend to prompt a reconnect, not just
+    // log a generic sync error — let this one propagate instead of being
+    // swallowed into stats.lastError like an ordinary sync hiccup.
+    if (error.code === 'QBO_RECONNECT_REQUIRED') throw error;
     stats.lastError = error.message || 'Unknown sync error';
   }
 

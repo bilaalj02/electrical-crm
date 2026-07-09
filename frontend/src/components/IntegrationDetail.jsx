@@ -133,8 +133,13 @@ function IntegrationDetail({ provider, onBack }) {
       }
       fetchDetail();
     } catch (error) {
-      const message = error.response?.data?.error || 'Sync failed. Please try again.';
-      showToast(message, 'error', 7000);
+      if (error.response?.data?.reconnectRequired) {
+        showToast('Your QuickBooks connection expired — reconnect below to keep syncing.', 'error', 9000);
+        fetchDetail(); // pulls needsReconnect:true so the Reconnect view renders
+      } else {
+        const message = error.response?.data?.error || 'Sync failed. Please try again.';
+        showToast(message, 'error', 7000);
+      }
     } finally {
       setSaving(false);
       setSyncing(false);
@@ -259,9 +264,9 @@ function IntegrationDetail({ provider, onBack }) {
             <h3>{detail.name}</h3>
             <p>{detail.description}</p>
           </div>
-          <div className={`connection-status ${detail.connected ? 'connected' : 'disconnected'}`}>
+          <div className={`connection-status ${detail.connected ? 'connected' : detail.needsReconnect ? 'reconnect' : 'disconnected'}`}>
             {detail.connected ? <FiCheckCircle /> : <FiXCircle />}
-            {detail.connected ? 'Connected' : 'Not Connected'}
+            {detail.connected ? 'Connected' : detail.needsReconnect ? 'Reconnect Needed' : 'Not Connected'}
           </div>
         </div>
 
@@ -295,7 +300,26 @@ function IntegrationDetail({ provider, onBack }) {
         {/* ---------- QuickBooks ---------- */}
         {provider === 'quickbooks' && (
           <>
-            {!detail.connected ? (
+            {detail.needsReconnect && (
+              <div
+                className="reconnect-banner"
+                style={{
+                  marginTop: '1.5rem', padding: '1rem', borderRadius: '8px',
+                  background: '#fef3f2', border: '1px solid #fda29b', color: '#912018',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap'
+                }}
+              >
+                <span>Your QuickBooks connection expired or was revoked. Reconnect to resume syncing — your sync settings are saved and will be reused.</span>
+                <button
+                  className="btn-primary"
+                  onClick={beginQuickBooksConnect}
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}
+                >
+                  <FiLink /> Reconnect QuickBooks
+                </button>
+              </div>
+            )}
+            {!detail.connected && !detail.needsReconnect ? (
               <div className="integration-actions" style={{ marginTop: '1.5rem' }}>
                 <button
                   className="btn-primary"
@@ -305,7 +329,7 @@ function IntegrationDetail({ provider, onBack }) {
                   <FiLink /> Connect QuickBooks
                 </button>
               </div>
-            ) : (
+            ) : detail.connected ? (
               <div style={{ marginTop: '1.5rem' }}>
                 <h4 style={{ marginBottom: '0.75rem' }}>What should sync?</h4>
                 <div className="qb-feature-list">
@@ -359,7 +383,7 @@ function IntegrationDetail({ provider, onBack }) {
                   </button>
                 </div>
               </div>
-            )}
+            ) : null}
 
             {/* ---------- Document upload fallback ---------- */}
             {detail.supportsDocumentUpload && (

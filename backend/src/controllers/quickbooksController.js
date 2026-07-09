@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const OAuthClient = require('intuit-oauth');
 const QuickBooks = require('node-quickbooks');
 const Integration = require('../models/Integration');
@@ -12,6 +13,71 @@ const getOAuthClient = () => {
   });
 };
 
+// ---- CSRF-safe OAuth `state` parameter ----
+// The state param round-trips through Intuit's servers, so it must be
+// unforgeable: signed with a server-only secret and time-boxed, not just
+// the raw userId (which an attacker could guess and use to forge a
+// callback that links their QuickBooks company to another user's account).
+const STATE_TTL_MS = 15 * 60 * 1000; // 15 minutes — long enough for a real login, short enough to block replay
+
+function signState(userId) {
+  const nonce = crypto.randomBytes(16).toString('hex');
+  const timestamp = Date.now().toString();
+  const payload = `${userId}.${nonce}.${timestamp}`;
+  const signature = crypto.createHmac('sha256', process.env.ENCRYPTION_KEY).update(payload).digest('hex');
+  return `${payload}.${signature}`;
+}
+
+// Returns the verified userId, or null if the state is missing, malformed,
+// expired, or the signature doesn't match (forged/tampered — a CSRF attempt
+// on the OAuth callback).
+function verifyState(state) {
+  if (!state || typeof state !== 'string') return null;
+  const parts = state.split('.');
+  if (parts.length !== 4) return null;
+  const [userId, nonce, timestamp, signature] = parts;
+
+  const payload = `${userId}.${nonce}.${timestamp}`;
+  const expectedSignature = crypto.createHmac('sha256', process.env.ENCRYPTION_KEY).update(payload).digest('hex');
+
+  const sigBuf = Buffer.from(signature, 'hex');
+  const expectedBuf = Buffer.from(expectedSignature, 'hex');
+  if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) return null;
+
+  if (Date.now() - Number(timestamp) > STATE_TTL_MS) return null;
+
+  return userId;
+}
+
+// Marks an integration as needing the user to reconnect (distinct from a
+// deliberate disconnect) and returns a typed error that routes/frontend can
+// detect via `.code === 'QBO_RECONNECT_REQUIRED'` to show a clear
+// "reconnect" prompt instead of a generic failure message.
+async function markNeedsReconnect(integration, reason) {
+  integration.isActive = false;
+  integration.needsReconnect = true;
+  integration.syncStats = integration.syncStats || {};
+  integration.syncStats.lastError = reason;
+  await integration.save();
+
+  const error = new Error(reason);
+  error.code = 'QBO_RECONNECT_REQUIRED';
+  return error;
+}
+
+// Recognizes the OAuth-error shape intuit-oauth's refresh() throws
+// (see createError() in the SDK) for a dead refresh token — this is what
+// Intuit sends back as `invalid_grant` when a refresh token has expired or
+// been revoked. Transient failures (network blips, 5xx) are already retried
+// internally by the SDK before it ever throws, so anything that reaches
+// here is a real, permanent auth failure.
+function isPermanentAuthError(error) {
+  const code = String(error?.error || error?.message || '').toLowerCase();
+  if (code.includes('invalid_grant') || code.includes('invalid_token')) return true;
+  const status = error?.authResponse?.response?.status || error?.response?.status;
+  return status === 400 || status === 401;
+}
+
 // GET /api/oauth/quickbooks/auth-url
 const getQuickBooksAuthUrl = (req, res) => {
   try {
@@ -24,7 +90,7 @@ const getQuickBooksAuthUrl = (req, res) => {
     const oauthClient = getOAuthClient();
     const authUri = oauthClient.authorizeUri({
       scope: [OAuthClient.scopes.Accounting],
-      state: req.user._id.toString()
+      state: signState(req.user._id.toString())
     });
 
     res.json({ authUrl: authUri });
@@ -38,8 +104,18 @@ const getQuickBooksAuthUrl = (req, res) => {
 const handleQuickBooksCallback = async (req, res) => {
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5174';
   try {
-    const { state } = req.query;
-    const userId = state;
+    const userId = verifyState(req.query.state);
+
+    if (!userId) {
+      // Missing, expired, or tampered state — reject rather than trust it.
+      // This is the actual CSRF defense: a forged callback (e.g. an
+      // attacker starting their own OAuth flow and tricking a victim into
+      // completing it under the attacker's session) won't carry a state
+      // this server signed, so it gets rejected here instead of silently
+      // linking the wrong QuickBooks company to an account.
+      console.error('QuickBooks OAuth callback rejected: invalid or expired state (possible CSRF attempt)');
+      return res.redirect(`${frontendUrl}?error=invalid_state&integration=quickbooks`);
+    }
 
     if (!req.query.code) {
       return res.redirect(`${frontendUrl}?error=no_code&integration=quickbooks`);
@@ -94,7 +170,24 @@ const getQBOClient = async (integration) => {
       realmId: integration.realmId
     });
 
-    const authResponse = await oauthClient.refresh();
+    let authResponse;
+    try {
+      // intuit-oauth already retries transient failures (5xx/408/429/
+      // network errors) internally with backoff before this can throw —
+      // see loadResponse()/shouldRetry() in the SDK. Anything that reaches
+      // this catch is a real, permanent failure (expired/revoked refresh
+      // token → invalid_grant).
+      authResponse = await oauthClient.refresh();
+    } catch (refreshError) {
+      if (isPermanentAuthError(refreshError)) {
+        throw await markNeedsReconnect(
+          integration,
+          'QuickBooks connection expired or was revoked — reconnect required.'
+        );
+      }
+      throw refreshError;
+    }
+
     const token = authResponse.getToken();
 
     accessToken = token.access_token;
@@ -135,6 +228,7 @@ const disconnectQuickBooks = async (req, res) => {
     }
 
     integration.isActive = false;
+    integration.needsReconnect = false; // deliberate disconnect, not a token failure
     await integration.save();
 
     res.json({ message: 'QuickBooks disconnected successfully' });
@@ -148,5 +242,7 @@ module.exports = {
   getQuickBooksAuthUrl,
   handleQuickBooksCallback,
   getQBOClient,
-  disconnectQuickBooks
+  disconnectQuickBooks,
+  markNeedsReconnect,
+  isPermanentAuthError
 };

@@ -8,7 +8,7 @@ const Job = require('../models/Job');
 const { auth, adminOnly } = require('../middleware/auth');
 const uploadDocument = require('../config/uploadDocument');
 const { extractText, extractCrmDataFromText } = require('../services/documentExtractor');
-const { getQBOClient } = require('../controllers/quickbooksController');
+const { getQBOClient, markNeedsReconnect } = require('../controllers/quickbooksController');
 const { runSync } = require('../services/quickbooksSync');
 
 router.use(auth, adminOnly);
@@ -101,15 +101,19 @@ router.get('/:provider', async (req, res) => {
       });
     }
 
+    // Not filtered by isActive here — a record with isActive:false but
+    // needsReconnect:true (a token that failed, not a deliberate disconnect)
+    // still needs to be found so the UI can show "Reconnect" instead of a
+    // plain "Connect" state.
     const integration = await Integration.findOne({
       userId: req.user._id,
-      provider: req.params.provider,
-      isActive: true
+      provider: req.params.provider
     });
 
     res.json({
       ...def,
-      connected: !!integration,
+      connected: integration?.isActive === true,
+      needsReconnect: integration?.needsReconnect === true,
       enabledDataTypes: integration?.enabledDataTypes || [],
       lastSyncedAt: integration?.lastSyncedAt || null,
       syncStats: integration?.syncStats || null
@@ -184,6 +188,21 @@ router.post('/:provider/sync', async (req, res) => {
     res.json({ message: 'Sync complete', stats });
   } catch (error) {
     console.error('Error syncing integration:', error);
+
+    if (error.code === 'QBO_RECONNECT_REQUIRED') {
+      // Idempotent — getQBOClient() already marks this on a refresh
+      // failure; a mid-sync auth fault detected in quickbooksSync.js
+      // hasn't been persisted yet, so make sure it is here too.
+      const integration = await Integration.findOne({ userId: req.user._id, provider: 'quickbooks' });
+      if (integration && !integration.needsReconnect) {
+        await markNeedsReconnect(integration, error.message);
+      }
+      return res.status(401).json({
+        error: 'Your QuickBooks connection has expired. Please reconnect to continue syncing.',
+        reconnectRequired: true
+      });
+    }
+
     res.status(500).json({ error: error.message || 'Sync failed' });
   }
 });

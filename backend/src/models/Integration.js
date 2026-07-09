@@ -27,6 +27,14 @@ const integrationSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  // Set true when a token refresh fails with a permanent auth error
+  // (expired/revoked refresh token, invalid_grant) — distinct from the user
+  // deliberately clicking "Disconnect". Lets the UI show "Reconnect" instead
+  // of a generic error.
+  needsReconnect: {
+    type: Boolean,
+    default: false
+  },
   lastSyncedAt: {
     type: Date
   },
