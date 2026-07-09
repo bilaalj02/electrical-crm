@@ -27,6 +27,9 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 const getInitialPage = () => {
   const params = new URLSearchParams(window.location.search);
   if (params.get('integration') === 'quickbooks') return 'integrations';
+  // Direct links to /integrations (e.g. the Connect/Disconnect URLs registered
+  // with QuickBooks) should land on that page after login, not default to Home.
+  if (window.location.pathname.replace(/\/+$/, '') === '/integrations') return 'integrations';
   return 'home';
 };
 
