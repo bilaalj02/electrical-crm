@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Job = require('../models/Job');
 const Client = require('../models/Client');
+const { auth } = require('../middleware/auth');
 
 // Fire-and-forget: notify MCP automation engine
 async function notifyMCP(endpoint, payload) {
@@ -24,7 +25,7 @@ async function notifyMCP(endpoint, payload) {
  * GET /api/jobs
  * Get all jobs with filtering and pagination
  */
-router.get('/', async (req, res) => {
+router.get('/', auth, async (req, res) => {
   try {
     const {
       page = 1,
@@ -78,7 +79,7 @@ router.get('/', async (req, res) => {
  * GET /api/jobs/stats
  * Get job statistics
  */
-router.get('/stats', async (req, res) => {
+router.get('/stats', auth, async (req, res) => {
   try {
     const total = await Job.countDocuments();
     const byStatus = await Job.aggregate([
@@ -117,7 +118,7 @@ router.get('/stats', async (req, res) => {
  * GET /api/jobs/recommendations
  * Get expense recommendations based on completed jobs
  */
-router.get('/recommendations', async (req, res) => {
+router.get('/recommendations', auth, async (req, res) => {
   try {
     // Aggregate all completed jobs to calculate averages
     const recommendations = await Job.aggregate([
@@ -186,7 +187,7 @@ router.get('/recommendations', async (req, res) => {
  * GET /api/jobs/:id
  * Get a single job by ID
  */
-router.get('/:id', async (req, res) => {
+router.get('/:id', auth, async (req, res) => {
   try {
     const job = await Job.findById(req.params.id)
       .populate('client')
@@ -208,7 +209,7 @@ router.get('/:id', async (req, res) => {
  * POST /api/jobs
  * Create a new job
  */
-router.post('/', async (req, res) => {
+router.post('/', auth, async (req, res) => {
   try {
     // Generate job number
     const jobNumber = await Job.generateJobNumber();
@@ -241,7 +242,7 @@ router.post('/', async (req, res) => {
  * PATCH /api/jobs/:id
  * Update a job
  */
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', auth, async (req, res) => {
   try {
     const job = await Job.findById(req.params.id);
 
@@ -295,7 +296,7 @@ router.patch('/:id', async (req, res) => {
  * DELETE /api/jobs/:id
  * Delete a job
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', auth, async (req, res) => {
   try {
     const job = await Job.findById(req.params.id);
 
@@ -321,7 +322,7 @@ router.delete('/:id', async (req, res) => {
  * POST /api/jobs/:id/notes
  * Add a note to a job
  */
-router.post('/:id/notes', async (req, res) => {
+router.post('/:id/notes', auth, async (req, res) => {
   try {
     const { text, author } = req.body;
 
@@ -350,7 +351,7 @@ router.post('/:id/notes', async (req, res) => {
  * PATCH /api/jobs/:id/status
  * Update job status
  */
-router.patch('/:id/status', async (req, res) => {
+router.patch('/:id/status', auth, async (req, res) => {
   try {
     const { status } = req.body;
     const updateData = { status };

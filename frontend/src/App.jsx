@@ -1,10 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import './App.css';
 import { FiMail, FiBriefcase, FiUsers, FiHome, FiBarChart2, FiCalendar, FiChevronLeft, FiChevronRight, FiUser, FiLogOut, FiSettings as FiSettingsIcon, FiBell, FiFolder, FiZap, FiSend, FiLink, FiHelpCircle } from 'react-icons/fi';
-
-// TODO(Elvis): replace with the real support inbox/phone before relying on
-// this for the Intuit compliance questionnaire — this is a placeholder.
-const SUPPORT_EMAIL = 'support@example.com';
 import { ToastContainer } from './components/Toast';
 import { useAuth } from './context/AuthContext';
 import Login from './components/Login';
@@ -24,6 +20,7 @@ import mesLogo from './assets/mes-logo.png';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const SUPPORT_EMAIL = 'contact@coldsolutions.ca';
 
 // After an OAuth redirect (e.g. QuickBooks), land back on the page that
 // initiated it instead of defaulting to Home, where the result would

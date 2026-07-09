@@ -2,12 +2,13 @@ const express = require('express');
 const router = express.Router();
 const Client = require('../models/Client');
 const Job = require('../models/Job');
+const { auth } = require('../middleware/auth');
 
 /**
  * GET /api/clients
  * Get all clients
  */
-router.get('/', async (req, res) => {
+router.get('/', auth, async (req, res) => {
   try {
     const {
       page = 1,
@@ -57,7 +58,7 @@ router.get('/', async (req, res) => {
  * GET /api/clients/stats
  * Get client statistics
  */
-router.get('/stats', async (req, res) => {
+router.get('/stats', auth, async (req, res) => {
   try {
     const total = await Client.countDocuments();
     const active = await Client.countDocuments({ status: 'active' });
@@ -83,7 +84,7 @@ router.get('/stats', async (req, res) => {
  * GET /api/clients/:id
  * Get a single client by ID
  */
-router.get('/:id', async (req, res) => {
+router.get('/:id', auth, async (req, res) => {
   try {
     const client = await Client.findById(req.params.id).populate('jobs');
 
@@ -144,7 +145,7 @@ router.post('/website-lead', async (req, res) => {
  * POST /api/clients
  * Create a new client
  */
-router.post('/', async (req, res) => {
+router.post('/', auth, async (req, res) => {
   try {
     const client = await Client.create(req.body);
     res.status(201).json(client);
@@ -158,7 +159,7 @@ router.post('/', async (req, res) => {
  * PATCH /api/clients/:id
  * Update a client
  */
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', auth, async (req, res) => {
   try {
     const client = await Client.findByIdAndUpdate(
       req.params.id,
@@ -181,7 +182,7 @@ router.patch('/:id', async (req, res) => {
  * DELETE /api/clients/:id
  * Delete a client
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', auth, async (req, res) => {
   try {
     // Check if client has any jobs
     const jobCount = await Job.countDocuments({ client: req.params.id });
@@ -209,7 +210,7 @@ router.delete('/:id', async (req, res) => {
  * GET /api/clients/:id/jobs
  * Get all jobs for a specific client
  */
-router.get('/:id/jobs', async (req, res) => {
+router.get('/:id/jobs', auth, async (req, res) => {
   try {
     const jobs = await Job.find({ client: req.params.id })
       .populate('client')
