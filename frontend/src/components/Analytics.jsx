@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FiBarChart2, FiTrendingUp, FiDollarSign, FiDownload, FiChevronDown, FiChevronUp, FiBriefcase, FiUsers, FiMail, FiLink, FiRefreshCw, FiCheckCircle, FiXCircle } from 'react-icons/fi';
+import { FiBarChart2, FiTrendingUp, FiDollarSign, FiDownload, FiChevronDown, FiChevronUp, FiBriefcase, FiUsers, FiMail, FiLink, FiRefreshCw } from 'react-icons/fi';
 import { showToast } from './Toast';
 import NotificationModal from './NotificationModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-function Analytics() {
+function Analytics({ onNavigate }) {
   const [stats, setStats] = useState({
     jobs: null,
     clients: null,
@@ -18,11 +18,8 @@ function Analytics() {
     revenue: true,
     jobs: false,
     clients: false,
-    emails: false,
-    quickbooks: false
+    emails: false
   });
-  const [quickbooksConnected, setQuickbooksConnected] = useState(false);
-  const [quickbooksLoading, setQuickbooksLoading] = useState(false);
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
 
   useEffect(() => {
@@ -57,50 +54,6 @@ function Analytics() {
       ...prev,
       [section]: !prev[section]
     }));
-  };
-
-  const connectQuickBooks = async () => {
-    setQuickbooksLoading(true);
-    try {
-      showToast('QuickBooks integration coming soon! Available as optional add-on: $30/month', 'info', 6000);
-    } catch (error) {
-      console.error('Error connecting QuickBooks:', error);
-      showToast('Failed to connect QuickBooks. Please try again.', 'error');
-    } finally {
-      setQuickbooksLoading(false);
-    }
-  };
-
-  const disconnectQuickBooks = async () => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Disconnect QuickBooks',
-      message: 'Are you sure you want to disconnect QuickBooks?',
-      onConfirm: async () => {
-        setQuickbooksLoading(true);
-        try {
-          setQuickbooksConnected(false);
-          showToast('QuickBooks disconnected successfully', 'success');
-        } catch (error) {
-          console.error('Error disconnecting QuickBooks:', error);
-          showToast('Failed to disconnect QuickBooks', 'error');
-        } finally {
-          setQuickbooksLoading(false);
-        }
-      }
-    });
-  };
-
-  const syncQuickBooks = async () => {
-    setQuickbooksLoading(true);
-    try {
-      showToast('QuickBooks sync coming soon!', 'info');
-    } catch (error) {
-      console.error('Error syncing QuickBooks:', error);
-      showToast('Failed to sync with QuickBooks', 'error');
-    } finally {
-      setQuickbooksLoading(false);
-    }
   };
 
   const handleDownloadPDF = () => {
@@ -244,212 +197,25 @@ function Analytics() {
         )}
       </div>
 
-      {/* QuickBooks Integration - Collapsible */}
+      {/* QuickBooks — moved to the standalone Integrations page */}
       <div className="analytics-section-collapsible">
-        <div className="section-header" onClick={() => toggleSection('quickbooks')}>
+        <div className="section-header" onClick={() => onNavigate && onNavigate('integrations')}>
           <h2><FiLink /> QuickBooks Integration</h2>
-          {expandedSections.quickbooks ? <FiChevronUp /> : <FiChevronDown />}
         </div>
-        {expandedSections.quickbooks && (
-          <div className="section-content">
-            <div className="quickbooks-integration">
-              <div className="integration-header">
-                <div className="integration-info">
-                  <h3>Sync with QuickBooks Online</h3>
-                  <p>Automatically sync invoices, expenses, and financial data with your QuickBooks account</p>
-                </div>
-                {quickbooksConnected && (
-                  <div className="connection-status connected">
-                    <FiCheckCircle /> Connected
-                  </div>
-                )}
-                {!quickbooksConnected && (
-                  <div className="connection-status disconnected">
-                    <FiXCircle /> Not Connected
-                  </div>
-                )}
-              </div>
-
-              {quickbooksConnected && (
-                <div className="qb-dashboard">
-                  <div className="qb-stats-grid">
-                    <div className="qb-stat-card">
-                      <div className="qb-stat-label">Synced Invoices</div>
-                      <div className="qb-stat-value">42</div>
-                      <div className="qb-stat-detail">Last sync: 2 min ago</div>
-                    </div>
-                    <div className="qb-stat-card">
-                      <div className="qb-stat-label">Unpaid Invoices</div>
-                      <div className="qb-stat-value">$12,450</div>
-                      <div className="qb-stat-detail">8 outstanding</div>
-                    </div>
-                    <div className="qb-stat-card">
-                      <div className="qb-stat-label">Expenses Imported</div>
-                      <div className="qb-stat-value">156</div>
-                      <div className="qb-stat-detail">This month</div>
-                    </div>
-                    <div className="qb-stat-card">
-                      <div className="qb-stat-label">Sync Status</div>
-                      <div className="qb-stat-value success">Active</div>
-                      <div className="qb-stat-detail">Auto-sync enabled</div>
-                    </div>
-                  </div>
-
-                  <div className="qb-features-active">
-                    <h4>Active Integrations:</h4>
-                    <div className="qb-feature-list">
-                      <div className="qb-feature-item active">
-                        <FiCheckCircle className="feature-icon" />
-                        <div className="feature-content">
-                          <span className="feature-name">Invoice Sync</span>
-                          <span className="feature-desc">Automatic two-way sync</span>
-                        </div>
-                      </div>
-                      <div className="qb-feature-item active">
-                        <FiCheckCircle className="feature-icon" />
-                        <div className="feature-content">
-                          <span className="feature-name">Expense Tracking</span>
-                          <span className="feature-desc">Import from QB daily</span>
-                        </div>
-                      </div>
-                      <div className="qb-feature-item active">
-                        <FiCheckCircle className="feature-icon" />
-                        <div className="feature-content">
-                          <span className="feature-name">Customer Sync</span>
-                          <span className="feature-desc">Bidirectional updates</span>
-                        </div>
-                      </div>
-                      <div className="qb-feature-item active">
-                        <FiCheckCircle className="feature-icon" />
-                        <div className="feature-content">
-                          <span className="feature-name">Payment Updates</span>
-                          <span className="feature-desc">Real-time notifications</span>
-                        </div>
-                      </div>
-                      <div className="qb-feature-item active">
-                        <FiCheckCircle className="feature-icon" />
-                        <div className="feature-content">
-                          <span className="feature-name">P&L Reports</span>
-                          <span className="feature-desc">View in CRM dashboard</span>
-                        </div>
-                      </div>
-                      <div className="qb-feature-item active">
-                        <FiCheckCircle className="feature-icon" />
-                        <div className="feature-content">
-                          <span className="feature-name">Accounts Receivable</span>
-                          <span className="feature-desc">Track aging reports</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="qb-quick-actions">
-                    <h4>Quick Actions:</h4>
-                    <div className="qb-action-buttons">
-                      <button className="qb-action-btn">
-                        <FiDollarSign /> Create Invoice in QB
-                      </button>
-                      <button className="qb-action-btn">
-                        <FiBarChart2 /> View P&L Report
-                      </button>
-                      <button className="qb-action-btn">
-                        <FiTrendingUp /> Export Revenue Data
-                      </button>
-                      <button className="qb-action-btn">
-                        <FiRefreshCw /> Force Sync Now
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {!quickbooksConnected && (
-                <div className="integration-features">
-                  <h4>What You'll Get:</h4>
-                  <div className="integration-benefits">
-                    <div className="benefit-section">
-                      <h5>📊 Complete Financial Dashboard</h5>
-                      <ul>
-                        <li>View invoices, expenses, and payments without leaving CRM</li>
-                        <li>Real-time P&L and cash flow reports</li>
-                        <li>Accounts receivable tracking with aging reports</li>
-                        <li>Tax-ready financial summaries</li>
-                      </ul>
-                    </div>
-
-                    <div className="benefit-section">
-                      <h5>🔄 Automatic Data Sync</h5>
-                      <ul>
-                        <li>Jobs automatically become invoices in QuickBooks</li>
-                        <li>Customer data syncs bidirectionally</li>
-                        <li>Payment status updates in real-time</li>
-                        <li>Expense imports for accurate job costing</li>
-                      </ul>
-                    </div>
-
-                    <div className="benefit-section">
-                      <h5>💼 Work Entirely in CRM</h5>
-                      <ul>
-                        <li>Create and send invoices from CRM</li>
-                        <li>Record payments and expenses</li>
-                        <li>Generate financial reports</li>
-                        <li>No need to open QuickBooks anymore</li>
-                      </ul>
-                    </div>
-
-                    <div className="benefit-section">
-                      <h5>🎯 Advanced Features</h5>
-                      <ul>
-                        <li>Automatic profit margin calculations with actual costs</li>
-                        <li>Job costing with QB expense data</li>
-                        <li>Budget vs actual tracking per project</li>
-                        <li>Sales tax reporting and filing assistance</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="integration-actions">
-                {!quickbooksConnected ? (
-                  <button
-                    className="btn-primary"
-                    onClick={connectQuickBooks}
-                    disabled={quickbooksLoading}
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-                  >
-                    <FiLink />
-                    {quickbooksLoading ? 'Connecting...' : 'Connect QuickBooks'}
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      className="btn-secondary"
-                      onClick={syncQuickBooks}
-                      disabled={quickbooksLoading}
-                      style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-                    >
-                      <FiRefreshCw className={quickbooksLoading ? 'spinning' : ''} />
-                      {quickbooksLoading ? 'Syncing...' : 'Sync Now'}
-                    </button>
-                    <button
-                      className="btn-danger"
-                      onClick={disconnectQuickBooks}
-                      disabled={quickbooksLoading}
-                    >
-                      Disconnect
-                    </button>
-                  </>
-                )}
-              </div>
-
-              <div className="integration-note">
-                <p><strong>Note:</strong> QuickBooks integration is available as an optional add-on for $30/month. Contact support to enable this feature for your account.</p>
-              </div>
-            </div>
-          </div>
-        )}
+        <div className="section-content">
+          <p className="hint">
+            QuickBooks connection, sync settings, and document import now live on the Integrations page.
+          </p>
+          <button
+            className="btn-secondary"
+            onClick={() => onNavigate && onNavigate('integrations')}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <FiLink /> Manage in Integrations
+          </button>
+        </div>
       </div>
+
 
       {/* Jobs Analytics - Collapsible */}
       <div className="analytics-section-collapsible">

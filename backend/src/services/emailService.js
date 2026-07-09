@@ -1,6 +1,8 @@
 const { Resend } = require('resend');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Guarded like the OpenAI client in aiJobExtractor.js — a missing key disables
+// this feature instead of crashing the whole server on startup.
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 const FROM_ADDRESS = process.env.EMAIL_FROM || 'MES Electrical <noreply@aicoldsolutions.com>';
 
@@ -29,6 +31,10 @@ async function sendInvitationEmail({ to, signupLink, role, companyName }) {
       </div>
     </div>
   `;
+
+  if (!resend) {
+    throw new Error('Invitation emails are unavailable: RESEND_API_KEY is not configured.');
+  }
 
   return resend.emails.send({
     from: FROM_ADDRESS,

@@ -10,6 +10,10 @@ const {
   getEmailAccounts,
   disconnectEmailAccount
 } = require('../controllers/oauthController');
+const {
+  getQuickBooksAuthUrl,
+  handleQuickBooksCallback
+} = require('../controllers/quickbooksController');
 const { auth } = require('../middleware/auth');
 
 // Google OAuth routes (Gmail + Calendar combined — used by Calendar page)
@@ -23,6 +27,10 @@ router.get('/gmail/callback', handleGmailCallback);
 // Microsoft OAuth routes
 router.get('/microsoft/auth-url', auth, getMicrosoftAuthUrl);
 router.get('/microsoft/callback', handleMicrosoftCallback);
+
+// QuickBooks OAuth routes
+router.get('/quickbooks/auth-url', auth, getQuickBooksAuthUrl);
+router.get('/quickbooks/callback', handleQuickBooksCallback);
 
 // Email account management
 router.get('/accounts', auth, getEmailAccounts);

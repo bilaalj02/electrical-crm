@@ -34,8 +34,15 @@ const clientSchema = new mongoose.Schema({
   // Lead Source
   source: {
     type: String,
-    enum: ['website', 'referral', 'manual', 'phone', 'email'],
+    enum: ['website', 'referral', 'manual', 'phone', 'email', 'quickbooks', 'document-upload'],
     default: 'manual'
+  },
+
+  // External ID from QuickBooks, when this client was synced from/linked to QuickBooks
+  quickbooksCustomerId: {
+    type: String,
+    index: true,
+    sparse: true
   },
 
   // Service requested (from website form)
