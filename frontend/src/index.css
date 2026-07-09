@@ -30,6 +30,15 @@ body {
   min-height: 100vh;
 }
 
+/* #root has no explicit width, so under body's flex/place-items:center it
+   shrinks to its content's natural width instead of filling the viewport —
+   harmless for the main app shell (which forces its own width elsewhere),
+   but breaks any plain full-width page, like the new /privacy and /terms
+   routes. */
+#root {
+  width: 100%;
+}
+
 h1 {
   font-size: 3.2em;
   line-height: 1.1;
