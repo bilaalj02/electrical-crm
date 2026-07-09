@@ -1,12 +1,48 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FiX, FiEdit, FiTrash2, FiDollarSign, FiCalendar, FiAlertCircle } from 'react-icons/fi';
+import { FiX, FiEdit, FiTrash2, FiDollarSign, FiCalendar, FiAlertCircle, FiUser, FiUsers, FiCheck } from 'react-icons/fi';
+import { useAuth } from '../context/AuthContext';
+import { showToast } from './Toast';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-function JobDetail({ job, onClose, onEdit, onDelete, onEnterExpenses }) {
+function JobDetail({ job, onClose, onEdit, onDelete, onEnterExpenses, onUpdate }) {
+  const { isManager } = useAuth();
   const [syncingCalendar, setSyncingCalendar] = useState(false);
   const [calendarMessage, setCalendarMessage] = useState('');
+  const [employees, setEmployees] = useState([]);
+  const [assignedUsers, setAssignedUsers] = useState(
+    (job.assignedUsers || []).map(u => u._id || u)
+  );
+  const [savingAssignment, setSavingAssignment] = useState(false);
+  const [showAssignPanel, setShowAssignPanel] = useState(false);
+
+  useEffect(() => {
+    if (!isManager) return;
+    axios.get(`${API_URL}/auth/users`)
+      .then(res => setEmployees(res.data.users || []))
+      .catch(() => {});
+  }, [isManager]);
+
+  const toggleAssign = (empId) => {
+    setAssignedUsers(prev =>
+      prev.includes(empId) ? prev.filter(id => id !== empId) : [...prev, empId]
+    );
+  };
+
+  const saveAssignment = async () => {
+    setSavingAssignment(true);
+    try {
+      await axios.patch(`${API_URL}/jobs/${job._id}`, { assignedUsers });
+      showToast('Assignment saved', 'success');
+      setShowAssignPanel(false);
+      onUpdate && onUpdate();
+    } catch {
+      showToast('Failed to save assignment', 'error');
+    } finally {
+      setSavingAssignment(false);
+    }
+  };
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', {
@@ -382,6 +418,66 @@ function JobDetail({ job, onClose, onEdit, onDelete, onEnterExpenses }) {
               </div>
             </section>
           ) : null}
+
+          {/* Assigned Employees */}
+          <section className="detail-section">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <h3 style={{ margin: 0 }}><FiUsers style={{ marginRight: '8px' }} />Assigned Employees</h3>
+              {isManager && (
+                <button
+                  onClick={() => setShowAssignPanel(p => !p)}
+                  style={{ background: '#d4af37', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <FiEdit size={13} /> {showAssignPanel ? 'Cancel' : 'Assign'}
+                </button>
+              )}
+            </div>
+
+            {/* Current assignments */}
+            {(job.assignedUsers || []).length === 0 && !showAssignPanel ? (
+              <p style={{ color: '#9ca3af', fontSize: '14px', margin: 0 }}>No employees assigned yet.</p>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: showAssignPanel ? '12px' : 0 }}>
+                {(job.assignedUsers || []).map(u => (
+                  <span key={u._id || u} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#fef9e7', border: '1.5px solid #d4af37', borderRadius: '20px', padding: '4px 12px', fontSize: '13px', fontWeight: '500', color: '#92400e' }}>
+                    <FiUser size={12} /> {u.name || u}
+                    {u.role && <span style={{ fontSize: '11px', color: '#b45309', textTransform: 'capitalize' }}>({u.role})</span>}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Assignment panel */}
+            {showAssignPanel && isManager && (
+              <div style={{ background: '#f9fafb', borderRadius: '8px', padding: '12px', border: '1px solid #e5e7eb' }}>
+                <p style={{ margin: '0 0 10px', fontSize: '13px', color: '#6b7280' }}>Select employees to assign:</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+                  {employees.map(emp => {
+                    const isSelected = assignedUsers.includes(emp._id);
+                    return (
+                      <button
+                        key={emp._id}
+                        type="button"
+                        onClick={() => toggleAssign(emp._id)}
+                        style={{ padding: '5px 12px', borderRadius: '20px', border: isSelected ? '2px solid #d4af37' : '2px solid #e5e7eb', background: isSelected ? '#fef9e7' : 'white', color: isSelected ? '#92400e' : '#374151', fontSize: '13px', fontWeight: isSelected ? '600' : '400', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        {isSelected && <FiCheck size={12} />}
+                        <FiUser size={12} /> {emp.name}
+                        <span style={{ fontSize: '11px', color: isSelected ? '#b45309' : '#9ca3af', textTransform: 'capitalize' }}>({emp.role})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  onClick={saveAssignment}
+                  disabled={savingAssignment}
+                  style={{ background: '#d4af37', color: 'white', border: 'none', borderRadius: '6px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', cursor: savingAssignment ? 'not-allowed' : 'pointer', opacity: savingAssignment ? 0.7 : 1 }}
+                >
+                  {savingAssignment ? 'Saving...' : 'Save Assignment'}
+                </button>
+              </div>
+            )}
+          </section>
 
           {job.costs?.materials && job.costs.materials.length > 0 && (
             <section className="detail-section">

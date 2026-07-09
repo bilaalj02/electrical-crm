@@ -57,7 +57,8 @@ router.get('/', async (req, res) => {
       .limit(limit * 1)
       .skip((page - 1) * limit)
       .populate('client')
-      .populate('relatedEmails');
+      .populate('relatedEmails')
+      .populate('assignedUsers', 'name email role phone');
 
     const count = await Job.countDocuments(filter);
 
@@ -189,7 +190,8 @@ router.get('/:id', async (req, res) => {
   try {
     const job = await Job.findById(req.params.id)
       .populate('client')
-      .populate('relatedEmails');
+      .populate('relatedEmails')
+      .populate('assignedUsers', 'name email role phone');
 
     if (!job) {
       return res.status(404).json({ error: 'Job not found' });
@@ -269,14 +271,18 @@ router.patch('/:id', async (req, res) => {
     }
 
     // If payment updated and job is now paid, notify MCP for referral ask
-    if (req.body['payment.paidInFull'] === true || job.payment?.paidInFull) {
+    const paymentJustMarkedPaid =
+      req.body?.payment?.paidInFull === true ||
+      req.body['payment.paidInFull'] === true;
+    if (paymentJustMarkedPaid && job.payment?.paidInFull) {
       notifyMCP('/webhook/payment-received', { jobId: job._id.toString() });
     }
 
     // Populate and return
     const updatedJob = await Job.findById(job._id)
       .populate('client')
-      .populate('relatedEmails');
+      .populate('relatedEmails')
+      .populate('assignedUsers', 'name email role phone');
 
     res.json(updatedJob);
   } catch (error) {

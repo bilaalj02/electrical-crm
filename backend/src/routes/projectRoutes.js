@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Project = require('../models/Project');
 const Job = require('../models/Job');
+const Photo = require('../models/Photo');
 const { auth } = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
@@ -77,7 +78,28 @@ router.get('/', auth, async (req, res) => {
       .populate('notes.author', 'name email')
       .sort({ projectDate: -1 });
 
-    res.json({ projects });
+    // Attach first photo from Photo collection as cover for each project
+    const projectIds = projects.map(p => p._id);
+    const coverPhotos = await Photo.find({ project: { $in: projectIds } })
+      .sort({ uploadedAt: 1 })
+      .select('project url');
+
+    const coverMap = {};
+    for (const photo of coverPhotos) {
+      const pid = photo.project.toString();
+      if (!coverMap[pid]) coverMap[pid] = photo.url;
+    }
+
+    const projectsWithCover = projects.map(p => {
+      const obj = p.toObject();
+      if (!obj.photos || obj.photos.length === 0) {
+        const coverUrl = coverMap[p._id.toString()];
+        if (coverUrl) obj.photos = [{ url: coverUrl }];
+      }
+      return obj;
+    });
+
+    res.json({ projects: projectsWithCover });
   } catch (error) {
     console.error('Error fetching projects:', error);
     res.status(500).json({ error: 'Failed to fetch projects' });

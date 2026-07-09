@@ -15,7 +15,9 @@ export default function Signup() {
     name: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    phone: '',
+    preferredContact: 'email',
   });
 
   const [invitation, setInvitation] = useState(null);
@@ -29,7 +31,6 @@ export default function Signup() {
       setLoading(false);
       return;
     }
-
     verifyInvitation();
   }, [token]);
 
@@ -53,27 +54,24 @@ export default function Signup() {
       setError('Passwords do not match');
       return;
     }
-
     if (formData.password.length < 6) {
       setError('Password must be at least 6 characters');
       return;
     }
 
     setValidating(true);
-
     try {
       const response = await axios.post(`${API_URL}/auth/signup`, {
         name: formData.name,
         email: formData.email,
         password: formData.password,
-        token
+        phone: formData.phone,
+        preferredContact: formData.preferredContact,
+        token,
       });
 
-      // Store token and user data
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
-
-      // Redirect to dashboard
       window.location.href = '/';
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create account');
@@ -82,18 +80,36 @@ export default function Signup() {
   };
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const inputStyle = {
+    width: '100%',
+    padding: '9px 12px',
+    border: '1.5px solid #e5e7eb',
+    borderRadius: '8px',
+    fontSize: '14px',
+    boxSizing: 'border-box',
+    background: '#ffffff',
+    color: '#111827',
+    fontFamily: 'inherit',
+    outline: 'none',
+  };
+
+  const labelStyle = {
+    display: 'block',
+    marginBottom: '4px',
+    color: '#374151',
+    fontWeight: '500',
+    fontSize: '13px',
   };
 
   if (loading) {
     return (
       <div className="auth-container">
-        <div className="auth-card">
+        <div className="auth-card" style={{ textAlign: 'center' }}>
           <img src={mesLogo} alt="MES Logo" className="auth-logo" />
-          <p>Verifying invitation...</p>
+          <p style={{ color: '#6b7280' }}>Verifying invitation...</p>
         </div>
       </div>
     );
@@ -104,9 +120,7 @@ export default function Signup() {
       <div className="auth-container">
         <div className="auth-card">
           <img src={mesLogo} alt="MES Logo" className="auth-logo" />
-          <div className="error-message">
-            {error || 'Invalid invitation'}
-          </div>
+          <div className="error-message">{error || 'Invalid invitation'}</div>
           <p className="auth-footer">
             If you believe this is an error, please contact your administrator.
           </p>
@@ -127,61 +141,96 @@ export default function Signup() {
         {error && <div className="error-message">{error}</div>}
 
         <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="name">Full Name</label>
-            <input
-              type="text"
-              id="name"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              required
-              autoFocus
-              disabled={validating}
-            />
+          {/* Two-column layout for name + phone */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+            <div>
+              <label style={labelStyle}>Full Name *</label>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                required
+                autoFocus
+                disabled={validating}
+                placeholder="John Smith"
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Phone</label>
+              <input
+                type="tel"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                disabled={validating}
+                placeholder="(555) 000-0000"
+                style={inputStyle}
+              />
+            </div>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
+          <div style={{ marginBottom: '14px' }}>
+            <label style={labelStyle}>Email</label>
             <input
               type="email"
-              id="email"
               name="email"
               value={formData.email}
               readOnly
               disabled
-              className="readonly-input"
+              style={{ ...inputStyle, background: '#f5f5f5', color: '#6b7280', cursor: 'not-allowed' }}
             />
-            <small className="form-hint">This email is from your invitation</small>
+            <small style={{ display: 'block', marginTop: '4px', fontSize: '12px', color: '#9ca3af' }}>
+              This email is from your invitation
+            </small>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              value={formData.password}
+          <div style={{ marginBottom: '14px' }}>
+            <label style={labelStyle}>Preferred Contact Method</label>
+            <select
+              name="preferredContact"
+              value={formData.preferredContact}
               onChange={handleChange}
-              required
-              minLength={6}
               disabled={validating}
-            />
-            <small className="form-hint">Minimum 6 characters</small>
+              style={inputStyle}
+            >
+              <option value="email">Email</option>
+              <option value="phone">Phone</option>
+              <option value="text">Text / SMS</option>
+            </select>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="confirmPassword">Confirm Password</label>
-            <input
-              type="password"
-              id="confirmPassword"
-              name="confirmPassword"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              required
-              minLength={6}
-              disabled={validating}
-            />
+          {/* Two-column for passwords */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '6px' }}>
+            <div>
+              <label style={labelStyle}>Password *</label>
+              <input
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                required
+                minLength={6}
+                disabled={validating}
+                placeholder="Min 6 characters"
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Confirm Password *</label>
+              <input
+                type="password"
+                name="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                required
+                minLength={6}
+                disabled={validating}
+                placeholder="Repeat password"
+                style={inputStyle}
+              />
+            </div>
           </div>
 
           <button

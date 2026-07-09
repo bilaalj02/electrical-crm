@@ -6,10 +6,12 @@ import JobDetail from './JobDetail';
 import ExpenseEntryModal from './ExpenseEntryModal';
 import { showToast } from './Toast';
 import NotificationModal from './NotificationModal';
+import { useAuth } from '../context/AuthContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 function Jobs({ initialJobId, onConsumeInitial }) {
+  const { isManager } = useAuth();
   const [jobs, setJobs] = useState([]);
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -189,33 +191,37 @@ function Jobs({ initialJobId, onConsumeInitial }) {
               <div className="stat-value">{stats.total}</div>
             </div>
           </div>
-          <div className="stat-card">
-            <div className="stat-icon" style={{ background: '#dcfce7' }}>
-              <FiDollarSign style={{ color: '#10b981' }} />
-            </div>
-            <div className="stat-content">
-              <div className="stat-label">Total Revenue</div>
-              <div className="stat-value">{formatCurrency(stats.totalRevenue)}</div>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon" style={{ background: '#fef3c7' }}>
-              <FiClock style={{ color: '#f59e0b' }} />
-            </div>
-            <div className="stat-content">
-              <div className="stat-label">Pending Revenue</div>
-              <div className="stat-value">{formatCurrency(stats.pendingRevenue)}</div>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon" style={{ background: '#fee2e2' }}>
-              <FiDollarSign style={{ color: '#ef4444' }} />
-            </div>
-            <div className="stat-content">
-              <div className="stat-label">Unpaid Invoices</div>
-              <div className="stat-value">{stats.unpaidInvoices}</div>
-            </div>
-          </div>
+          {isManager && (
+            <>
+              <div className="stat-card">
+                <div className="stat-icon" style={{ background: '#dcfce7' }}>
+                  <FiDollarSign style={{ color: '#10b981' }} />
+                </div>
+                <div className="stat-content">
+                  <div className="stat-label">Total Revenue</div>
+                  <div className="stat-value">{formatCurrency(stats.totalRevenue)}</div>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon" style={{ background: '#fef3c7' }}>
+                  <FiClock style={{ color: '#f59e0b' }} />
+                </div>
+                <div className="stat-content">
+                  <div className="stat-label">Pending Revenue</div>
+                  <div className="stat-value">{formatCurrency(stats.pendingRevenue)}</div>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon" style={{ background: '#fee2e2' }}>
+                  <FiDollarSign style={{ color: '#ef4444' }} />
+                </div>
+                <div className="stat-content">
+                  <div className="stat-label">Unpaid Invoices</div>
+                  <div className="stat-value">{stats.unpaidInvoices}</div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -364,18 +370,22 @@ function Jobs({ initialJobId, onConsumeInitial }) {
               </div>
 
               <div className="job-info">
-                <div className="info-row">
-                  <span className="label">Amount:</span>
-                  <span className="value">{formatCurrency(job.costs?.finalTotal)}</span>
-                </div>
+                {isManager && (
+                  <div className="info-row">
+                    <span className="label">Amount:</span>
+                    <span className="value">{formatCurrency(job.costs?.finalTotal)}</span>
+                  </div>
+                )}
                 <div className="info-row">
                   <span className="label">Scheduled:</span>
                   <span className="value">{formatDate(job.scheduledDate)}</span>
                 </div>
-                <div className="info-row">
-                  <span className="label">Balance:</span>
-                  <span className="value">{formatCurrency(job.payment?.balance)}</span>
-                </div>
+                {isManager && (
+                  <div className="info-row">
+                    <span className="label">Balance:</span>
+                    <span className="value">{formatCurrency(job.payment?.balance)}</span>
+                  </div>
+                )}
               </div>
             </div>
           ))

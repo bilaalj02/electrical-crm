@@ -28,7 +28,7 @@
   --de-green:       #34d399;
   --toolbar-h:      48px;
   --lib-w:          240px;
-  --props-w:        220px;
+  --props-w:        230px;
 }
 
 /* ── Layout ──────────────────────────────────────── */
@@ -569,7 +569,7 @@
 .de-prop-label {
   font-size: 11px;
   color: var(--de-text-muted);
-  width: 70px;
+  width: 56px;
   flex-shrink: 0;
 }
 

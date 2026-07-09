@@ -251,6 +251,12 @@ const jobSchema = new mongoose.Schema({
     role: String
   }],
 
+  // Assigned users (User references — for employee dropdown in job form)
+  assignedUsers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+
   // Related Emails
   relatedEmails: [{
     type: mongoose.Schema.Types.ObjectId,

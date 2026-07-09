@@ -110,7 +110,7 @@ router.get('/me', auth, async (req, res) => {
 // Update current user profile
 router.patch('/me', auth, async (req, res) => {
   try {
-    const allowedUpdates = ['name', 'phone', 'profileImage'];
+    const allowedUpdates = ['name', 'phone', 'preferredContact', 'profileImage'];
     const updates = {};
 
     Object.keys(req.body).forEach(key => {
@@ -277,13 +277,17 @@ router.post('/signup', async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    const { phone, preferredContact } = req.body;
+
     // Create user
     const user = new User({
       name,
       email: email.toLowerCase(),
       password: hashedPassword,
       role: invitation.role,
-      createdBy: invitation.invitedBy
+      createdBy: invitation.invitedBy,
+      phone: phone || '',
+      preferredContact: preferredContact || 'email',
     });
 
     await user.save();

@@ -561,7 +561,7 @@ export default function Projects() {
                   onClick={(e) => handleDeleteProject(project._id, e)}
                   title="Delete project"
                 >
-                  <FiTrash2 />
+                  <FiTrash2 /> Delete
                 </button>
               </div>
             </div>

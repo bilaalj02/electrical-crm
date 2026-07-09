@@ -29,11 +29,13 @@ function Home({ onNavigate }) {
     (async () => {
       setLoading(true);
       try {
+        const token = localStorage.getItem('token');
+        const authHeader = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
         const [jobsRes, clientsRes, emailsRes, dashRes] = await Promise.all([
           axios.get(`${API_URL}/jobs/stats`),
           axios.get(`${API_URL}/clients/stats`),
           axios.get(`${API_URL}/emails/stats/summary`),
-          axios.get(`${API_URL}/dashboard`),
+          axios.get(`${API_URL}/dashboard`, authHeader),
         ]);
         if (!mounted) return;
         setStats({
@@ -217,22 +219,40 @@ function Home({ onNavigate }) {
             {dashboard.todayScheduled.length === 0 && (
               <p className="empty">Nothing scheduled today.</p>
             )}
-            {dashboard.todayScheduled.map((j) => (
-              <button
-                key={j._id}
-                className="shortcut-item"
-                onClick={() => onNavigate('jobs', { jobId: j._id })}
-              >
-                <div className="shortcut-item-main">
-                  <span className="shortcut-item-title">
-                    {formatTime(j.scheduledDate)} · {j.title || 'Untitled'}
-                  </span>
-                  <span className="shortcut-item-sub">
-                    {(j.client?.companyName || j.client?.name) || 'No client'}
-                  </span>
+            {dashboard.todayScheduled.map((item) => (
+              item._type === 'event' ? (
+                <div
+                  key={item._id}
+                  className="shortcut-item"
+                  style={{ borderLeft: `3px solid ${item.color || '#d4af37'}`, cursor: 'default' }}
+                >
+                  <div className="shortcut-item-main">
+                    <span className="shortcut-item-title">
+                      {item.allDay ? 'All day' : formatTime(item.scheduledDate)} · {item.title || 'Untitled'}
+                    </span>
+                    <span className="shortcut-item-sub">
+                      {item.location || 'Manual event'}
+                    </span>
+                  </div>
+                  <span className="shortcut-item-status" style={{ background: '#fef9e7', color: '#92400e' }}>event</span>
                 </div>
-                <span className="shortcut-item-status">{j.status}</span>
-              </button>
+              ) : (
+                <button
+                  key={item._id}
+                  className="shortcut-item"
+                  onClick={() => onNavigate('jobs', { jobId: item._id })}
+                >
+                  <div className="shortcut-item-main">
+                    <span className="shortcut-item-title">
+                      {formatTime(item.scheduledDate)} · {item.title || 'Untitled'}
+                    </span>
+                    <span className="shortcut-item-sub">
+                      {(item.client?.companyName || item.client?.name) || 'No client'}
+                    </span>
+                  </div>
+                  <span className="shortcut-item-status">{item.status}</span>
+                </button>
+              )
             ))}
           </div>
         </div>

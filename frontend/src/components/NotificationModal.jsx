@@ -91,11 +91,10 @@ function NotificationModal({
           }}
         >
           <h2 style={{
-            color: '#ffffff',
+            color: '#111827',
             fontSize: '18px',
             fontWeight: '600',
-            margin: 0,
-            textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+            margin: 0
           }}>
             {title || (type === 'success' ? 'Success' : type === 'error' ? 'Error' : type === 'warning' ? 'Warning' : type === 'confirm' ? 'Confirm' : 'Information')}
           </h2>

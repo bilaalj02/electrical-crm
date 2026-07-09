@@ -42,6 +42,10 @@ function ProjectDetail({ projectId, onBack }) {
   // Confirm dialog
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
 
+  // Photo comments
+  const [photoCommentText, setPhotoCommentText] = useState('');
+  const [addingPhotoComment, setAddingPhotoComment] = useState(false);
+
   // Upload form state
   const [uploadFiles, setUploadFiles] = useState([]);
   const [uploadPreviews, setUploadPreviews] = useState([]);
@@ -114,6 +118,19 @@ function ProjectDetail({ projectId, onBack }) {
       setComments(projectData.notes || []);
     } catch (error) {
       console.error('Error fetching comments:', error);
+    }
+  };
+
+  const handleStatusChange = async (newStatus) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.patch(`${API_URL}/projects/${projectId}`, { status: newStatus }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setProject(prev => ({ ...prev, status: newStatus }));
+      showToast('Status updated', 'success');
+    } catch (error) {
+      showToast('Failed to update status', 'error');
     }
   };
 
@@ -274,14 +291,85 @@ function ProjectDetail({ projectId, onBack }) {
     }
   };
 
+  const handleDeleteComment = (commentId) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Comment',
+      message: 'Are you sure you want to delete this comment?',
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem('token');
+          await axios.delete(`${API_URL}/projects/${projectId}/notes/${commentId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          showToast('Comment deleted', 'success');
+          fetchComments();
+        } catch (error) {
+          showToast(error.response?.data?.error || 'Failed to delete comment', 'error');
+        }
+      }
+    });
+  };
+
+  const handleAddPhotoComment = async () => {
+    if (!photoCommentText.trim() || !selectedPhoto) return;
+    setAddingPhotoComment(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.post(`${API_URL}/photos/${selectedPhoto._id}/comments`, {
+        content: photoCommentText.trim()
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setPhotoCommentText('');
+      // Update the selectedPhoto's comments in state
+      setSelectedPhoto(prev => ({
+        ...prev,
+        comments: [...(prev.comments || []), res.data.comment]
+      }));
+      // Also refresh photos list
+      fetchPhotos();
+    } catch (error) {
+      showToast(error.response?.data?.error || 'Failed to add comment', 'error');
+    } finally {
+      setAddingPhotoComment(false);
+    }
+  };
+
+  const handleDeletePhotoComment = (commentId) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Comment',
+      message: 'Are you sure you want to delete this comment?',
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem('token');
+          await axios.delete(`${API_URL}/photos/${selectedPhoto._id}/comments/${commentId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          showToast('Comment deleted', 'success');
+          setSelectedPhoto(prev => ({
+            ...prev,
+            comments: prev.comments.filter(c => c._id !== commentId)
+          }));
+          fetchPhotos();
+        } catch (error) {
+          showToast(error.response?.data?.error || 'Failed to delete comment', 'error');
+        }
+      }
+    });
+  };
+
   const openLightbox = (photo) => {
     setSelectedPhoto(photo);
     setLightboxOpen(true);
+    setPhotoCommentText('');
   };
 
   const closeLightbox = () => {
     setLightboxOpen(false);
     setSelectedPhoto(null);
+    setPhotoCommentText('');
   };
 
   const getServerUrl = () => {
@@ -319,25 +407,27 @@ function ProjectDetail({ projectId, onBack }) {
     <div className="project-detail-page">
       {/* Header */}
       <div className="detail-header">
-        <button className="btn-back" onClick={onBack}>
-          <FiArrowLeft /> Back to Projects
-        </button>
-        <div className="header-content">
-          <h1>{project.name || project.title}</h1>
-          <p className="project-description">{project.description}</p>
-          <div className="project-meta">
-            <span className="meta-item">
-              <FiCalendar /> {formatDate(project.createdAt || project.projectDate)}
-            </span>
-            <span className={`status-badge status-${project.status}`}>
-              {project.status}
-            </span>
-            <span className="meta-item">
-              <FiImage /> {allPhotos.length} Photos
-            </span>
-            <span className="meta-item">
-              <FiMessageSquare /> {comments.length} Comments
-            </span>
+        <div className="detail-header-left">
+          <button className="btn-back" onClick={onBack}>
+            <FiArrowLeft /> Back to Projects
+          </button>
+          <span className="header-date">
+            <FiCalendar /> {formatDate(project.createdAt || project.projectDate)}
+          </span>
+        </div>
+        <div className="detail-header-right">
+          <h1 className="header-title">{project.name || project.title}</h1>
+          <div className="header-status-row">
+            <span className={`status-badge status-${project.status}`}>{project.status}</span>
+            <select
+              className="status-select"
+              value={project.status}
+              onChange={e => handleStatusChange(e.target.value)}
+            >
+              <option value="active">Active</option>
+              <option value="completed">Completed</option>
+              <option value="archived">Archived</option>
+            </select>
           </div>
         </div>
       </div>
@@ -638,12 +728,21 @@ function ProjectDetail({ projectId, onBack }) {
                       <div className="comment-avatar">
                         <FiUser />
                       </div>
-                      <div className="comment-content">
-                        <div className="comment-header">
-                          <strong>{comment.author?.name || 'Unknown'}</strong>
-                          <span className="comment-time">
-                            {formatDate(comment.createdAt)}
-                          </span>
+                      <div className="comment-content" style={{ flex: 1 }}>
+                        <div className="comment-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div>
+                            <strong>{comment.author?.name || 'Unknown'}</strong>
+                            <span className="comment-time" style={{ marginLeft: '8px' }}>
+                              {formatDate(comment.createdAt)}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteComment(comment._id)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '2px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center' }}
+                            title="Delete comment"
+                          >
+                            <FiTrash2 size={13} />
+                          </button>
                         </div>
                         <p>{comment.content}</p>
                       </div>
@@ -805,48 +904,87 @@ function ProjectDetail({ projectId, onBack }) {
       {/* Lightbox */}
       {lightboxOpen && selectedPhoto && (
         <div className="lightbox-overlay" onClick={closeLightbox}>
-          <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
+          <div className="lightbox-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '95vw', maxHeight: '95vh', width: '1100px' }}>
             <button className="lightbox-close" onClick={closeLightbox}>
               <FiX size={24} />
             </button>
-            <img src={`${getServerUrl()}${selectedPhoto.url}`} alt={selectedPhoto.label} />
-            <div className="lightbox-info">
-              <h3>{selectedPhoto.label}</h3>
-              {selectedPhoto.notes && <p>{selectedPhoto.notes}</p>}
-              <div className="lightbox-meta">
-                <span className={`category-badge category-${selectedPhoto.category}`}>
-                  {selectedPhoto.category}
-                </span>
-                <span>
-                  <FiCalendar /> {formatDate(selectedPhoto.uploadedAt)}
-                </span>
-                <span>
-                  <FiUser /> {selectedPhoto.uploadedBy?.name || 'Unknown'}
-                </span>
+            <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+              {/* Image panel */}
+              <div style={{ flex: '0 0 65%', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '500px' }}>
+                <img src={`${getServerUrl()}${selectedPhoto.url}`} alt={selectedPhoto.label} style={{ maxWidth: '100%', maxHeight: '85vh', objectFit: 'contain' }} />
               </div>
-              <div className="lightbox-actions">
-                <a
-                  href={`${getServerUrl()}${selectedPhoto.url}`}
-                  download={selectedPhoto.originalName}
-                  className="btn-download"
-                >
-                  <FiDownload /> Download
-                </a>
-                <button className="btn-edit" onClick={() => {
-                  setEditingPhoto(selectedPhoto);
-                  closeLightbox();
-                }}>
-                  <FiEdit2 /> Edit
-                </button>
-                <button
-                  className="btn-delete"
-                  onClick={() => {
-                    handleDeletePhoto(selectedPhoto._id);
-                    closeLightbox();
-                  }}
-                >
-                  <FiTrash2 /> Delete
-                </button>
+              {/* Info + comments panel */}
+              <div style={{ flex: '0 0 35%', display: 'flex', flexDirection: 'column', overflow: 'hidden', borderLeft: '1px solid #e5e7eb' }}>
+                <div className="lightbox-info" style={{ flex: '0 0 auto' }}>
+                  <h3>{selectedPhoto.label}</h3>
+                  {selectedPhoto.notes && <p>{selectedPhoto.notes}</p>}
+                  <div className="lightbox-meta">
+                    <span className={`category-badge category-${selectedPhoto.category}`}>
+                      {selectedPhoto.category}
+                    </span>
+                    <span><FiCalendar /> {formatDate(selectedPhoto.uploadedAt)}</span>
+                    <span><FiUser /> {selectedPhoto.uploadedBy?.name || 'Unknown'}</span>
+                  </div>
+                  <div className="lightbox-actions">
+                    <a href={`${getServerUrl()}${selectedPhoto.url}`} download={selectedPhoto.originalName} className="btn-download">
+                      <FiDownload /> Download
+                    </a>
+                    <button className="btn-edit" onClick={() => { setEditingPhoto(selectedPhoto); closeLightbox(); }}>
+                      <FiEdit2 /> Edit
+                    </button>
+                    <button className="btn-delete" onClick={() => { handleDeletePhoto(selectedPhoto._id); closeLightbox(); }}>
+                      <FiTrash2 /> Delete
+                    </button>
+                  </div>
+                </div>
+
+                {/* Photo comments */}
+                <div style={{ flex: 1, overflowY: 'auto', borderTop: '1px solid #e5e7eb', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#374151', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <FiMessageSquare size={14} /> Comments ({selectedPhoto.comments?.length || 0})
+                  </h4>
+
+                  <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {(selectedPhoto.comments || []).map(c => (
+                      <div key={c._id} style={{ background: '#f9fafb', borderRadius: '8px', padding: '10px 12px', fontSize: '13px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                          <span style={{ fontWeight: '600', color: '#374151' }}>{c.author?.name || 'Unknown'}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ color: '#9ca3af', fontSize: '11px' }}>{new Date(c.createdAt).toLocaleDateString()}</span>
+                            <button
+                              onClick={() => handleDeletePhotoComment(c._id)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '2px', display: 'flex', alignItems: 'center' }}
+                              title="Delete"
+                            >
+                              <FiTrash2 size={11} />
+                            </button>
+                          </div>
+                        </div>
+                        <p style={{ margin: 0, color: '#4b5563', lineHeight: '1.5' }}>{c.content}</p>
+                      </div>
+                    ))}
+                    {(!selectedPhoto.comments || selectedPhoto.comments.length === 0) && (
+                      <p style={{ color: '#9ca3af', fontSize: '13px', margin: 0 }}>No comments yet.</p>
+                    )}
+                  </div>
+
+                  <div style={{ marginTop: 'auto', paddingTop: '10px', borderTop: '1px solid #e5e7eb' }}>
+                    <textarea
+                      value={photoCommentText}
+                      onChange={(e) => setPhotoCommentText(e.target.value)}
+                      placeholder="Add a comment on this photo..."
+                      rows={2}
+                      style={{ width: '100%', padding: '8px 10px', border: '1.5px solid #e5e7eb', borderRadius: '8px', fontSize: '13px', resize: 'none', boxSizing: 'border-box', background: '#ffffff', color: '#111827', fontFamily: 'inherit' }}
+                    />
+                    <button
+                      onClick={handleAddPhotoComment}
+                      disabled={addingPhotoComment || !photoCommentText.trim()}
+                      style={{ marginTop: '6px', width: '100%', padding: '7px 12px', background: '#d4af37', border: 'none', borderRadius: '8px', color: 'white', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', opacity: (addingPhotoComment || !photoCommentText.trim()) ? 0.6 : 1 }}
+                    >
+                      <FiSend size={13} /> {addingPhotoComment ? 'Posting...' : 'Post Comment'}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

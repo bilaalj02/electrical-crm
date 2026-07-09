@@ -70,11 +70,10 @@ export default function DiagramEditor() {
     return () => clearInterval(timer);
   }, [diagramName, diagramId]); // eslint-disable-line
 
-  // Update undo/redo state after canvas actions
-  const refreshHistoryState = useCallback(() => {
-    if (!canvasRef.current) return;
-    setCanUndo(canvasRef.current.canUndo());
-    setCanRedo(canvasRef.current.canRedo());
+  // Called by Canvas whenever history changes (saveHistory, undo, redo)
+  const handleHistoryChange = useCallback(({ canUndo: u, canRedo: r }) => {
+    setCanUndo(u);
+    setCanRedo(r);
   }, []);
 
   // ── Save ──────────────────────────────────────────────────────────────────
@@ -132,8 +131,7 @@ export default function DiagramEditor() {
     const cv = canvasRef.current;
     if (!cv) return;
     cv.addSymbol(symbol);
-    refreshHistoryState();
-  }, [refreshHistoryState]);
+  }, []);
 
   // ── Custom symbol save ────────────────────────────────────────────────────
   const handleSaveCustomSymbol = useCallback(async (sym) => {
@@ -161,12 +159,11 @@ export default function DiagramEditor() {
 
   const handleSelectionChange = useCallback((objs) => {
     setSelected(objs || []);
-    refreshHistoryState();
-  }, [refreshHistoryState]);
+  }, []);
 
   // ── Undo/Redo wrappers ────────────────────────────────────────────────────
-  const undo = () => { canvasRef.current?.undo(); refreshHistoryState(); };
-  const redo = () => { canvasRef.current?.redo(); refreshHistoryState(); };
+  const undo = () => { canvasRef.current?.undo(); };
+  const redo = () => { canvasRef.current?.redo(); };
 
   return (
     <div className="de-root">
@@ -203,6 +200,8 @@ export default function DiagramEditor() {
         onDeleteSelected={() => canvasRef.current?.deleteSelected()}
         onGroup={() => canvasRef.current?.groupSelected()}
         onUngroup={() => canvasRef.current?.ungroupSelected()}
+        onLock={() => canvasRef.current?.lockSelected()}
+        onUnlock={() => canvasRef.current?.unlockSelected()}
         onAlignLeft={() => canvasRef.current?.align('left')}
         onAlignCenter={() => canvasRef.current?.align('center')}
         onAlignRight={() => canvasRef.current?.align('right')}
@@ -238,14 +237,18 @@ export default function DiagramEditor() {
           onSelectionChange={handleSelectionChange}
           onZoomChange={setZoom}
           onCoordsChange={(x, y) => setCoords({ x, y })}
+          onToolUsed={setActiveTool}
+          onHistoryChange={handleHistoryChange}
         />
 
         {/* Right: Properties */}
         <PropertiesPanel
           selectedObjects={selected}
           onUpdateObject={handleUpdateObject}
-          onDeleteSelected={() => { canvasRef.current?.deleteSelected(); refreshHistoryState(); }}
-          onDuplicate={() => { canvasRef.current?.duplicateSelected(); refreshHistoryState(); }}
+          onDeleteSelected={() => { canvasRef.current?.deleteSelected(); }}
+          onDuplicate={() => { canvasRef.current?.duplicateSelected(); }}
+          onLock={() => canvasRef.current?.lockSelected()}
+          onUnlock={() => canvasRef.current?.unlockSelected()}
         />
       </div>
 

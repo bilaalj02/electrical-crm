@@ -4,13 +4,24 @@ import {
   Line, Rect, Circle, IText, Group, ActiveSelection,
   loadSVGFromString,
   util,
+  InteractiveFabricObject,
 } from 'fabric';
 import { getSymbolById } from './symbols/electricalSymbols.js';
 
 const GRID_SIZE = 20;
 
+// Dark selection handles — visible on the light canvas background
+InteractiveFabricObject.ownDefaults = {
+  ...InteractiveFabricObject.ownDefaults,
+  borderColor:        '#1a1a1a',
+  cornerColor:        '#1a1a1a',
+  cornerStrokeColor:  '#ffffff',
+  cornerSize:         8,
+  transparentCorners: false,
+};
+
 const CanvasComponent = forwardRef(function CanvasComponent(
-  { activeTool, gridVisible, snapEnabled, onSelectionChange, onZoomChange, onCoordsChange },
+  { activeTool, gridVisible, snapEnabled, onSelectionChange, onZoomChange, onCoordsChange, onToolUsed, onHistoryChange },
   ref
 ) {
   const containerRef = useRef(null);
@@ -28,17 +39,24 @@ const CanvasComponent = forwardRef(function CanvasComponent(
   // Clipboard
   const clipboard = useRef(null);
 
-  // Keep latest tool/snap refs so event handlers don't go stale
+  // Keep latest tool/snap/drawGrid/callbacks refs so event handlers don't go stale
   const activeToolRef  = useRef(activeTool);
   const snapEnabledRef = useRef(snapEnabled);
+  const drawGridRef    = useRef(null);
+  const onToolUsedRef  = useRef(onToolUsed);
   useEffect(() => { activeToolRef.current  = activeTool;  }, [activeTool]);
   useEffect(() => { snapEnabledRef.current = snapEnabled; }, [snapEnabled]);
+  useEffect(() => { onToolUsedRef.current  = onToolUsed;  }, [onToolUsed]);
 
   // ── Snap helper ────────────────────────────────────────────────────────
   const snap = (val) => {
     if (!snapEnabledRef.current) return val;
     return Math.round(val / GRID_SIZE) * GRID_SIZE;
   };
+
+  // Keep latest onHistoryChange ref so saveHistory/undo/redo always fire it
+  const onHistoryChangeRef = useRef(onHistoryChange);
+  useEffect(() => { onHistoryChangeRef.current = onHistoryChange; }, [onHistoryChange]);
 
   // ── History ────────────────────────────────────────────────────────────
   const saveHistory = useCallback(() => {
@@ -48,31 +66,50 @@ const CanvasComponent = forwardRef(function CanvasComponent(
     history.current = history.current.slice(0, historyIdx.current + 1);
     history.current.push(json);
     historyIdx.current = history.current.length - 1;
+    onHistoryChangeRef.current?.({
+      canUndo: historyIdx.current > 0,
+      canRedo: historyIdx.current < history.current.length - 1,
+    });
   }, []);
 
   // ── Grid ───────────────────────────────────────────────────────────────
   const drawGrid = useCallback(() => {
     const cv = fabricRef.current;
     if (!cv) return;
-    const w = cv.width;
-    const h = cv.height;
 
     cv.getObjects().filter(o => o._isGrid).forEach(o => cv.remove(o));
 
     if (!gridVisible) { cv.renderAll(); return; }
 
-    for (let x = 0; x <= w; x += GRID_SIZE) {
-      const l = new Line([x, 0, x, h], {
-        stroke: '#d0d4dc', strokeWidth: 0.5, selectable: false,
+    // Convert viewport corners to scene coordinates so grid covers the full
+    // visible area regardless of zoom level or pan offset.
+    const vpt = cv.viewportTransform;
+    const zoom = cv.getZoom();
+    const w = cv.width;
+    const h = cv.height;
+
+    // Scene coordinate of the top-left and bottom-right canvas corners
+    const left   = (0 - vpt[4]) / zoom;
+    const top    = (0 - vpt[5]) / zoom;
+    const right  = (w - vpt[4]) / zoom;
+    const bottom = (h - vpt[5]) / zoom;
+
+    // Snap grid start to nearest grid line
+    const startX = Math.floor(left / GRID_SIZE) * GRID_SIZE;
+    const startY = Math.floor(top  / GRID_SIZE) * GRID_SIZE;
+
+    for (let x = startX; x <= right; x += GRID_SIZE) {
+      const l = new Line([x, top - GRID_SIZE, x, bottom + GRID_SIZE], {
+        stroke: '#d0d4dc', strokeWidth: 0.5 / zoom, selectable: false,
         evented: false, excludeFromExport: true,
       });
       l._isGrid = true;
       cv.add(l);
       cv.sendObjectToBack(l);
     }
-    for (let y = 0; y <= h; y += GRID_SIZE) {
-      const l = new Line([0, y, w, y], {
-        stroke: '#d0d4dc', strokeWidth: 0.5, selectable: false,
+    for (let y = startY; y <= bottom; y += GRID_SIZE) {
+      const l = new Line([left - GRID_SIZE, y, right + GRID_SIZE, y], {
+        stroke: '#d0d4dc', strokeWidth: 0.5 / zoom, selectable: false,
         evented: false, excludeFromExport: true,
       });
       l._isGrid = true;
@@ -82,6 +119,7 @@ const CanvasComponent = forwardRef(function CanvasComponent(
     cv.renderAll();
   }, [gridVisible]);
 
+  useEffect(() => { drawGridRef.current = drawGrid; }, [drawGrid]);
   useEffect(() => { drawGrid(); }, [gridVisible, drawGrid]);
 
   // ── Init ───────────────────────────────────────────────────────────────
@@ -98,6 +136,14 @@ const CanvasComponent = forwardRef(function CanvasComponent(
       backgroundColor: '#f0f2f5',
       preserveObjectStacking: true,
     });
+
+    // Dark selection marquee
+    canvas.set({
+      selectionColor:       'rgba(26, 26, 26, 0.08)',
+      selectionBorderColor: '#1a1a1a',
+      selectionLineWidth:   1.5,
+    });
+
     fabricRef.current = canvas;
 
     // Resize observer
@@ -120,6 +166,7 @@ const CanvasComponent = forwardRef(function CanvasComponent(
       opt.e.preventDefault();
       opt.e.stopPropagation();
       onZoomChange && onZoomChange(z);
+      drawGridRef.current && drawGridRef.current();
     });
 
     // ── Mouse down ──────────────────────────────────────────────────────
@@ -223,10 +270,19 @@ const CanvasComponent = forwardRef(function CanvasComponent(
 
       if (tool !== 'wire' && tool !== 'bus') {
         if (ws.drawing) {
-          ws.line && ws.line.setCoords();
+          const obj = ws.line;
+          obj && obj.setCoords();
+          // Make the finished shape fully selectable/interactive
+          if (obj) {
+            obj.set({ selectable: true, evented: true });
+          }
           wireState.current = { drawing: false, line: null, startX: 0, startY: 0 };
           canvas.selection = true;
           saveHistory();
+          // Auto-revert to select tool after placing rect, circle, or line
+          if (tool === 'rect' || tool === 'circle' || tool === 'line') {
+            onToolUsedRef.current?.('select');
+          }
         }
       }
 
@@ -242,17 +298,60 @@ const CanvasComponent = forwardRef(function CanvasComponent(
         itext.enterEditing();
         itext.selectAll();
         saveHistory();
+        onToolUsedRef.current?.('select');
+      }
+
+      if (tool === 'note' && !ws.drawing) {
+        const ptr = canvas.getScenePoint(opt.e);
+        const noteX = snap(ptr.x);
+        const noteY = snap(ptr.y);
+        // Use IText with backgroundColor — directly editable on double-click
+        const note = new IText('Note…', {
+          left: noteX, top: noteY,
+          fontSize: 13,
+          fill: '#713f12',
+          backgroundColor: '#fef9c3',
+          fontFamily: 'Inter, Segoe UI, sans-serif',
+          width: 160,
+          padding: 8,
+          selectable: true, evented: true,
+          borderColor: '#ca8a04',
+          cornerColor: '#ca8a04',
+        });
+        note._isNote = true;
+        canvas.add(note);
+        canvas.setActiveObject(note);
+        note.enterEditing();
+        note.selectAll();
+        canvas.renderAll();
+        saveHistory();
+        onToolUsedRef.current?.('select');
       }
     });
 
-    // Double-click ends wire
-    canvas.on('mouse:dblclick', () => {
+    // Double-click ends wire — remove the dangling in-progress segment
+    // Also allows double-clicking a note group to edit its text
+    canvas.on('mouse:dblclick', (opt) => {
       const ws = wireState.current;
       if ((activeToolRef.current === 'wire' || activeToolRef.current === 'bus') && ws.drawing) {
         if (ws.line) canvas.remove(ws.line);
         wireState.current = { drawing: false, line: null, startX: 0, startY: 0 };
         canvas.selection = true;
+        // Make all placed wire segments selectable so they can be grouped
+        canvas.getObjects().filter(o => o.isWire && !o._isGrid).forEach(o => {
+          o.set({ selectable: true, evented: true });
+        });
         saveHistory();
+        return;
+      }
+
+      // Double-click on a note (IText with _isNote) — enter editing mode
+      const target = opt.target;
+      if (target && target._isNote && target.type === 'i-text') {
+        canvas.setActiveObject(target);
+        target.enterEditing();
+        target.selectAll();
+        canvas.renderAll();
       }
     });
 
@@ -314,8 +413,12 @@ const CanvasComponent = forwardRef(function CanvasComponent(
     skipHistory.current = true;
     cv.loadFromJSON(JSON.parse(history.current[historyIdx.current])).then(() => {
       skipHistory.current = false;
-      drawGrid();
+      drawGridRef.current?.();
       onZoomChange && onZoomChange(cv.getZoom());
+      onHistoryChangeRef.current?.({
+        canUndo: historyIdx.current > 0,
+        canRedo: historyIdx.current < history.current.length - 1,
+      });
     });
   };
 
@@ -326,8 +429,12 @@ const CanvasComponent = forwardRef(function CanvasComponent(
     skipHistory.current = true;
     cv.loadFromJSON(JSON.parse(history.current[historyIdx.current])).then(() => {
       skipHistory.current = false;
-      drawGrid();
+      drawGridRef.current?.();
       onZoomChange && onZoomChange(cv.getZoom());
+      onHistoryChangeRef.current?.({
+        canUndo: historyIdx.current > 0,
+        canRedo: historyIdx.current < history.current.length - 1,
+      });
     });
   };
 
@@ -495,6 +602,49 @@ const CanvasComponent = forwardRef(function CanvasComponent(
     saveHistory();
   }, [saveHistory]);
 
+  const lockSelected = useCallback(() => {
+    const cv = fabricRef.current;
+    if (!cv) return;
+    const objs = cv.getActiveObjects();
+    if (!objs.length) return;
+    objs.forEach(o => {
+      o.set({
+        _locked:          true,
+        lockMovementX:    true,
+        lockMovementY:    true,
+        lockScalingX:     true,
+        lockScalingY:     true,
+        lockRotation:     true,
+        hasControls:      false,
+        borderColor:      '#ef4444',
+      });
+    });
+    cv.discardActiveObject();
+    cv.requestRenderAll();
+    saveHistory();
+  }, [saveHistory]);
+
+  const unlockSelected = useCallback(() => {
+    const cv = fabricRef.current;
+    if (!cv) return;
+    const objs = cv.getActiveObjects();
+    if (!objs.length) return;
+    objs.forEach(o => {
+      o.set({
+        _locked:       false,
+        lockMovementX: false,
+        lockMovementY: false,
+        lockScalingX:  false,
+        lockScalingY:  false,
+        lockRotation:  false,
+        hasControls:   true,
+        borderColor:   '#1a1a1a',
+      });
+    });
+    cv.requestRenderAll();
+    saveHistory();
+  }, [saveHistory]);
+
   const align = useCallback((direction) => {
     const cv = fabricRef.current;
     if (!cv) return;
@@ -524,6 +674,8 @@ const CanvasComponent = forwardRef(function CanvasComponent(
     selectAll:       selectAllImpl,
     groupSelected,
     ungroupSelected,
+    lockSelected,
+    unlockSelected,
     zoomIn, zoomOut, zoomReset,
     updateSelected,
     toJSON, loadJSON,

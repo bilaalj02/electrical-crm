@@ -246,7 +246,7 @@ const syncMicrosoftEmails = async (req, res, emailAccount, maxResults) => {
     });
 
     // Notify MCP for AI classification (non-blocking, inbox only)
-    if (!message.isRead === false) {
+    if (!message.isDraft) {
       notifyMCPNewEmail(newMsEmail._id);
     }
 

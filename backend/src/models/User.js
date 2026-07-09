@@ -32,6 +32,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  preferredContact: {
+    type: String,
+    enum: ['email', 'phone', 'text'],
+    default: 'email'
+  },
   profileImage: {
     type: String
   },

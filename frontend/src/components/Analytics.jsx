@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FiBarChart2, FiTrendingUp, FiDollarSign, FiDownload, FiChevronDown, FiChevronUp, FiBriefcase, FiUsers, FiMail, FiLink, FiRefreshCw, FiCheckCircle, FiXCircle } from 'react-icons/fi';
+import { FiBarChart2, FiTrendingUp, FiDollarSign, FiDownload, FiChevronDown, FiChevronUp, FiBriefcase, FiUsers, FiMail, FiLink, FiRefreshCw, FiCheckCircle, FiXCircle, FiPieChart, FiZap, FiMonitor, FiStar } from 'react-icons/fi';
 import { showToast } from './Toast';
 import NotificationModal from './NotificationModal';
 
@@ -368,7 +368,7 @@ function Analytics() {
                   <h4>What You'll Get:</h4>
                   <div className="integration-benefits">
                     <div className="benefit-section">
-                      <h5>📊 Complete Financial Dashboard</h5>
+                      <h5><FiPieChart style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle', color: '#d4af37' }} /> Complete Financial Dashboard</h5>
                       <ul>
                         <li>View invoices, expenses, and payments without leaving CRM</li>
                         <li>Real-time P&L and cash flow reports</li>
@@ -378,7 +378,7 @@ function Analytics() {
                     </div>
 
                     <div className="benefit-section">
-                      <h5>🔄 Automatic Data Sync</h5>
+                      <h5><FiRefreshCw style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle', color: '#d4af37' }} /> Automatic Data Sync</h5>
                       <ul>
                         <li>Jobs automatically become invoices in QuickBooks</li>
                         <li>Customer data syncs bidirectionally</li>
@@ -388,7 +388,7 @@ function Analytics() {
                     </div>
 
                     <div className="benefit-section">
-                      <h5>💼 Work Entirely in CRM</h5>
+                      <h5><FiMonitor style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle', color: '#d4af37' }} /> Work Entirely in CRM</h5>
                       <ul>
                         <li>Create and send invoices from CRM</li>
                         <li>Record payments and expenses</li>
@@ -398,7 +398,7 @@ function Analytics() {
                     </div>
 
                     <div className="benefit-section">
-                      <h5>🎯 Advanced Features</h5>
+                      <h5><FiStar style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle', color: '#d4af37' }} /> Advanced Features</h5>
                       <ul>
                         <li>Automatic profit margin calculations with actual costs</li>
                         <li>Job costing with QB expense data</li>

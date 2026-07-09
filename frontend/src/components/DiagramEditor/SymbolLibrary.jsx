@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { FiEdit, FiSearch } from 'react-icons/fi';
 import { CATEGORIES, getSymbolsByCategory, searchSymbols, CUSTOM_SYMBOLS } from './symbols/electricalSymbols.js';
 
 function SymbolTile({ symbol, onDragStart, onDoubleClick }) {
@@ -104,7 +105,7 @@ export default function SymbolLibrary({ onDragStart, onSymbolDrop, onAddCustom }
               </div>
             ) : (
               <div style={{ padding: '16px', color: 'var(--de-text-muted)', fontSize: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '24px', marginBottom: '8px' }}>🔍</div>
+                <div style={{ fontSize: '24px', marginBottom: '8px' }}><FiSearch size={24} /></div>
                 No symbols found.<br />
                 <button
                   className="de-add-custom-btn"
@@ -131,7 +132,7 @@ export default function SymbolLibrary({ onDragStart, onSymbolDrop, onAddCustom }
       </div>
 
       <button className="de-add-custom-btn" onClick={onAddCustom}>
-        ✏️ Create Custom Symbol
+        <FiEdit style={{ marginRight: '6px' }} /> Create Custom Symbol
       </button>
     </div>
   );

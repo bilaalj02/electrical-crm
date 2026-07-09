@@ -956,7 +956,7 @@ function Emails() {
                 >
                   <FiMail size={24} style={{ color: '#ef4444' }} />
                   <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontWeight: '600' }}>Gmail</div>
+                    <div style={{ fontWeight: '600', color: '#111827' }}>Gmail</div>
                     <div style={{ fontSize: '12px', color: '#6b7280' }}>Connect your Google account</div>
                   </div>
                 </button>
@@ -990,7 +990,7 @@ function Emails() {
                 >
                   <FiMail size={24} style={{ color: '#0078d4' }} />
                   <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontWeight: '600' }}>Microsoft / Outlook</div>
+                    <div style={{ fontWeight: '600', color: '#111827' }}>Microsoft / Outlook</div>
                     <div style={{ fontSize: '12px', color: '#6b7280' }}>Connect your Microsoft account</div>
                   </div>
                 </button>
@@ -1020,7 +1020,7 @@ function Emails() {
                 >
                   <FiMail size={24} style={{ color: '#6b7280' }} />
                   <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontWeight: '600' }}>IMAP / Other Providers</div>
+                    <div style={{ fontWeight: '600', color: '#111827' }}>IMAP / Other Providers</div>
                     <div style={{ fontSize: '12px', color: '#6b7280' }}>Coming soon</div>
                   </div>
                 </button>

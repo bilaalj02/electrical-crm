@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FiUsers, FiMail, FiTrash2, FiUserPlus, FiX, FiRefreshCw, FiSettings as FiSettingsIcon } from 'react-icons/fi';
+import { FiUsers, FiMail, FiTrash2, FiUserPlus, FiX, FiRefreshCw, FiSettings as FiSettingsIcon, FiUser, FiSave, FiPhone } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import NotificationModal from './NotificationModal';
+import { showToast } from './Toast';
 import './Settings.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 export default function Settings() {
-  const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('employees');
+  const { user, updateProfile } = useAuth();
+  const isAdmin = user?.role === 'admin';
+  const [activeTab, setActiveTab] = useState('profile');
   const [employees, setEmployees] = useState([]);
   const [invitations, setInvitations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,10 +22,23 @@ export default function Settings() {
   const [message, setMessage] = useState({ type: '', text: '' });
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
 
+  // Profile edit state
+  const [profileForm, setProfileForm] = useState({ name: '', phone: '', preferredContact: 'email' });
+  const [savingProfile, setSavingProfile] = useState(false);
+
   useEffect(() => {
-    if (user?.role === 'admin') {
+    if (user) {
+      setProfileForm({
+        name: user.name || '',
+        phone: user.phone || '',
+        preferredContact: user.preferredContact || 'email',
+      });
+    }
+    if (isAdmin) {
       fetchEmployees();
       fetchInvitations();
+    } else {
+      setLoading(false);
     }
   }, [user]);
 
@@ -145,6 +160,25 @@ export default function Settings() {
     }
   };
 
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    setSavingProfile(true);
+    try {
+      const result = await updateProfile({
+        name: profileForm.name,
+        phone: profileForm.phone,
+        preferredContact: profileForm.preferredContact,
+      });
+      if (result.success) {
+        showToast('Profile updated!', 'success');
+      } else {
+        showToast(result.error || 'Failed to update profile', 'error');
+      }
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
   const formatDate = (date) => {
     return new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -152,17 +186,6 @@ export default function Settings() {
       day: 'numeric'
     });
   };
-
-  if (user?.role !== 'admin') {
-    return (
-      <div className="settings-container">
-        <div className="access-denied">
-          <h2>Access Denied</h2>
-          <p>You do not have permission to view this page.</p>
-        </div>
-      </div>
-    );
-  }
 
   if (loading) {
     return <div className="loading">Loading settings...</div>;
@@ -183,21 +206,159 @@ export default function Settings() {
 
       <div className="settings-tabs">
         <button
-          className={activeTab === 'employees' ? 'active' : ''}
-          onClick={() => setActiveTab('employees')}
+          className={activeTab === 'profile' ? 'active' : ''}
+          onClick={() => setActiveTab('profile')}
         >
-          <FiUsers /> Employees ({employees.length})
+          <FiUser /> My Profile
         </button>
-        <button
-          className={activeTab === 'invitations' ? 'active' : ''}
-          onClick={() => setActiveTab('invitations')}
-        >
-          <FiMail /> Pending Invitations ({invitations.filter(inv => inv.status === 'pending').length})
-        </button>
+        {isAdmin && (
+          <>
+            <button
+              className={activeTab === 'employees' ? 'active' : ''}
+              onClick={() => setActiveTab('employees')}
+            >
+              <FiUsers /> Employees ({employees.length})
+            </button>
+            <button
+              className={activeTab === 'invitations' ? 'active' : ''}
+              onClick={() => setActiveTab('invitations')}
+            >
+              <FiMail /> Pending Invitations ({invitations.filter(inv => inv.status === 'pending').length})
+            </button>
+          </>
+        )}
       </div>
 
       <div className="settings-content">
-        {activeTab === 'employees' && (
+        {activeTab === 'profile' && (
+          <div className="profile-section">
+            <div className="section-header">
+              <h2>My Profile</h2>
+            </div>
+
+            <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              {/* Avatar */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', minWidth: '120px' }}>
+                <div style={{ width: '96px', height: '96px', borderRadius: '50%', background: 'linear-gradient(135deg, #d4af37, #b8941f)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '36px', fontWeight: '700', color: 'white', flexShrink: 0 }}>
+                  {user?.name?.charAt(0)?.toUpperCase() || '?'}
+                </div>
+                <span style={{ fontSize: '12px', color: '#6b7280', textAlign: 'center' }}>
+                  {user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1)}
+                </span>
+              </div>
+
+              {/* Edit form */}
+              <form onSubmit={handleSaveProfile} style={{ flex: 1, minWidth: '260px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label>Full Name</label>
+                    <input
+                      type="text"
+                      value={profileForm.name}
+                      onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label>Phone Number</label>
+                    <input
+                      type="tel"
+                      value={profileForm.phone}
+                      onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                      placeholder="(555) 000-0000"
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Preferred Contact Method</label>
+                  <select
+                    value={profileForm.preferredContact}
+                    onChange={(e) => setProfileForm({ ...profileForm, preferredContact: e.target.value })}
+                  >
+                    <option value="email">Email</option>
+                    <option value="phone">Phone</option>
+                    <option value="text">Text / SMS</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '4px' }}>
+                  <label>Email Address</label>
+                  <input
+                    type="email"
+                    value={user?.email || ''}
+                    readOnly
+                    disabled
+                    style={{ background: '#f5f5f5', color: '#9ca3af', cursor: 'not-allowed' }}
+                  />
+                </div>
+                <small style={{ color: '#9ca3af', fontSize: '12px', display: 'block', marginBottom: '20px' }}>
+                  Email cannot be changed. Contact admin if needed.
+                </small>
+
+                <button type="submit" className="btn-primary" disabled={savingProfile} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <FiSave /> {savingProfile ? 'Saving...' : 'Save Profile'}
+                </button>
+              </form>
+
+              {/* Read-only info */}
+              <div style={{ minWidth: '180px' }}>
+                <div style={{ background: '#f9fafb', borderRadius: '10px', padding: '16px', fontSize: '13px' }}>
+                  <div style={{ marginBottom: '10px' }}>
+                    <div style={{ color: '#9ca3af', marginBottom: '2px' }}>Member since</div>
+                    <div style={{ color: '#374151', fontWeight: '500' }}>{user?.createdAt ? formatDate(user.createdAt) : '—'}</div>
+                  </div>
+                  <div style={{ marginBottom: '10px' }}>
+                    <div style={{ color: '#9ca3af', marginBottom: '2px' }}>Last login</div>
+                    <div style={{ color: '#374151', fontWeight: '500' }}>{user?.lastLogin ? formatDate(user.lastLogin) : '—'}</div>
+                  </div>
+                  <div>
+                    <div style={{ color: '#9ca3af', marginBottom: '2px' }}>Account status</div>
+                    <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '600', background: '#d1fae5', color: '#065f46' }}>
+                      {user?.status || 'active'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Admin: all employee profiles */}
+            {isAdmin && employees.length > 0 && (
+              <div style={{ marginTop: '40px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#111827', marginBottom: '16px' }}>
+                  <FiUsers style={{ display: 'inline', marginRight: '8px', verticalAlign: 'middle' }} />
+                  All Employee Profiles
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '14px' }}>
+                  {employees.map(emp => (
+                    <div key={emp._id} style={{ background: '#f9fafb', borderRadius: '12px', padding: '16px', border: '1px solid #e5e7eb' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                        <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: emp._id === user._id ? 'linear-gradient(135deg, #d4af37, #b8941f)' : 'linear-gradient(135deg, #6b7280, #4b5563)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: '700', color: 'white', flexShrink: 0 }}>
+                          {emp.name?.charAt(0)?.toUpperCase()}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: '600', color: '#111827', fontSize: '14px' }}>{emp.name}</div>
+                          <span style={{ fontSize: '11px', fontWeight: '600', padding: '1px 8px', borderRadius: '10px', background: '#dbeafe', color: '#1e40af' }}>{emp.role}</span>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '13px', color: '#6b7280', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div><FiMail style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} />{emp.email}</div>
+                        {emp.phone && <div><FiPhone style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} />{emp.phone}</div>}
+                        {emp.preferredContact && (
+                          <div style={{ marginTop: '4px', color: '#374151' }}>
+                            <strong>Preferred:</strong> {emp.preferredContact}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'employees' && isAdmin && (
           <div className="employees-section">
             <div className="section-header">
               <h2>Team Members</h2>
@@ -260,7 +421,7 @@ export default function Settings() {
           </div>
         )}
 
-        {activeTab === 'invitations' && (
+        {activeTab === 'invitations' && isAdmin && (
           <div className="invitations-section">
             <div className="section-header">
               <h2>Pending Invitations</h2>

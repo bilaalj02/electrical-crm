@@ -1,12 +1,13 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { FiEdit2, FiMinus, FiSquare, FiCircle, FiType, FiDelete, FiTrash2, FiDownload, FiSave } from 'react-icons/fi';
 
 const DRAW_TOOLS = [
-  { id: 'pencil',  label: '✏️ Freehand' },
-  { id: 'line',    label: '╱  Line' },
-  { id: 'rect',    label: '▭  Rectangle' },
-  { id: 'circle',  label: '◯  Circle' },
-  { id: 'text',    label: 'T  Text' },
-  { id: 'eraser',  label: '⌫  Eraser' },
+  { id: 'pencil',  label: 'Freehand', icon: <FiEdit2 size={13} /> },
+  { id: 'line',    label: 'Line',      icon: <FiMinus size={13} /> },
+  { id: 'rect',    label: 'Rectangle', icon: <FiSquare size={13} /> },
+  { id: 'circle',  label: 'Circle',    icon: <FiCircle size={13} /> },
+  { id: 'text',    label: 'Text',      icon: <FiType size={13} /> },
+  { id: 'eraser',  label: 'Eraser',    icon: <FiDelete size={13} /> },
 ];
 
 const CATEGORIES_FOR_SAVE = [
@@ -200,7 +201,7 @@ export default function CustomSymbolCreator({ onSave, onClose }) {
     <div className="de-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="de-modal de-custom-creator">
         <div className="de-modal-header">
-          <span className="de-modal-title">✏️ Create Custom Symbol</span>
+          <span className="de-modal-title"><FiEdit2 style={{ marginRight: '6px' }} />Create Custom Symbol</span>
           <button className="de-modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="de-modal-body">
@@ -212,8 +213,9 @@ export default function CustomSymbolCreator({ onSave, onClose }) {
                 key={t.id}
                 className={`de-creator-tool-btn${tool === t.id ? ' active' : ''}`}
                 onClick={() => setTool(t.id)}
+                title={t.label}
               >
-                {t.label}
+                {t.icon} <span style={{ marginLeft: '4px' }}>{t.label}</span>
               </button>
             ))}
             <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -244,9 +246,9 @@ export default function CustomSymbolCreator({ onSave, onClose }) {
           </div>
 
           <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
-            <button className="de-creator-tool-btn" onClick={clearCanvas}>🗑️ Clear</button>
+            <button className="de-creator-tool-btn" onClick={clearCanvas}><FiTrash2 size={13} style={{ marginRight: '4px' }} /> Clear</button>
             <button className="de-creator-tool-btn" onClick={() => setShowSvgImport(s => !s)}>
-              📥 Import SVG
+              <FiDownload size={13} style={{ marginRight: '4px' }} /> Import SVG
             </button>
           </div>
 
@@ -293,7 +295,7 @@ export default function CustomSymbolCreator({ onSave, onClose }) {
         <div className="de-modal-footer">
           <button className="de-btn-secondary" onClick={onClose}>Cancel</button>
           <button className="de-btn-primary" onClick={handleSave} disabled={saving || !symName.trim()}>
-            {saving ? 'Saving…' : '💾 Save Symbol'}
+            {saving ? 'Saving…' : <><FiSave size={13} style={{ marginRight: '4px' }} /> Save Symbol</>}
           </button>
         </div>
       </div>

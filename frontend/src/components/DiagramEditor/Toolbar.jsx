@@ -43,6 +43,7 @@ export default function Toolbar({
   zoom, onZoomIn, onZoomOut, onZoomReset,
   onUndo, onRedo, canUndo, canRedo,
   onSelectAll, onDeleteSelected, onGroup, onUngroup,
+  onLock, onUnlock,
   onAlignLeft, onAlignCenter, onAlignRight, onAlignTop, onAlignMiddle, onAlignBottom,
   onSave, saving,
   onExport,
@@ -87,6 +88,11 @@ export default function Toolbar({
           icon="M2 7l4-4h12l4 4v10l-4 4H6l-4-4z" />
         <Btn tip="Ungroup" onClick={onUngroup}
           icon="M3 3h6v6H3zM15 3h6v6h-6zM15 15h6v6h-6zM3 15h6v6H3z" />
+        <div className="de-tool-mini-sep" />
+        <Btn tip="Lock selection — prevents moving/resizing/rotating" onClick={onLock}
+          icon="M19 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2zM7 11V7a5 5 0 0 1 10 0v4" />
+        <Btn tip="Unlock selection" onClick={onUnlock}
+          icon="M19 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2zM7 11V7a5 5 0 0 1 9.9-1" />
         <Btn tip="Delete (Del)" onClick={onDeleteSelected} danger
           icon="M3 6h18M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2" />
       </Group>

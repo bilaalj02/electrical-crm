@@ -90,7 +90,8 @@ router.get('/project/:projectId', auth, async (req, res) => {
     const photos = await Photo.find(filter)
       .sort({ [sortBy]: sortOrder === 'desc' ? -1 : 1 })
       .populate('uploadedBy', 'name email')
-      .populate('job', 'jobNumber title');
+      .populate('job', 'jobNumber title')
+      .populate('comments.author', 'name email');
 
     res.json({ photos });
   } catch (error) {
@@ -236,6 +237,59 @@ router.delete('/project/:projectId/bulk', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('Error bulk deleting photos:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/photos/:photoId/comments
+ * Add a comment to a photo
+ */
+router.post('/:photoId/comments', auth, async (req, res) => {
+  try {
+    const { content } = req.body;
+    if (!content?.trim()) {
+      return res.status(400).json({ error: 'Comment content is required' });
+    }
+
+    const photo = await Photo.findById(req.params.photoId);
+    if (!photo) return res.status(404).json({ error: 'Photo not found' });
+
+    photo.comments.push({ content: content.trim(), author: req.user._id });
+    await photo.save();
+
+    const updated = await Photo.findById(req.params.photoId)
+      .populate('comments.author', 'name email');
+
+    res.status(201).json({ comment: updated.comments[updated.comments.length - 1] });
+  } catch (error) {
+    console.error('Error adding photo comment:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * DELETE /api/photos/:photoId/comments/:commentId
+ * Delete a comment from a photo
+ */
+router.delete('/:photoId/comments/:commentId', auth, async (req, res) => {
+  try {
+    const photo = await Photo.findById(req.params.photoId);
+    if (!photo) return res.status(404).json({ error: 'Photo not found' });
+
+    const comment = photo.comments.id(req.params.commentId);
+    if (!comment) return res.status(404).json({ error: 'Comment not found' });
+
+    if (comment.author.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Not authorized to delete this comment' });
+    }
+
+    photo.comments.pull(req.params.commentId);
+    await photo.save();
+
+    res.json({ message: 'Comment deleted' });
+  } catch (error) {
+    console.error('Error deleting photo comment:', error);
     res.status(500).json({ error: error.message });
   }
 });

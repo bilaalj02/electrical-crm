@@ -21,7 +21,7 @@ import axios from 'axios';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 function App() {
-  const { isAuthenticated, user, logout, loading } = useAuth();
+  const { isAuthenticated, user, logout, loading, isManager } = useAuth();
   const [currentPage, setCurrentPage] = useState('home');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [emailDropdownOpen, setEmailDropdownOpen] = useState(false);
@@ -296,8 +296,8 @@ function App() {
         </div>
       )}
 
-      {/* Floating Job Opportunities Button */}
-      <button
+      {/* Floating Job Opportunities Button — admin/manager only, hidden on diagrams page */}
+      {isManager && currentPage !== 'diagrams' && <button
         className="floating-notification-btn"
         onClick={() => setSummarizerOpen(true)}
         title="View potential job opportunities"
@@ -318,7 +318,7 @@ function App() {
         {potentialJobsCount > 0 && (
           <span className="notification-badge">{potentialJobsCount}</span>
         )}
-      </button>
+      </button>}
 
       {/* Email Job Summarizer Popup */}
       <EmailJobSummarizer

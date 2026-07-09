@@ -26,13 +26,14 @@ function ColorProp({ label, value, onChange }) {
   );
 }
 
-export default function PropertiesPanel({ selectedObjects, onUpdateObject, onDeleteSelected, onDuplicate }) {
+export default function PropertiesPanel({ selectedObjects, onUpdateObject, onDeleteSelected, onDuplicate, onLock, onUnlock }) {
   const obj = selectedObjects && selectedObjects.length === 1 ? selectedObjects[0] : null;
   const multi = selectedObjects && selectedObjects.length > 1;
 
   const [label, setLabel]         = useState('');
   const [stroke, setStroke]       = useState('#1a1a2e');
   const [fill, setFill]           = useState('none');
+  const [noteTextColor, setNoteTextColor] = useState('#713f12');
   const [strokeW, setStrokeW]     = useState('2');
   const [fontSize, setFontSize]   = useState('14');
   const [opacity, setOpacity]     = useState('100');
@@ -47,7 +48,12 @@ export default function PropertiesPanel({ selectedObjects, onUpdateObject, onDel
     if (!obj) return;
     setLabel(obj.label || '');
     setStroke(obj.stroke || '#1a1a2e');
-    setFill(obj.fill || 'none');
+    if (obj._isNote) {
+      setFill(obj.backgroundColor || '#fef9c3');
+      setNoteTextColor(obj.fill || '#713f12');
+    } else {
+      setFill(obj.fill || 'none');
+    }
     setStrokeW(String(obj.strokeWidth || 2));
     setFontSize(String(obj.fontSize || 14));
     setOpacity(String(Math.round((obj.opacity ?? 1) * 100)));
@@ -60,6 +66,15 @@ export default function PropertiesPanel({ selectedObjects, onUpdateObject, onDel
 
   const commit = (updates) => {
     if (!obj || !onUpdateObject) return;
+    if (obj._isNote && obj.type === 'i-text') {
+      const mapped = { ...updates };
+      if ('fill' in mapped) {
+        mapped.backgroundColor = mapped.fill;
+        delete mapped.fill;
+      }
+      onUpdateObject(obj, mapped);
+      return;
+    }
     onUpdateObject(obj, updates);
   };
 
@@ -116,28 +131,26 @@ export default function PropertiesPanel({ selectedObjects, onUpdateObject, onDel
             {/* Position & Size */}
             <div className="de-prop-section">
               <div className="de-prop-section-title">Position & Size</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                <PropRow label="X">
-                  <input className="de-prop-input" type="number" value={posX}
-                    onChange={e => setPosX(e.target.value)}
-                    onBlur={() => commit({ left: Number(posX) })} />
-                </PropRow>
-                <PropRow label="Y">
-                  <input className="de-prop-input" type="number" value={posY}
-                    onChange={e => setPosY(e.target.value)}
-                    onBlur={() => commit({ top: Number(posY) })} />
-                </PropRow>
-                <PropRow label="W">
-                  <input className="de-prop-input" type="number" value={width}
-                    onChange={e => setWidth(e.target.value)}
-                    onBlur={() => commit({ width: Number(width), scaleX: 1 })} />
-                </PropRow>
-                <PropRow label="H">
-                  <input className="de-prop-input" type="number" value={height}
-                    onChange={e => setHeight(e.target.value)}
-                    onBlur={() => commit({ height: Number(height), scaleY: 1 })} />
-                </PropRow>
-              </div>
+              <PropRow label="X">
+                <input className="de-prop-input" type="number" value={posX}
+                  onChange={e => setPosX(e.target.value)}
+                  onBlur={() => commit({ left: Number(posX) })} />
+              </PropRow>
+              <PropRow label="Y">
+                <input className="de-prop-input" type="number" value={posY}
+                  onChange={e => setPosY(e.target.value)}
+                  onBlur={() => commit({ top: Number(posY) })} />
+              </PropRow>
+              <PropRow label="Width">
+                <input className="de-prop-input" type="number" value={width}
+                  onChange={e => setWidth(e.target.value)}
+                  onBlur={() => commit({ width: Number(width), scaleX: 1 })} />
+              </PropRow>
+              <PropRow label="Height">
+                <input className="de-prop-input" type="number" value={height}
+                  onChange={e => setHeight(e.target.value)}
+                  onBlur={() => commit({ height: Number(height), scaleY: 1 })} />
+              </PropRow>
               <PropRow label="Rotation">
                 <input className="de-prop-input" type="number" min="-360" max="360"
                   value={rotation}
@@ -150,8 +163,12 @@ export default function PropertiesPanel({ selectedObjects, onUpdateObject, onDel
             <div className="de-prop-section">
               <div className="de-prop-section-title">Appearance</div>
               <ColorProp label="Stroke" value={stroke} onChange={v => { setStroke(v); commit({ stroke: v }); }} />
-              <ColorProp label="Fill"   value={fill === 'none' ? '#ffffff' : fill}
+              <ColorProp label={obj._isNote ? 'Box Color' : 'Fill'} value={fill === 'none' ? '#ffffff' : fill}
                 onChange={v => { setFill(v); commit({ fill: v }); }} />
+              {obj._isNote && (
+                <ColorProp label="Text Color" value={noteTextColor}
+                  onChange={v => { setNoteTextColor(v); onUpdateObject && onUpdateObject(obj, { fill: v }); }} />
+              )}
               <PropRow label="Line W">
                 <input className="de-prop-input" type="number" min="0.5" max="10" step="0.5"
                   value={strokeW}
@@ -195,6 +212,21 @@ export default function PropertiesPanel({ selectedObjects, onUpdateObject, onDel
               </div>
             )}
           </>
+        )}
+
+        {/* Lock status */}
+        {obj && (
+          <div className="de-prop-section">
+            <div className="de-prop-section-title">Lock</div>
+            {obj._locked ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <span style={{ fontSize: '11px', color: '#ef4444', fontWeight: '600' }}>🔒 Locked</span>
+                <button className="de-prop-btn" style={{ flex: 1, marginBottom: 0 }} onClick={onUnlock}>Unlock</button>
+              </div>
+            ) : (
+              <button className="de-prop-btn" onClick={onLock}>Lock</button>
+            )}
+          </div>
         )}
 
         {/* Actions */}
