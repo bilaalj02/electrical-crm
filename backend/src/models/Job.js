@@ -13,6 +13,20 @@ const jobSchema = new mongoose.Schema({
   },
   description: String,
 
+  // External ID from QuickBooks, when this job was synced from/linked to a QuickBooks invoice
+  quickbooksInvoiceId: {
+    type: String,
+    index: true,
+    sparse: true
+  },
+
+  // Where this job's data originally came from
+  source: {
+    type: String,
+    enum: ['manual', 'quickbooks', 'document-upload'],
+    default: 'manual'
+  },
+
   // Client Information
   client: {
     type: mongoose.Schema.Types.ObjectId,

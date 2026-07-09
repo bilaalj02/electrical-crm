@@ -4081,6 +4081,11 @@ body {
   color: #991b1b;
 }
 
+.connection-status.reconnect {
+  background: #fef3c7;
+  color: #92400e;
+}
+
 .integration-features {
   margin-bottom: 24px;
 }

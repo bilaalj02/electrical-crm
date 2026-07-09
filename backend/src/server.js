@@ -15,6 +15,7 @@ const photoRoutes = require('./routes/photoRoutes');
 const diagramRoutes = require('./routes/diagramRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const calendarRoutes = require('./routes/calendarRoutes');
+const integrationRoutes = require('./routes/integrationRoutes');
 // const emailSyncService = require('./services/emailSyncService'); // Disabled - using new OAuth system
 
 const app = express();
@@ -59,6 +60,7 @@ app.use('/api/photos', photoRoutes);
 app.use('/api/diagrams', diagramRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/calendar-events', calendarRoutes);
+app.use('/api/integrations', integrationRoutes);
 
 // Serve uploaded files
 app.use('/uploads', express.static('uploads'));

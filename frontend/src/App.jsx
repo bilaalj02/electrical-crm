@@ -1,6 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import './App.css';
-import { FiMail, FiBriefcase, FiUsers, FiHome, FiBarChart2, FiCalendar, FiChevronLeft, FiChevronRight, FiUser, FiLogOut, FiSettings as FiSettingsIcon, FiBell, FiFolder, FiZap, FiSend } from 'react-icons/fi';
+import { FiMail, FiBriefcase, FiUsers, FiHome, FiBarChart2, FiCalendar, FiChevronLeft, FiChevronRight, FiUser, FiLogOut, FiSettings as FiSettingsIcon, FiBell, FiFolder, FiZap, FiSend, FiLink } from 'react-icons/fi';
 import { ToastContainer } from './components/Toast';
 import { useAuth } from './context/AuthContext';
 import Login from './components/Login';
@@ -14,15 +14,28 @@ import EmailJobSummarizer from './components/EmailJobSummarizer';
 import Calendar from './components/Calendar';
 import Projects from './components/Projects';
 import Settings from './components/Settings';
+import Integrations from './components/Integrations';
 const DiagramEditor = lazy(() => import('./components/DiagramEditor/DiagramEditor'));
 import mesLogo from './assets/mes-logo.png';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
+// After an OAuth redirect (e.g. QuickBooks), land back on the page that
+// initiated it instead of defaulting to Home, where the result would
+// otherwise go unseen until the user manually navigates there.
+const getInitialPage = () => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('integration') === 'quickbooks') return 'integrations';
+  // Direct links to /integrations (e.g. the Connect/Disconnect URLs registered
+  // with QuickBooks) should land on that page after login, not default to Home.
+  if (window.location.pathname.replace(/\/+$/, '') === '/integrations') return 'integrations';
+  return 'home';
+};
+
 function App() {
   const { isAuthenticated, user, logout, loading, isManager } = useAuth();
-  const [currentPage, setCurrentPage] = useState('home');
+  const [currentPage, setCurrentPage] = useState(getInitialPage);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [emailDropdownOpen, setEmailDropdownOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -167,6 +180,14 @@ function App() {
                 <FiSend className="sidebar-icon" />
                 {sidebarOpen && <span>Marketing</span>}
               </button>
+              <button
+                className={`sidebar-link ${currentPage === 'integrations' ? 'active' : ''}`}
+                onClick={() => setCurrentPage('integrations')}
+                title="Integrations"
+              >
+                <FiLink className="sidebar-icon" />
+                {sidebarOpen && <span>Integrations</span>}
+              </button>
             </>
           )}
         </nav>
@@ -266,8 +287,11 @@ function App() {
             )}
             {currentPage === 'calendar' && <Calendar />}
             {currentPage === 'projects' && <Projects />}
-            {currentPage === 'analytics' && user?.role === 'admin' && <Analytics />}
+            {currentPage === 'analytics' && user?.role === 'admin' && <Analytics onNavigate={navigate} />}
             {currentPage === 'marketing' && user?.role === 'admin' && <MarketingOutreach />}
+            {currentPage === 'integrations' && user?.role === 'admin' && (
+              <Integrations onNavigate={navigate} />
+            )}
             {currentPage === 'settings' && user?.role === 'admin' && <Settings />}
           </div>
         )}

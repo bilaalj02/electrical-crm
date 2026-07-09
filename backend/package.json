@@ -21,12 +21,16 @@
     "express": "^5.2.1",
     "googleapis": "^169.0.0",
     "imap": "^0.8.19",
+    "intuit-oauth": "^4.2.3",
     "jsonwebtoken": "^9.0.3",
     "mailparser": "^3.9.1",
+    "mammoth": "^1.12.0",
     "mongoose": "^9.1.1",
     "multer": "^2.1.1",
+    "node-quickbooks": "^2.0.50",
     "nodemailer": "^7.0.12",
     "openai": "^6.15.0",
+    "pdf-parse": "^2.4.5",
     "resend": "^6.12.4"
   }
 }
