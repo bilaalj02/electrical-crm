@@ -3,6 +3,7 @@ const OAuthClient = require('intuit-oauth');
 const QuickBooks = require('node-quickbooks');
 const Integration = require('../models/Integration');
 const { encrypt, decrypt } = require('./oauthController');
+const { logIntegrationError } = require('../utils/errorLog');
 
 const getOAuthClient = () => {
   return new OAuthClient({
@@ -103,8 +104,11 @@ const getQuickBooksAuthUrl = (req, res) => {
 // GET /api/oauth/quickbooks/callback
 const handleQuickBooksCallback = async (req, res) => {
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5174';
+  // Declared outside the try block (not `const` inside it) so the catch
+  // block below — a separate block scope — can still see it for logging.
+  let userId;
   try {
-    const userId = verifyState(req.query.state);
+    userId = verifyState(req.query.state);
 
     if (!userId) {
       // Missing, expired, or tampered state — reject rather than trust it.
@@ -151,7 +155,7 @@ const handleQuickBooksCallback = async (req, res) => {
 
     res.redirect(`${frontendUrl}?oauth=success&integration=quickbooks`);
   } catch (error) {
-    console.error('Error handling QuickBooks OAuth callback:', error.originalMessage || error.message || error);
+    await logIntegrationError({ userId, provider: 'quickbooks', action: 'oauth_callback', error });
     res.redirect(`${frontendUrl}?error=oauth_failed&integration=quickbooks`);
   }
 };
@@ -179,6 +183,7 @@ const getQBOClient = async (integration) => {
       // token → invalid_grant).
       authResponse = await oauthClient.refresh();
     } catch (refreshError) {
+      await logIntegrationError({ userId: integration.userId, provider: 'quickbooks', action: 'token_refresh', error: refreshError });
       if (isPermanentAuthError(refreshError)) {
         throw await markNeedsReconnect(
           integration,

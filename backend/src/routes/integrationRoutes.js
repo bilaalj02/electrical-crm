@@ -10,6 +10,8 @@ const uploadDocument = require('../config/uploadDocument');
 const { extractText, extractCrmDataFromText } = require('../services/documentExtractor');
 const { getQBOClient, markNeedsReconnect } = require('../controllers/quickbooksController');
 const { runSync } = require('../services/quickbooksSync');
+const { logIntegrationError } = require('../utils/errorLog');
+const IntegrationErrorLog = require('../models/IntegrationErrorLog');
 
 router.use(auth, adminOnly);
 
@@ -179,7 +181,7 @@ router.post('/:provider/sync', async (req, res) => {
     }
 
     const qbo = await getQBOClient(integration);
-    const stats = await runSync(qbo, integration.enabledDataTypes);
+    const stats = await runSync(qbo, integration.enabledDataTypes, req.user._id);
 
     integration.lastSyncedAt = new Date();
     integration.syncStats = stats;
@@ -187,7 +189,11 @@ router.post('/:provider/sync', async (req, res) => {
 
     res.json({ message: 'Sync complete', stats });
   } catch (error) {
-    console.error('Error syncing integration:', error);
+    if (error.code !== 'QBO_RECONNECT_REQUIRED') {
+      // Reconnect-required errors are already logged where they're detected
+      // (getQBOClient / runSync) — avoid a duplicate log entry here.
+      await logIntegrationError({ userId: req.user._id, provider: 'quickbooks', action: 'sync', error });
+    }
 
     if (error.code === 'QBO_RECONNECT_REQUIRED') {
       // Idempotent — getQBOClient() already marks this on a refresh
@@ -336,6 +342,27 @@ router.post('/:provider/confirm', async (req, res) => {
   } catch (error) {
     console.error('Error confirming document import:', error);
     res.status(500).json({ error: 'Failed to import data: ' + error.message });
+  }
+});
+
+/**
+ * GET /api/integrations/:provider/error-logs
+ * Recent error history for troubleshooting — includes intuit_tid where
+ * available, which Intuit support uses to trace a request on their end.
+ */
+router.get('/:provider/error-logs', async (req, res) => {
+  try {
+    const logs = await IntegrationErrorLog.find({
+      userId: req.user._id,
+      provider: req.params.provider
+    })
+      .sort({ createdAt: -1 })
+      .limit(50);
+
+    res.json({ logs });
+  } catch (error) {
+    console.error('Error fetching integration error logs:', error);
+    res.status(500).json({ error: 'Failed to load error logs' });
   }
 });
 

@@ -1,6 +1,7 @@
 const Client = require('../models/Client');
 const Job = require('../models/Job');
 const { withRetry } = require('../utils/retry');
+const { logIntegrationError, extractErrorInfo } = require('../utils/errorLog');
 
 // node-quickbooks has no retry logic of its own for the Data API (unlike
 // intuit-oauth, which retries the token endpoints internally) — a QBO
@@ -14,18 +15,29 @@ function isAuthFault(err) {
   return faultCode === '3200' || faultCode === '3201'; // QBO's AuthenticationFailed/Authorization codes
 }
 
+// Intuit's intuit_tid response header is what their support team uses to
+// look up a request on their end — capture it off the raw response
+// regardless of whether the call succeeded or failed, so it's available for
+// error logging.
+function extractIntuitTid(res) {
+  return res?.headers?.intuit_tid || res?.headers?.['intuit-tid'] || null;
+}
+
 // Promise wrapper around node-quickbooks' callback-style find methods, with
 // retry-on-transient-failure and fast-fail-with-a-typed-error on auth faults
 // so the caller can prompt reconnection instead of showing a generic error.
 const qboFind = (qbo, method, criteria = ' ') =>
   withRetry(() => new Promise((resolve, reject) => {
-    qbo[method](criteria, (err, result) => {
+    qbo[method](criteria, (err, result, res) => {
       if (err) {
+        const intuitTid = extractIntuitTid(res);
         if (isAuthFault(err)) {
           const authError = new Error('QuickBooks rejected the request — the connection needs to be reconnected.');
           authError.code = 'QBO_RECONNECT_REQUIRED';
+          authError.intuitTid = intuitTid;
           return reject(authError);
         }
+        if (err && typeof err === 'object') err.intuitTid = intuitTid;
         return reject(err);
       }
       resolve(result?.QueryResponse || {});
@@ -150,7 +162,7 @@ async function syncInvoices(qbo) {
  * summary. Each data type is independent — a failure in one does not block
  * the others, and the specific error is surfaced per type.
  */
-async function runSync(qbo, enabledDataTypes) {
+async function runSync(qbo, enabledDataTypes, userId) {
   const stats = { clientsImported: 0, jobsImported: 0, paymentsUpdated: 0, lastError: null };
 
   try {
@@ -165,12 +177,16 @@ async function runSync(qbo, enabledDataTypes) {
       stats.paymentsUpdated = res.statusUpdated;
     }
   } catch (error) {
-    console.error('QuickBooks sync error:', error);
+    await logIntegrationError({ userId, provider: 'quickbooks', action: 'sync', error });
     // Auth failures need the route/frontend to prompt a reconnect, not just
     // log a generic sync error — let this one propagate instead of being
     // swallowed into stats.lastError like an ordinary sync hiccup.
     if (error.code === 'QBO_RECONNECT_REQUIRED') throw error;
-    stats.lastError = error.message || 'Unknown sync error';
+    // Fault objects from node-quickbooks aren't Error instances, so
+    // error.message is usually empty — pull the actual QBO-reported detail
+    // instead of falling back to a generic string.
+    const { message, detail } = extractErrorInfo(error);
+    stats.lastError = detail ? `${message}: ${detail}` : message;
   }
 
   return stats;
