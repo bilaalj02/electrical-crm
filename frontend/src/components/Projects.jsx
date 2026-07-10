@@ -508,7 +508,7 @@ export default function Projects() {
                 {project.photos && project.photos.length > 0 ? (
                   <div className="project-thumbnail">
                     <img
-                      src={`${API_URL.replace('/api', '')}${project.photos[0].url}`}
+                      src={project.photos[0].url?.startsWith('http') ? project.photos[0].url : `${API_URL.replace('/api', '')}${project.photos[0].url}`}
                       alt={project.title}
                     />
                     {project.photos.length > 1 && (
@@ -795,7 +795,7 @@ export default function Projects() {
                   {selectedProject.photos?.map((photo) => (
                     <div key={photo._id} className="photo-item">
                       <img
-                        src={`${API_URL.replace('/api', '')}${photo.url}`}
+                        src={photo.url?.startsWith('http') ? photo.url : `${API_URL.replace('/api', '')}${photo.url}`}
                         alt={photo.caption || selectedProject.title}
                       />
                       {photo.caption && <p className="photo-caption">{photo.caption}</p>}
