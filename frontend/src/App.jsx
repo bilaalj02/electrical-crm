@@ -215,14 +215,12 @@ function App() {
 
           {userMenuOpen && (
             <div className="user-dropdown">
-              {user?.role === 'admin' && (
-                <button className="user-dropdown-item" onClick={() => {
-                  setCurrentPage('settings');
-                  setUserMenuOpen(false);
-                }}>
-                  <FiSettingsIcon /> {sidebarOpen && 'Settings'}
-                </button>
-              )}
+              <button className="user-dropdown-item" onClick={() => {
+                setCurrentPage('settings');
+                setUserMenuOpen(false);
+              }}>
+                <FiSettingsIcon /> {sidebarOpen && 'Settings'}
+              </button>
               <a
                 className="user-dropdown-item"
                 href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('MES CRM Support Request')}`}
@@ -309,7 +307,7 @@ function App() {
             {currentPage === 'integrations' && user?.role === 'admin' && (
               <Integrations onNavigate={navigate} />
             )}
-            {currentPage === 'settings' && user?.role === 'admin' && <Settings />}
+            {currentPage === 'settings' && <Settings />}
           </div>
         )}
       </main>
