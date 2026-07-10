@@ -2,7 +2,7 @@ import {
   FiArrowLeft, FiDollarSign, FiTrendingUp, FiBriefcase, FiUsers, FiMail, FiLink, FiClock
 } from 'react-icons/fi';
 import {
-  AnimatedNumber, TrendChart, DonutChart, Bar3DChart
+  AnimatedNumber, TrendChart, DonutChart, Bar3DChart, useTilt
 } from './AnalyticsCharts';
 
 // Full-detail drill-down for a single Analytics section — reached via "View
@@ -20,6 +20,14 @@ function AnalyticsSectionDetail({ section, data, onBack, onNavigate }) {
     clientTypeRows, newClientsPerMonth,
     emailSegments, emailsByAccountRows
   } = data;
+
+  // Only one section is ever shown at a time, so a fixed pool of 4 tilt
+  // refs (the max card count any section needs) covers all of them —
+  // hooks can't be called conditionally inside the per-section JSX below.
+  const tilt1 = useTilt();
+  const tilt2 = useTilt();
+  const tilt3 = useTilt();
+  const tilt4 = useTilt();
 
   const TITLES = {
     revenue: 'Revenue Analytics',
@@ -42,28 +50,28 @@ function AnalyticsSectionDetail({ section, data, onBack, onNavigate }) {
       {section === 'revenue' && (
         <>
           <div className="dashboard-grid">
-            <div className="dashboard-card">
+            <div className="dashboard-card a-tilt" ref={tilt1}>
               <div className="card-header">
                 <div className="card-icon gold"><FiDollarSign /></div>
                 <div className="card-title"><h3>Total Revenue</h3><p>All Time</p></div>
               </div>
               <div className="card-value"><AnimatedNumber to={stats.jobs?.totalRevenue || 0} prefix="$" /></div>
             </div>
-            <div className="dashboard-card">
+            <div className="dashboard-card a-tilt" ref={tilt2}>
               <div className="card-header">
                 <div className="card-icon green"><FiTrendingUp /></div>
                 <div className="card-title"><h3>Avg Profit Margin</h3><p>From Completed Jobs</p></div>
               </div>
               <div className="card-value"><AnimatedNumber to={profitability.avgProfitMargin} decimals={1} /><span>%</span></div>
             </div>
-            <div className="dashboard-card">
+            <div className="dashboard-card a-tilt" ref={tilt3}>
               <div className="card-header">
                 <div className="card-icon blue"><FiBriefcase /></div>
                 <div className="card-title"><h3>Avg Job Value</h3><p>Per Completed Job</p></div>
               </div>
               <div className="card-value"><AnimatedNumber to={avgJobValue} prefix="$" /></div>
             </div>
-            <div className="dashboard-card">
+            <div className="dashboard-card a-tilt" ref={tilt4}>
               <div className="card-header">
                 <div className="card-icon orange"><FiDollarSign /></div>
                 <div className="card-title"><h3>Pending Revenue</h3><p>In Progress</p></div>
@@ -112,21 +120,21 @@ function AnalyticsSectionDetail({ section, data, onBack, onNavigate }) {
           ) : (
             <>
               <div className="dashboard-grid">
-                <div className="dashboard-card">
+                <div className="dashboard-card a-tilt" ref={tilt1}>
                   <div className="card-header">
                     <div className="card-icon gold"><FiDollarSign /></div>
                     <div className="card-title"><h3>Total Income</h3><p>Last 6 Months</p></div>
                   </div>
                   <div className="card-value"><AnimatedNumber to={qbTotalIncome} prefix="$" /></div>
                 </div>
-                <div className="dashboard-card">
+                <div className="dashboard-card a-tilt" ref={tilt2}>
                   <div className="card-header">
                     <div className="card-icon orange"><FiTrendingUp /></div>
                     <div className="card-title"><h3>Total Expenses</h3><p>Last 6 Months</p></div>
                   </div>
                   <div className="card-value"><AnimatedNumber to={qbTotalExpenses} prefix="$" /></div>
                 </div>
-                <div className="dashboard-card">
+                <div className="dashboard-card a-tilt" ref={tilt3}>
                   <div className="card-header">
                     <div className="card-icon red"><FiDollarSign /></div>
                     <div className="card-title"><h3>Outstanding A/R</h3><p>Unpaid Invoices</p></div>
@@ -157,28 +165,28 @@ function AnalyticsSectionDetail({ section, data, onBack, onNavigate }) {
       {section === 'jobs' && (
         <>
           <div className="dashboard-grid">
-            <div className="dashboard-card">
+            <div className="dashboard-card a-tilt" ref={tilt4}>
               <div className="card-header">
                 <div className="card-icon gold"><FiBriefcase /></div>
                 <div className="card-title"><h3>Total Jobs</h3><p>All Time</p></div>
               </div>
               <div className="card-value"><AnimatedNumber to={stats.jobs?.total || 0} /></div>
             </div>
-            <div className="dashboard-card">
+            <div className="dashboard-card a-tilt" ref={tilt1}>
               <div className="card-header">
                 <div className="card-icon green"><FiTrendingUp /></div>
                 <div className="card-title"><h3>Completed</h3><p>{completionPct}% completion rate</p></div>
               </div>
               <div className="card-value"><AnimatedNumber to={completedJobsCount} /></div>
             </div>
-            <div className="dashboard-card">
+            <div className="dashboard-card a-tilt" ref={tilt2}>
               <div className="card-header">
                 <div className="card-icon orange"><FiBriefcase /></div>
                 <div className="card-title"><h3>Active</h3><p>Scheduled + In Progress</p></div>
               </div>
               <div className="card-value"><AnimatedNumber to={activeJobsCount} /></div>
             </div>
-            <div className="dashboard-card">
+            <div className="dashboard-card a-tilt" ref={tilt3}>
               <div className="card-header">
                 <div className="card-icon blue"><FiClock /></div>
                 <div className="card-title"><h3>Completion Velocity</h3><p>Scheduled → Completed</p></div>
@@ -202,21 +210,21 @@ function AnalyticsSectionDetail({ section, data, onBack, onNavigate }) {
       {section === 'clients' && (
         <>
           <div className="dashboard-grid">
-            <div className="dashboard-card">
+            <div className="dashboard-card a-tilt" ref={tilt4}>
               <div className="card-header">
                 <div className="card-icon purple"><FiUsers /></div>
                 <div className="card-title"><h3>Total Clients</h3><p>Database</p></div>
               </div>
               <div className="card-value"><AnimatedNumber to={stats.clients?.total || 0} /></div>
             </div>
-            <div className="dashboard-card">
+            <div className="dashboard-card a-tilt" ref={tilt1}>
               <div className="card-header">
                 <div className="card-icon green"><FiTrendingUp /></div>
                 <div className="card-title"><h3>Active</h3><p>Current Pipeline</p></div>
               </div>
               <div className="card-value"><AnimatedNumber to={stats.clients?.active || 0} /></div>
             </div>
-            <div className="dashboard-card">
+            <div className="dashboard-card a-tilt" ref={tilt2}>
               <div className="card-header">
                 <div className="card-icon orange"><FiUsers /></div>
                 <div className="card-title"><h3>Prospects</h3><p>Not Yet Active</p></div>
@@ -241,21 +249,21 @@ function AnalyticsSectionDetail({ section, data, onBack, onNavigate }) {
       {section === 'emails' && (
         <>
           <div className="dashboard-grid">
-            <div className="dashboard-card">
+            <div className="dashboard-card a-tilt" ref={tilt3}>
               <div className="card-header">
                 <div className="card-icon teal"><FiMail /></div>
                 <div className="card-title"><h3>Total Emails</h3><p>All Accounts</p></div>
               </div>
               <div className="card-value"><AnimatedNumber to={stats.emails?.total || 0} /></div>
             </div>
-            <div className="dashboard-card">
+            <div className="dashboard-card a-tilt" ref={tilt4}>
               <div className="card-header">
                 <div className="card-icon blue"><FiBriefcase /></div>
                 <div className="card-title"><h3>Work Related</h3><p>Business Emails</p></div>
               </div>
               <div className="card-value"><AnimatedNumber to={stats.emails?.workRelated || 0} /></div>
             </div>
-            <div className="dashboard-card">
+            <div className="dashboard-card a-tilt" ref={tilt1}>
               <div className="card-header">
                 <div className="card-icon orange"><FiMail /></div>
                 <div className="card-title"><h3>Unread</h3><p>Needs Attention</p></div>

@@ -529,13 +529,35 @@
 }
 
 /* ---------- Pseudo-3D extruded bar chart ---------- */
+/* .a-bar3d-scene holds the perspective; .a-bar3d-group is the object that
+   actually rotates (mouse-driven via use3DSceneTilt, plus a slow ambient
+   idle spin from a3dAmbient below) — a real 3D transform, not just the flat
+   skewed faces underneath reacting to nothing. */
+.a-bar3d-scene {
+  perspective: 480px;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
 .a-bar3d-group {
   display: flex;
   align-items: flex-end;
   gap: 1.75rem;
   padding: 0 0.75rem;
-  overflow-x: auto;
-  overflow-y: visible;
+  transform-style: preserve-3d;
+  transition: transform 0.4s cubic-bezier(.22, 1, .36, 1);
+  animation: a3dAmbient 7s ease-in-out infinite;
+  cursor: grab;
+}
+
+.a-bar3d-group.is-tilting {
+  transition: transform 0.05s linear;
+  animation-play-state: paused;
+}
+
+@keyframes a3dAmbient {
+  0%, 100% { transform: rotateY(-9deg) rotateX(3deg); }
+  50% { transform: rotateY(9deg) rotateX(-2.5deg); }
 }
 
 .a-bar3d-col {
@@ -543,6 +565,8 @@
   flex-direction: column;
   align-items: center;
   flex-shrink: 0;
+  transform-style: preserve-3d;
+  transition: transform 0.5s ease;
 }
 
 .a-bar3d {
@@ -550,6 +574,7 @@
   width: 30px;
   display: flex;
   align-items: flex-end;
+  transform-style: preserve-3d;
 }
 
 .a-bar3d-front {
@@ -609,8 +634,12 @@
 @media (prefers-reduced-motion: reduce) {
   .a-bar3d-front,
   .a-bar3d-top,
-  .a-bar3d-side {
+  .a-bar3d-side,
+  .a-bar3d-col,
+  .a-bar3d-group {
     transition: none !important;
+    animation: none !important;
+    transform: none !important;
   }
 }
 

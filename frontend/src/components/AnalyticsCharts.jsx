@@ -88,6 +88,45 @@ export function useTilt(maxTilt = 8) {
   }, [maxTilt]);
 }
 
+// Mouse-driven rotation for a real (not flat-skew-only) 3D scene — used by
+// Bar3DChart. Rotates the whole bar group in 3D space based on cursor
+// position, like turning a physical model in your hands. While the mouse
+// isn't over it, a slow CSS keyframe animation (`a3dAmbient` in
+// Analytics.css) keeps it gently rotating on its own — the 'is-tilting'
+// class (added here) pauses that ambient animation so it doesn't fight the
+// mouse-driven transform.
+export function use3DSceneTilt(maxTilt = 20) {
+  const cleanupRef = useRef(null);
+  return useCallback((el) => {
+    if (cleanupRef.current) { cleanupRef.current(); cleanupRef.current = null; }
+    if (!el || prefersReducedMotion()) return;
+    let raf = null;
+    const handleMove = (e) => {
+      const r = el.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width;
+      const py = (e.clientY - r.top) / r.height;
+      const ry = (px - 0.5) * maxTilt * 2;
+      const rx = (0.5 - py) * maxTilt;
+      el.classList.add('is-tilting');
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        el.style.transform = `rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg)`;
+      });
+    };
+    const handleLeave = () => {
+      el.classList.remove('is-tilting');
+      el.style.transform = '';
+    };
+    el.addEventListener('mousemove', handleMove);
+    el.addEventListener('mouseleave', handleLeave);
+    cleanupRef.current = () => {
+      el.removeEventListener('mousemove', handleMove);
+      el.removeEventListener('mouseleave', handleLeave);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [maxTilt]);
+}
+
 // Animated count-up, restarts only when `to` changes.
 export function AnimatedNumber({ to = 0, prefix = '', decimals = 0, duration = 1200 }) {
   const [value, setValue] = useState(0);
@@ -335,6 +374,7 @@ export function Bar3DChart({ title, rows, maxBars = 8, chartHeight = 140 }) {
   const [drawn, setDrawn] = useState(false);
   const displayRows = rows.slice(0, maxBars);
   const max = Math.max(1, ...displayRows.map((r) => r.value));
+  const sceneTiltRef = use3DSceneTilt();
 
   const revealRef = useReveal(() => {
     requestAnimationFrame(() => setDrawn(true));
@@ -343,21 +383,26 @@ export function Bar3DChart({ title, rows, maxBars = 8, chartHeight = 140 }) {
   return (
     <div className="a-chart-card a-reveal" ref={revealRef}>
       <div className="a-chart-head"><h3>{title}</h3></div>
-      <div className="a-bar3d-group" style={{ height: chartHeight + 40 }}>
-        {displayRows.map((row, i) => {
-          const h = drawn ? Math.max(4, (row.value / max) * chartHeight) : 0;
-          return (
-            <div className="a-bar3d-col" key={row.label}>
-              <div className="a-bar3d" style={{ height: chartHeight, transitionDelay: `${i * 60}ms` }}>
-                <div className="a-bar3d-top" style={{ bottom: `${h}px`, transitionDelay: `${i * 60}ms` }} />
-                <div className="a-bar3d-side" style={{ height: `${h}px`, transitionDelay: `${i * 60}ms` }} />
-                <div className="a-bar3d-front" style={{ height: `${h}px`, transitionDelay: `${i * 60}ms` }} />
+      <div className="a-bar3d-scene">
+        <div className="a-bar3d-group" ref={sceneTiltRef} style={{ height: chartHeight + 40 }}>
+          {displayRows.map((row, i) => {
+            const h = drawn ? Math.max(4, (row.value / max) * chartHeight) : 0;
+            // Small alternating Z-depth stagger so the group rotation reads
+            // as real parallax between bars, not just a flat rotating card.
+            const depth = (i % 3) * 14;
+            return (
+              <div className="a-bar3d-col" key={row.label} style={{ transform: `translateZ(${depth}px)` }}>
+                <div className="a-bar3d" style={{ height: chartHeight, transitionDelay: `${i * 60}ms` }}>
+                  <div className="a-bar3d-top" style={{ bottom: `${h}px`, transitionDelay: `${i * 60}ms` }} />
+                  <div className="a-bar3d-side" style={{ height: `${h}px`, transitionDelay: `${i * 60}ms` }} />
+                  <div className="a-bar3d-front" style={{ height: `${h}px`, transitionDelay: `${i * 60}ms` }} />
+                </div>
+                <div className="a-bar3d-value">{row.display ?? row.value}</div>
+                <div className="a-bar3d-label">{row.label}</div>
               </div>
-              <div className="a-bar3d-value">{row.display ?? row.value}</div>
-              <div className="a-bar3d-label">{row.label}</div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
