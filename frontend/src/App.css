@@ -4808,3 +4808,159 @@ body {
 
 /* Notification modal message */
 .notification-message { color: #1f2937; }
+
+/* ============================================
+   MOBILE RESPONSIVENESS — COMPREHENSIVE FIXES
+   ============================================ */
+
+/* Sidebar overlay on mobile so it doesn't push content */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    z-index: 1100;
+  }
+
+  /* Closed sidebar hides completely off-screen on mobile */
+  .sidebar.closed {
+    width: 0;
+    overflow: hidden;
+  }
+
+  /* Open sidebar slides in over content */
+  .sidebar.open {
+    width: 220px;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Main content always full-width on mobile */
+  .main-content,
+  .main-content.sidebar-open,
+  .main-content.sidebar-closed {
+    margin-left: 0 !important;
+    width: 100%;
+  }
+
+  /* Dim overlay when sidebar is open */
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 1099;
+  }
+
+  /* Modals go full-screen on mobile */
+  .modal-content,
+  .modal-content.large {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    margin: 0;
+  }
+
+  .modal-body {
+    max-height: calc(100dvh - 130px);
+  }
+
+  /* Page headers stack vertically */
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .page-header h1 {
+    font-size: 1.4rem;
+  }
+
+  /* Filter rows wrap */
+  .filters-row,
+  .filter-group {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .filters-row select,
+  .filters-row input {
+    width: 100%;
+  }
+
+  /* Job & client cards — single column */
+  .jobs-grid,
+  .clients-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Stats row stacks */
+  .stats-grid,
+  .dashboard-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Tables become scrollable */
+  .clients-table-wrapper,
+  .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Shortcut blocks stack */
+  .shortcut-row {
+    flex-direction: column;
+  }
+
+  /* Project detail header stacks */
+  .detail-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .detail-header-right {
+    align-items: flex-start;
+  }
+
+  .header-title {
+    font-size: 20px;
+  }
+
+  /* Diagram editor — hide on very small screens with message */
+  .de-root {
+    min-width: 0;
+  }
+
+  .de-body {
+    flex-direction: column;
+  }
+
+  .de-symbol-lib,
+  .de-props {
+    display: none;
+  }
+}
+
+/* Tablets — keep sidebar but make layout more compact */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .sidebar.open {
+    width: 180px;
+  }
+
+  .main-content.sidebar-open {
+    margin-left: 180px;
+  }
+
+  .jobs-grid,
+  .clients-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stats-grid,
+  .dashboard-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .modal-content.large {
+    max-width: 90vw;
+  }
+}

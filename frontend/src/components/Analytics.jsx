@@ -29,11 +29,13 @@ function Analytics({ onNavigate }) {
   const fetchAnalytics = async () => {
     setLoading(true);
     try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
       const [jobsRes, clientsRes, emailsRes, allJobsRes] = await Promise.all([
-        axios.get(`${API_URL}/jobs/stats`),
-        axios.get(`${API_URL}/clients/stats`),
-        axios.get(`${API_URL}/emails/stats/summary`),
-        axios.get(`${API_URL}/jobs?limit=1000`) // Get all jobs for profitability calc
+        axios.get(`${API_URL}/jobs/stats`, { headers }),
+        axios.get(`${API_URL}/clients/stats`, { headers }),
+        axios.get(`${API_URL}/emails/stats/summary`, { headers }),
+        axios.get(`${API_URL}/jobs?limit=1000`, { headers })
       ]);
 
       setStats({
@@ -44,6 +46,7 @@ function Analytics({ onNavigate }) {
       setJobs(allJobsRes.data.jobs || []);
     } catch (error) {
       console.error('Error fetching analytics:', error);
+      showToast('Failed to load analytics data', 'error');
     } finally {
       setLoading(false);
     }

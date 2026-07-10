@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Job = require('../models/Job');
 const Client = require('../models/Client');
-const { auth } = require('../middleware/auth');
+const { auth, authorize } = require('../middleware/auth');
 
 // Fire-and-forget: notify MCP automation engine
 async function notifyMCP(endpoint, payload) {
@@ -242,7 +242,7 @@ router.post('/', auth, async (req, res) => {
  * PATCH /api/jobs/:id
  * Update a job
  */
-router.patch('/:id', auth, async (req, res) => {
+router.patch('/:id', auth, authorize('admin', 'manager'), async (req, res) => {
   try {
     const job = await Job.findById(req.params.id);
 
@@ -296,7 +296,7 @@ router.patch('/:id', auth, async (req, res) => {
  * DELETE /api/jobs/:id
  * Delete a job
  */
-router.delete('/:id', auth, async (req, res) => {
+router.delete('/:id', auth, authorize('admin', 'manager'), async (req, res) => {
   try {
     const job = await Job.findById(req.params.id);
 

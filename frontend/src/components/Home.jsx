@@ -30,12 +30,12 @@ function Home({ onNavigate }) {
       setLoading(true);
       try {
         const token = localStorage.getItem('token');
-        const authHeader = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+        const headers = { Authorization: `Bearer ${token}` };
         const [jobsRes, clientsRes, emailsRes, dashRes] = await Promise.all([
-          axios.get(`${API_URL}/jobs/stats`),
-          axios.get(`${API_URL}/clients/stats`),
-          axios.get(`${API_URL}/emails/stats/summary`),
-          axios.get(`${API_URL}/dashboard`, authHeader),
+          axios.get(`${API_URL}/jobs/stats`, { headers }),
+          axios.get(`${API_URL}/clients/stats`, { headers }),
+          axios.get(`${API_URL}/emails/stats/summary`, { headers }),
+          axios.get(`${API_URL}/dashboard`, { headers }),
         ]);
         if (!mounted) return;
         setStats({
@@ -51,6 +51,10 @@ function Home({ onNavigate }) {
         });
       } catch (e) {
         console.error('Dashboard load error:', e);
+        if (mounted) {
+          const { showToast } = await import('./Toast');
+          showToast('Failed to load dashboard data', 'error');
+        }
       } finally {
         if (mounted) setLoading(false);
       }

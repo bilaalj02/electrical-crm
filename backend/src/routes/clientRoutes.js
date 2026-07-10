@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Client = require('../models/Client');
 const Job = require('../models/Job');
-const { auth } = require('../middleware/auth');
+const { auth, authorize } = require('../middleware/auth');
 
 /**
  * GET /api/clients
@@ -159,7 +159,7 @@ router.post('/', auth, async (req, res) => {
  * PATCH /api/clients/:id
  * Update a client
  */
-router.patch('/:id', auth, async (req, res) => {
+router.patch('/:id', auth, authorize('admin', 'manager'), async (req, res) => {
   try {
     const client = await Client.findByIdAndUpdate(
       req.params.id,
@@ -182,7 +182,7 @@ router.patch('/:id', auth, async (req, res) => {
  * DELETE /api/clients/:id
  * Delete a client
  */
-router.delete('/:id', auth, async (req, res) => {
+router.delete('/:id', auth, authorize('admin', 'manager'), async (req, res) => {
   try {
     // Check if client has any jobs
     const jobCount = await Job.countDocuments({ client: req.params.id });
