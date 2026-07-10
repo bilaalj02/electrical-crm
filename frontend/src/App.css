@@ -4178,8 +4178,24 @@ body {
 }
 
 .gmail-compose-panel.minimized {
-  max-height: 40px;
+  max-height: 44px;
   overflow: hidden;
+}
+
+.gmail-compose-panel.expanded {
+  position: fixed !important;
+  top: 40px !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: translateX(-50%);
+  width: min(860px, 94vw) !important;
+  max-height: calc(100vh - 60px) !important;
+  border-radius: 10px;
+}
+
+.gmail-compose-panel.expanded .compose-textarea {
+  min-height: 420px;
 }
 
 .compose-header {
@@ -4190,7 +4206,16 @@ body {
   justify-content: space-between;
   align-items: center;
   border-radius: 8px 8px 0 0;
-  cursor: move;
+  cursor: grab;
+  user-select: none;
+}
+
+.compose-header:active {
+  cursor: grabbing;
+}
+
+.gmail-compose-panel.expanded .compose-header {
+  cursor: default;
 }
 
 .compose-title {

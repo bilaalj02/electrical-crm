@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
-import { FiMail, FiRefreshCw, FiFilter, FiSearch, FiPlus, FiCheck, FiX, FiEdit, FiSend, FiMinus, FiMaximize2 } from 'react-icons/fi';
+import { FiMail, FiRefreshCw, FiFilter, FiSearch, FiPlus, FiCheck, FiX, FiEdit, FiSend, FiMinus, FiMaximize2, FiMinimize2 } from 'react-icons/fi';
 import NotificationModal from './NotificationModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -15,6 +15,10 @@ function Emails() {
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [showComposeModal, setShowComposeModal] = useState(false);
   const [composeMinimized, setComposeMinimized] = useState(false);
+  const [composeExpanded, setComposeExpanded] = useState(false);
+  const [composePos, setComposePos] = useState(null); // null = default bottom-right
+  const composeDrag = useRef({ dragging: false, startX: 0, startY: 0, startLeft: 0, startTop: 0 });
+  const composePanelRef = useRef(null);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [composeData, setComposeData] = useState({
     fromAccount: '',
@@ -463,6 +467,46 @@ function Emails() {
       document.body.style.userSelect = '';
     };
   }, [isResizingContent, sidebarCollapsed]);
+
+  const onComposeDragStart = useCallback((e) => {
+    if (composeExpanded) return; // no drag when fullscreen
+    e.preventDefault();
+    const panel = composePanelRef.current;
+    if (!panel) return;
+    const rect = panel.getBoundingClientRect();
+    composeDrag.current = {
+      dragging: true,
+      startX: e.clientX,
+      startY: e.clientY,
+      startLeft: rect.left,
+      startTop: rect.top,
+    };
+    document.body.style.userSelect = 'none';
+
+    const onMove = (ev) => {
+      if (!composeDrag.current.dragging) return;
+      const dx = ev.clientX - composeDrag.current.startX;
+      const dy = ev.clientY - composeDrag.current.startY;
+      const newLeft = composeDrag.current.startLeft + dx;
+      const newTop = composeDrag.current.startTop + dy;
+      // Clamp inside viewport
+      const panelW = panel.offsetWidth;
+      const panelH = panel.offsetHeight;
+      const clampedLeft = Math.max(0, Math.min(window.innerWidth - panelW, newLeft));
+      const clampedTop = Math.max(0, Math.min(window.innerHeight - 44, newTop)); // 44 = header height minimum visible
+      setComposePos({ left: clampedLeft, top: clampedTop });
+    };
+
+    const onUp = () => {
+      composeDrag.current.dragging = false;
+      document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [composeExpanded]);
 
   const formatDate = (date) => {
     return new Date(date).toLocaleString('en-US', {
@@ -1098,16 +1142,27 @@ function Emails() {
 
       {/* Gmail-Style Compose Panel */}
       {showComposeModal && (
-        <div className={`gmail-compose-panel ${composeMinimized ? 'minimized' : ''}`}>
-          <div className="compose-header">
+        <div
+          ref={composePanelRef}
+          className={`gmail-compose-panel ${composeMinimized ? 'minimized' : ''} ${composeExpanded ? 'expanded' : ''}`}
+          style={composeExpanded ? {} : composePos ? { position: 'fixed', left: composePos.left, top: composePos.top, bottom: 'auto', right: 'auto' } : {}}
+        >
+          <div className="compose-header" onMouseDown={onComposeDragStart}>
             <span className="compose-title">New Message</span>
             <div className="compose-actions">
               <button
                 className="compose-icon-btn"
                 onClick={() => setComposeMinimized(!composeMinimized)}
-                title={composeMinimized ? "Maximize" : "Minimize"}
+                title={composeMinimized ? "Restore" : "Minimize"}
               >
                 {composeMinimized ? <FiMaximize2 size={14} /> : <FiMinus size={14} />}
+              </button>
+              <button
+                className="compose-icon-btn"
+                onClick={() => { setComposeExpanded(e => !e); setComposeMinimized(false); }}
+                title={composeExpanded ? "Shrink" : "Expand"}
+              >
+                {composeExpanded ? <FiMinimize2 size={14} /> : <FiMaximize2 size={14} />}
               </button>
               <button
                 className="compose-icon-btn"
