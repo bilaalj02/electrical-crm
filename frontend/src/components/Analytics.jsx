@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
+import { jsPDF } from 'jspdf';
 import { FiBarChart2, FiTrendingUp, FiDollarSign, FiDownload, FiChevronDown, FiChevronUp, FiBriefcase, FiUsers, FiMail, FiLink, FiRefreshCw } from 'react-icons/fi';
 import { showToast } from './Toast';
 import NotificationModal from './NotificationModal';
@@ -519,7 +520,163 @@ function Analytics({ onNavigate }) {
   };
 
   const handleDownloadPDF = () => {
-    showToast('PDF download will be available soon. It will generate a detailed analytics report.', 'info', 5000);
+    try {
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const margin = 16;
+      const contentW = pageW - margin * 2;
+      let y = margin;
+
+      const gold = [212, 175, 55];
+      const dark = [31, 41, 55];
+      const gray = [107, 114, 128];
+
+      const ensureSpace = (needed) => {
+        if (y + needed > pageH - margin) {
+          pdf.addPage();
+          y = margin;
+        }
+      };
+
+      const money = (n) => `$${Math.round(n || 0).toLocaleString()}`;
+
+      const addSectionHeader = (title) => {
+        ensureSpace(14);
+        y += 4;
+        pdf.setFontSize(13);
+        pdf.setFont(undefined, 'bold');
+        pdf.setTextColor(...dark);
+        pdf.text(title, margin, y);
+        pdf.setDrawColor(...gold);
+        pdf.setLineWidth(0.6);
+        pdf.line(margin, y + 2, pageW - margin, y + 2);
+        y += 8;
+      };
+
+      const addRow = (label, value) => {
+        ensureSpace(7);
+        pdf.setFontSize(10);
+        pdf.setFont(undefined, 'normal');
+        pdf.setTextColor(...gray);
+        pdf.text(label, margin, y);
+        pdf.setFont(undefined, 'bold');
+        pdf.setTextColor(...dark);
+        pdf.text(String(value), pageW - margin, y, { align: 'right' });
+        y += 6.5;
+      };
+
+      const addBarRow = (label, value, max, displayValue) => {
+        ensureSpace(8);
+        pdf.setFontSize(9);
+        pdf.setFont(undefined, 'normal');
+        pdf.setTextColor(...dark);
+        pdf.text(String(label), margin, y + 3);
+        const barX = margin + 42;
+        const barW = contentW - 42 - 16;
+        pdf.setFillColor(245, 235, 210);
+        pdf.rect(barX, y, barW, 4, 'F');
+        const fillW = max > 0 ? Math.max(1, (value / max) * barW) : 0;
+        pdf.setFillColor(...gold);
+        pdf.rect(barX, y, fillW, 4, 'F');
+        pdf.setFont(undefined, 'bold');
+        pdf.text(String(displayValue ?? value), pageW - margin, y + 3, { align: 'right' });
+        y += 7.5;
+      };
+
+      // ---------- Header ----------
+      pdf.setFillColor(...dark);
+      pdf.rect(0, 0, pageW, 24, 'F');
+      pdf.setFontSize(16);
+      pdf.setFont(undefined, 'bold');
+      pdf.setTextColor(...gold);
+      pdf.text('MES Electrical', margin, 14);
+      pdf.setFontSize(10);
+      pdf.setFont(undefined, 'normal');
+      pdf.setTextColor(255, 255, 255);
+      pdf.text('Analytics Report', margin, 20);
+      pdf.setFontSize(9);
+      pdf.setTextColor(230, 230, 230);
+      const generatedOn = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+      pdf.text(`Generated ${generatedOn}`, pageW - margin, 14, { align: 'right' });
+      y = 32;
+
+      // ---------- Revenue Analytics ----------
+      addSectionHeader('Revenue Analytics');
+      addRow('Total Revenue (All Time)', money(stats.jobs?.totalRevenue));
+      addRow('Pending Revenue (In Progress)', money(stats.jobs?.pendingRevenue));
+      addRow('Unpaid Invoices', stats.jobs?.unpaidInvoices || 0);
+      addRow('Avg Profit Margin', `${profitability.avgProfitMargin.toFixed(1)}%`);
+      addRow('Profit (Completed Jobs)', money(profitability.totalProfit));
+      y += 2;
+      if (monthlyRevenue.length > 0) {
+        const maxRev = Math.max(1, ...monthlyRevenue.map((m) => m.value));
+        monthlyRevenue.forEach((m) => addBarRow(m.label, m.value, maxRev, money(m.value)));
+      }
+
+      // ---------- QuickBooks Financials ----------
+      if (qbData?.connected && !qbData?.reconnectRequired) {
+        addSectionHeader('QuickBooks Financials (Live)');
+        addRow('Total Income (Last 6 Months)', money(qbTotalIncome));
+        addRow('Total Expenses (Last 6 Months)', money(qbTotalExpenses));
+        addRow('Outstanding A/R', money(qbData.outstandingTotal));
+        if (qbData.invoiceBreakdown) {
+          addRow('Invoices — Paid', qbData.invoiceBreakdown.paid || 0);
+          addRow('Invoices — Open', qbData.invoiceBreakdown.open || 0);
+          addRow('Invoices — Overdue', qbData.invoiceBreakdown.overdue || 0);
+        }
+        if (qbTopCustomerRows.length > 0) {
+          y += 2;
+          const maxCust = Math.max(1, ...qbTopCustomerRows.map((c) => c.value));
+          qbTopCustomerRows.forEach((c) => addBarRow(c.label, c.value, maxCust, money(c.value)));
+        }
+      }
+
+      // ---------- Jobs Overview ----------
+      addSectionHeader('Jobs Overview');
+      addRow('Total Jobs', stats.jobs?.total || 0);
+      addRow('Completed', `${completedJobsCount} (${completionPct}%)`);
+      addRow('Active (Scheduled + In Progress)', activeJobsCount);
+      if (statusSegments.length > 0) {
+        y += 2;
+        const maxStatus = Math.max(1, ...statusSegments.map((s) => s.value));
+        statusSegments.forEach((s) => addBarRow(s.label, s.value, maxStatus));
+      }
+
+      // ---------- Client Metrics ----------
+      addSectionHeader('Client Metrics');
+      addRow('Total Clients', stats.clients?.total || 0);
+      addRow('Active', stats.clients?.active || 0);
+      addRow('Prospects', stats.clients?.prospects || 0);
+      if (clientTypeRows.length > 0) {
+        y += 2;
+        const maxType = Math.max(1, ...clientTypeRows.map((c) => c.value));
+        clientTypeRows.forEach((c) => addBarRow(c.label, c.value, maxType));
+      }
+
+      // ---------- Email Statistics ----------
+      addSectionHeader('Email Statistics');
+      addRow('Total Emails', stats.emails?.total || 0);
+      addRow('Unread', stats.emails?.unread || 0);
+      addRow('Work Related', stats.emails?.workRelated || 0);
+      addRow('Not Classified', stats.emails?.notClassified || 0);
+
+      // ---------- Footer / page numbers ----------
+      const pageCount = pdf.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        pdf.setPage(i);
+        pdf.setFontSize(8);
+        pdf.setTextColor(...gray);
+        pdf.text(`Page ${i} of ${pageCount}`, pageW - margin, pageH - 8, { align: 'right' });
+        pdf.text('MES Electrical CRM', margin, pageH - 8);
+      }
+
+      pdf.save(`MES_Analytics_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
+      showToast('Analytics report downloaded.', 'success');
+    } catch (error) {
+      console.error('Error generating PDF report:', error);
+      showToast('Failed to generate the PDF report. Please try again.', 'error');
+    }
   };
 
   const formatCurrency = (amount) => {
