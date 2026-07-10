@@ -20,6 +20,14 @@ const integrationSchema = new mongoose.Schema({
   tokenExpiry: {
     type: Date
   },
+  // Intuit refresh tokens are valid ~100 days from issuance (and rotate on
+  // every use). intuit-oauth's own Token class needs this passed into
+  // setToken() as x_refresh_token_expires_in — without it, the SDK defaults
+  // to 0 and its isRefreshTokenValid() check fails immediately on every
+  // refresh attempt, regardless of whether the token is actually still good.
+  refreshTokenExpiry: {
+    type: Date
+  },
   realmId: {
     type: String
   },

@@ -5,6 +5,12 @@ const { encrypt, decrypt } = require('./oauthController');
 const { logIntegrationError } = require('../utils/errorLog');
 const { signState, verifyState } = require('../utils/oauthState');
 
+// Intuit's documented refresh-token lifetime — used only as a fallback if a
+// token response is ever missing x_refresh_token_expires_in (Intuit always
+// sends it in practice, but this keeps a missing field from being treated as
+// "already expired").
+const DEFAULT_REFRESH_TOKEN_LIFETIME_SECONDS = 100 * 24 * 60 * 60;
+
 const getOAuthClient = () => {
   return new OAuthClient({
     clientId: process.env.QUICKBOOKS_CLIENT_ID,
@@ -36,9 +42,16 @@ async function markNeedsReconnect(integration, reason) {
 // been revoked. Transient failures (network blips, 5xx) are already retried
 // internally by the SDK before it ever throws, so anything that reaches
 // here is a real, permanent auth failure.
+//
+// The SDK also throws a plain local Error — no `.error`/`.response` at all —
+// from its own pre-flight `isRefreshTokenValid()` check, before any network
+// call happens, once a refresh token is past its ~100-day validity window.
+// That needs the same substring match; without it, an expired token bubbles
+// up as a raw 500 instead of prompting reconnect.
 function isPermanentAuthError(error) {
   const code = String(error?.error || error?.message || '').toLowerCase();
   if (code.includes('invalid_grant') || code.includes('invalid_token')) return true;
+  if (code.includes('refresh token is invalid') || code.includes('refresh token is missing')) return true;
   const status = error?.authResponse?.response?.status || error?.response?.status;
   return status === 400 || status === 401;
 }
@@ -94,6 +107,7 @@ const handleQuickBooksCallback = async (req, res) => {
     const token = authResponse.getToken();
 
     const tokenExpiry = new Date(Date.now() + token.expires_in * 1000);
+    const refreshTokenExpiry = new Date(Date.now() + (token.x_refresh_token_expires_in || DEFAULT_REFRESH_TOKEN_LIFETIME_SECONDS) * 1000);
 
     let integration = await Integration.findOne({ userId, provider: 'quickbooks' });
 
@@ -101,8 +115,10 @@ const handleQuickBooksCallback = async (req, res) => {
       integration.accessToken = encrypt(token.access_token);
       integration.refreshToken = encrypt(token.refresh_token);
       integration.tokenExpiry = tokenExpiry;
+      integration.refreshTokenExpiry = refreshTokenExpiry;
       integration.realmId = token.realmId;
       integration.isActive = true;
+      integration.needsReconnect = false; // clear a stale flag from a prior dead-token state — this is a fresh, valid connect
       await integration.save();
     } else {
       integration = await Integration.create({
@@ -111,6 +127,7 @@ const handleQuickBooksCallback = async (req, res) => {
         accessToken: encrypt(token.access_token),
         refreshToken: encrypt(token.refresh_token),
         tokenExpiry,
+        refreshTokenExpiry,
         realmId: token.realmId,
         isActive: true,
         enabledDataTypes: []
@@ -132,10 +149,23 @@ const getQBOClient = async (integration) => {
 
   if (new Date() >= integration.tokenExpiry) {
     const oauthClient = getOAuthClient();
+
+    // setToken() needs expires_in / x_refresh_token_expires_in to seed the
+    // SDK's own Token object correctly — without them it defaults both to 0,
+    // and its internal isRefreshTokenValid() check (createdAt + 0 > now)
+    // then fails immediately on every refresh, regardless of whether the
+    // stored refresh token is actually still good. integration.refreshTokenExpiry
+    // may be unset on records created before this field existed — treat that
+    // as "unknown, assume Intuit's default lifetime" rather than "expired".
+    const secondsUntil = (date, fallbackSeconds) =>
+      date ? Math.max(1, Math.round((new Date(date).getTime() - Date.now()) / 1000)) : fallbackSeconds;
+
     oauthClient.setToken({
       access_token: accessToken,
       refresh_token: refreshToken,
-      realmId: integration.realmId
+      realmId: integration.realmId,
+      expires_in: secondsUntil(integration.tokenExpiry, 1),
+      x_refresh_token_expires_in: secondsUntil(integration.refreshTokenExpiry, DEFAULT_REFRESH_TOKEN_LIFETIME_SECONDS)
     });
 
     let authResponse;
@@ -165,6 +195,10 @@ const getQBOClient = async (integration) => {
     integration.accessToken = encrypt(token.access_token);
     integration.refreshToken = encrypt(token.refresh_token);
     integration.tokenExpiry = new Date(Date.now() + token.expires_in * 1000);
+    // Intuit rotates the refresh token on every use and resets its ~100-day
+    // window — persist the new expiry so the next refresh seeds setToken()
+    // with an accurate value instead of falling back to the default.
+    integration.refreshTokenExpiry = new Date(Date.now() + (token.x_refresh_token_expires_in || DEFAULT_REFRESH_TOKEN_LIFETIME_SECONDS) * 1000);
     await integration.save();
   }
 
