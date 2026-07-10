@@ -53,19 +53,23 @@ function Clients({ initialClientId, onConsumeInitial }) {
     search: ''
   });
 
+  const getAuthHeaders = () => ({
+    Authorization: `Bearer ${localStorage.getItem('token')}`
+  });
+
   const fetchClients = async () => {
     setLoading(true);
     try {
-      // Build query parameters from filters
       const params = new URLSearchParams();
       if (filters.status) params.append('status', filters.status);
       if (filters.clientType) params.append('clientType', filters.clientType);
       if (filters.search) params.append('search', filters.search);
 
-      const response = await axios.get(`${API_URL}/clients?${params.toString()}`);
+      const response = await axios.get(`${API_URL}/clients?${params.toString()}`, { headers: getAuthHeaders() });
       setClients(response.data.clients);
     } catch (error) {
       console.error('Error fetching clients:', error);
+      showToast('Failed to load clients', 'error');
     } finally {
       setLoading(false);
     }
@@ -99,9 +103,9 @@ function Clients({ initialClientId, onConsumeInitial }) {
     e.preventDefault();
     try {
       if (editingClient) {
-        await axios.patch(`${API_URL}/clients/${editingClient._id}`, formData);
+        await axios.patch(`${API_URL}/clients/${editingClient._id}`, formData, { headers: getAuthHeaders() });
       } else {
-        await axios.post(`${API_URL}/clients`, formData);
+        await axios.post(`${API_URL}/clients`, formData, { headers: getAuthHeaders() });
       }
       setShowForm(false);
       setEditingClient(null);
@@ -121,7 +125,7 @@ function Clients({ initialClientId, onConsumeInitial }) {
       message: 'Are you sure you want to delete this client? This action cannot be undone.',
       onConfirm: async () => {
         try {
-          await axios.delete(`${API_URL}/clients/${id}`);
+          await axios.delete(`${API_URL}/clients/${id}`, { headers: getAuthHeaders() });
           fetchClients();
           showToast('Client deleted', 'success');
         } catch (error) {

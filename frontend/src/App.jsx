@@ -64,7 +64,10 @@ function App() {
 
   const fetchPotentialJobsCount = async () => {
     try {
-      const response = await axios.get(`${API_URL}/emails?isWorkRelated=true&isRead=false`);
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/emails?isWorkRelated=true&isRead=false`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setPotentialJobsCount(response.data.emails?.length || 0);
     } catch (error) {
       console.error('Error fetching potential jobs count:', error);
@@ -86,6 +89,11 @@ function App() {
 
   return (
     <div className="app-container">
+      {/* Mobile overlay — dims content when sidebar is open */}
+      {sidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
+      )}
+
       {/* Sidebar Navigation */}
       <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
         <div className="sidebar-header">

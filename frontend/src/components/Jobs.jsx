@@ -3,7 +3,6 @@ import axios from 'axios';
 import { FiBriefcase, FiPlus, FiEdit, FiTrash2, FiDollarSign, FiClock, FiUser, FiFilter } from 'react-icons/fi';
 import JobForm from './JobForm';
 import JobDetail from './JobDetail';
-import ExpenseEntryModal from './ExpenseEntryModal';
 import { showToast } from './Toast';
 import NotificationModal from './NotificationModal';
 import { useAuth } from '../context/AuthContext';
@@ -38,8 +37,6 @@ function Jobs({ initialJobId, onConsumeInitial }) {
   }, [initialJobId]);
   const [showJobForm, setShowJobForm] = useState(false);
   const [editingJob, setEditingJob] = useState(null);
-  const [expenseModalOpen, setExpenseModalOpen] = useState(false);
-  const [jobForExpenses, setJobForExpenses] = useState(null);
 
   const [filtersExpanded, setFiltersExpanded] = useState(false);
 
@@ -53,6 +50,10 @@ function Jobs({ initialJobId, onConsumeInitial }) {
   });
 
   // Fetch jobs
+  const getAuthHeaders = () => ({
+    Authorization: `Bearer ${localStorage.getItem('token')}`
+  });
+
   const fetchJobs = async () => {
     setLoading(true);
     try {
@@ -63,10 +64,11 @@ function Jobs({ initialJobId, onConsumeInitial }) {
       queryParams.append('sortBy', filters.sortBy);
       queryParams.append('sortOrder', filters.sortOrder);
 
-      const response = await axios.get(`${API_URL}/jobs?${queryParams.toString()}`);
+      const response = await axios.get(`${API_URL}/jobs?${queryParams.toString()}`, { headers: getAuthHeaders() });
       setJobs(response.data.jobs);
     } catch (error) {
       console.error('Error fetching jobs:', error);
+      showToast('Failed to load jobs', 'error');
     } finally {
       setLoading(false);
     }
@@ -75,7 +77,7 @@ function Jobs({ initialJobId, onConsumeInitial }) {
   // Fetch clients
   const fetchClients = async () => {
     try {
-      const response = await axios.get(`${API_URL}/clients`);
+      const response = await axios.get(`${API_URL}/clients`, { headers: getAuthHeaders() });
       setClients(response.data.clients);
     } catch (error) {
       console.error('Error fetching clients:', error);
@@ -85,7 +87,7 @@ function Jobs({ initialJobId, onConsumeInitial }) {
   // Fetch stats
   const fetchStats = async () => {
     try {
-      const response = await axios.get(`${API_URL}/jobs/stats`);
+      const response = await axios.get(`${API_URL}/jobs/stats`, { headers: getAuthHeaders() });
       setStats(response.data);
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -100,7 +102,7 @@ function Jobs({ initialJobId, onConsumeInitial }) {
       message: 'Are you sure you want to delete this job? This action cannot be undone.',
       onConfirm: async () => {
         try {
-          await axios.delete(`${API_URL}/jobs/${jobId}`);
+          await axios.delete(`${API_URL}/jobs/${jobId}`, { headers: getAuthHeaders() });
           fetchJobs();
           fetchStats();
           setSelectedJob(null);
@@ -435,21 +437,6 @@ function Jobs({ initialJobId, onConsumeInitial }) {
         />
       )}
 
-      {/* Expense Entry Modal */}
-      <ExpenseEntryModal
-        isOpen={expenseModalOpen}
-        onClose={() => {
-          setExpenseModalOpen(false);
-          setJobForExpenses(null);
-        }}
-        job={jobForExpenses}
-        onSave={() => {
-          fetchJobs();
-          fetchStats();
-          setExpenseModalOpen(false);
-          setJobForExpenses(null);
-        }}
-      />
 
       <NotificationModal
         isOpen={confirmModal.isOpen}

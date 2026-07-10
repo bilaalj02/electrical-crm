@@ -111,13 +111,8 @@ function JobForm({ job, clients, onClose, onSave }) {
         const token = localStorage.getItem('token');
         const clientRes = await axios.post(
           `${API_URL}/clients`,
-          {
-            name: newClient.name,
-            email: newClient.email,
-            phone: newClient.phone,
-            company: newClient.company,
-            address: newClient.address,
-          }
+          { name: newClient.name, email: newClient.email, phone: newClient.phone, company: newClient.company, address: newClient.address },
+          { headers: { Authorization: `Bearer ${token}` } }
         );
         clientId = clientRes.data._id;
       }
@@ -159,6 +154,20 @@ function JobForm({ job, clients, onClose, onSave }) {
         }
       }
 
+      showToast(job ? 'Job updated successfully!' : 'Job created successfully!', 'success');
+      // Reset form if creating a new job
+      if (!job) {
+        setFormData({
+          title: '', description: '', client: '',
+          location: { street: '', city: '', state: '', zipCode: '' },
+          status: 'quote', priority: 'medium',
+          scheduledDate: '', scheduledTime: '', dueDate: '',
+          costs: { laborHours: 0, laborRate: 85, materials: [], equipment: [], permitsCost: 0, subcontractorsCost: 0, otherCosts: 0, taxRate: 0, discount: 0 },
+          notes: [], assignedUsers: []
+        });
+        setCreatingClient(false);
+        setNewClient(emptyNewClient);
+      }
       onSave();
     } catch (error) {
       console.error('Error saving job:', error);
