@@ -10,6 +10,7 @@ const uploadDocument = require('../config/uploadDocument');
 const { extractText, extractCrmDataFromText } = require('../services/documentExtractor');
 const { getQBOClient, markNeedsReconnect } = require('../controllers/quickbooksController');
 const { runSync } = require('../services/quickbooksSync');
+const { getFinancialSnapshot } = require('../services/quickbooksReports');
 const { logIntegrationError } = require('../utils/errorLog');
 const IntegrationErrorLog = require('../models/IntegrationErrorLog');
 
@@ -210,6 +211,56 @@ router.post('/:provider/sync', async (req, res) => {
     }
 
     res.status(500).json({ error: error.message || 'Sync failed' });
+  }
+});
+
+/**
+ * GET /api/integrations/:provider/analytics
+ * Live financial snapshot pulled directly from QuickBooks (not from
+ * whatever's already been synced into Client/Job) — powers the QuickBooks
+ * Financials section on the Analytics page.
+ */
+router.get('/:provider/analytics', async (req, res) => {
+  if (req.params.provider !== 'quickbooks') {
+    return res.status(400).json({ error: 'Live analytics are only available for QuickBooks right now' });
+  }
+
+  try {
+    // Not filtered by isActive here — same reasoning as the GET /:provider
+    // detail route above: a record with isActive:false but needsReconnect:true
+    // (a dead token, not a deliberate disconnect) still needs to be found so
+    // the frontend can prompt "Reconnect" instead of a plain "Connect".
+    const integration = await Integration.findOne({
+      userId: req.user._id,
+      provider: 'quickbooks'
+    });
+
+    if (!integration || (!integration.isActive && !integration.needsReconnect)) {
+      return res.json({ connected: false });
+    }
+
+    if (integration.needsReconnect) {
+      return res.json({ connected: true, reconnectRequired: true });
+    }
+
+    const qbo = await getQBOClient(integration);
+    const snapshot = await getFinancialSnapshot(qbo);
+
+    res.json({ connected: true, ...snapshot });
+  } catch (error) {
+    if (error.code === 'QBO_RECONNECT_REQUIRED') {
+      const integration = await Integration.findOne({ userId: req.user._id, provider: 'quickbooks' });
+      if (integration && !integration.needsReconnect) {
+        await markNeedsReconnect(integration, error.message);
+      }
+      return res.status(401).json({
+        error: 'Your QuickBooks connection has expired. Please reconnect to continue.',
+        reconnectRequired: true
+      });
+    }
+
+    await logIntegrationError({ userId: req.user._id, provider: 'quickbooks', action: 'analytics', error });
+    res.status(500).json({ error: error.message || 'Failed to load QuickBooks analytics' });
   }
 });
 

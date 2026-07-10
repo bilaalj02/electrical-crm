@@ -195,5 +195,8 @@ async function runSync(qbo, enabledDataTypes, userId) {
 module.exports = {
   syncCustomers,
   syncInvoices,
-  runSync
+  runSync,
+  qboFind,
+  isAuthFault,
+  extractIntuitTid
 };

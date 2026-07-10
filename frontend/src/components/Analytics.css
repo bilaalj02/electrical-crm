@@ -1,0 +1,443 @@
+/* ============================================================
+   Analytics — immersive revamp
+   Stays inside the existing palette: gold #d4af37 accent, light
+   glass cards (rgba(255,255,255,.7) + blur), dark text (#1f2937 /
+   #111827), semantic icon colors (orange/blue/purple/teal/green).
+   No new colors introduced — only depth, motion, and real charts.
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .analytics-hero,
+  .analytics-hero *,
+  .a-tilt,
+  .a-reveal,
+  .a-donut-arc,
+  .a-trend-path,
+  .a-trend-area,
+  .a-bar-fill,
+  .a-count {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ---------- Hero ---------- */
+.analytics-hero {
+  position: relative;
+  min-height: 34vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow: hidden;
+  border-radius: 20px;
+  margin: 1.5rem 0 2rem;
+  padding: 3rem 1.5rem 2.5rem;
+  background: linear-gradient(180deg, rgba(212, 175, 55, 0.06) 0%, rgba(245, 247, 250, 0) 70%);
+  perspective: 1400px;
+}
+
+.analytics-hero-glow {
+  position: absolute;
+  inset: -20%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.analytics-hero-glow span {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(50px);
+  opacity: 0.35;
+  background: radial-gradient(circle, rgba(212, 175, 55, 0.5), rgba(212, 175, 55, 0) 70%);
+  animation: aGlowDrift 16s ease-in-out infinite;
+}
+
+.analytics-hero-glow span:nth-child(1) { width: 340px; height: 340px; top: 5%; left: 8%; }
+.analytics-hero-glow span:nth-child(2) { width: 260px; height: 260px; top: 40%; right: 10%; animation-delay: -5s; animation-duration: 20s; }
+.analytics-hero-glow span:nth-child(3) { width: 200px; height: 200px; bottom: 0%; left: 35%; animation-delay: -10s; animation-duration: 13s; }
+
+@keyframes aGlowDrift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(30px, -24px) scale(1.12); }
+}
+
+.analytics-hero-inner {
+  position: relative;
+  z-index: 1;
+  transform-style: preserve-3d;
+  will-change: transform;
+  transition: transform 0.35s cubic-bezier(.22, 1, .36, 1);
+}
+
+.analytics-hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #b8941f;
+  margin-bottom: 0.75rem;
+  opacity: 0;
+  animation: aFadeUp 0.6s cubic-bezier(.22, 1, .36, 1) 0.5s forwards;
+}
+
+.analytics-hero-eyebrow .a-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #d4af37;
+  box-shadow: 0 0 8px 2px rgba(212, 175, 55, 0.6);
+  animation: aBlink 2.2s ease-in-out infinite;
+}
+
+@keyframes aBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+.analytics-hero-title {
+  font-size: clamp(2.75rem, 8vw, 5.5rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  margin: 0;
+  color: #1f2937;
+  background: linear-gradient(180deg, #3d3320 0%, #1f2937 55%, #1f2937 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow:
+    0 1px 0 rgba(212, 175, 55, 0.5),
+    0 2px 0 rgba(212, 175, 55, 0.45),
+    0 3px 0 rgba(212, 175, 55, 0.4),
+    0 4px 0 rgba(212, 175, 55, 0.32),
+    0 5px 0 rgba(212, 175, 55, 0.24),
+    0 8px 16px rgba(31, 41, 55, 0.18),
+    0 16px 32px rgba(212, 175, 55, 0.12);
+  transform: perspective(1200px) rotateX(-38deg) translateY(24px) scale(0.85);
+  opacity: 0;
+  animation: aTitleIn 1s cubic-bezier(.16, 1, .3, 1) 0.1s forwards;
+}
+
+@keyframes aTitleIn {
+  0% { transform: perspective(1200px) rotateX(-38deg) translateY(24px) scale(0.85); opacity: 0; }
+  100% { transform: perspective(1200px) rotateX(0deg) translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes aFadeUp {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.analytics-hero-sub {
+  margin: 0.9rem 0 0;
+  font-size: 1.05rem;
+  color: #6b7280;
+  max-width: 46ch;
+  opacity: 0;
+  animation: aFadeUp 0.6s cubic-bezier(.22, 1, .36, 1) 0.65s forwards;
+}
+
+/* ---------- Section reveal-on-scroll ---------- */
+.a-reveal {
+  opacity: 0;
+  transform: perspective(900px) translateY(26px) rotateX(-6deg);
+  transition: opacity 0.7s cubic-bezier(.22, 1, .36, 1), transform 0.7s cubic-bezier(.22, 1, .36, 1);
+  transform-origin: center bottom;
+}
+
+.a-reveal.is-visible {
+  opacity: 1;
+  transform: perspective(900px) translateY(0) rotateX(0deg);
+}
+
+/* ---------- Mouse-tilt cards ---------- */
+.a-tilt {
+  transition: transform 0.35s cubic-bezier(.22, 1, .36, 1), box-shadow 0.35s ease;
+  will-change: transform;
+}
+
+.a-tilt.a-tilting {
+  transition: transform 0.05s linear;
+}
+
+/* ---------- Chart panel shell (reuses the glass-card look) ---------- */
+.a-chart-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.a-chart-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 1.1rem;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.a-chart-head h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+}
+
+.a-chart-head span {
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+.a-charts-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.a-charts-grid-secondary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+/* ---------- Trend (line/area) chart ---------- */
+.a-trend-svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.a-trend-area {
+  opacity: 0;
+  transition: opacity 0.6s ease 0.3s;
+}
+.a-trend-area.is-drawn { opacity: 1; }
+
+.a-trend-path {
+  fill: none;
+  stroke: #d4af37;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 2px 4px rgba(212, 175, 55, 0.3));
+}
+
+.a-trend-dot {
+  fill: #d4af37;
+  stroke: #fff;
+  stroke-width: 2;
+  cursor: pointer;
+  transition: r 0.15s ease, fill 0.15s ease;
+}
+.a-trend-dot:hover,
+.a-trend-dot.is-active {
+  fill: #b8941f;
+}
+
+.a-trend-axis-label {
+  font-size: 10.5px;
+  fill: #9ca3af;
+  font-family: inherit;
+}
+
+.a-chart-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: #1f2937;
+  color: #f9fafb;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+  transform: translate(-50%, -125%);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 5;
+}
+.a-chart-tooltip.is-visible {
+  opacity: 1;
+  transform: translate(-50%, -135%);
+}
+.a-chart-tooltip::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #1f2937;
+}
+
+/* ---------- Donut chart ---------- */
+.a-donut-wrap {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.a-donut-svg {
+  transform: rotate(-90deg);
+  overflow: visible;
+}
+
+.a-donut-arc {
+  fill: none;
+  stroke-linecap: round;
+  transition: stroke-width 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
+  cursor: pointer;
+}
+
+.a-donut-arc:hover,
+.a-donut-arc.is-active {
+  filter: brightness(1.12) drop-shadow(0 0 6px currentColor);
+}
+
+.a-donut-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+}
+
+.a-donut-center .a-donut-total {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1;
+}
+
+.a-donut-center .a-donut-caption {
+  font-size: 0.68rem;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 2px;
+}
+
+.a-donut-figure {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.a-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.a-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: #4b5563;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 6px;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.a-legend-item:hover,
+.a-legend-item.is-active {
+  background: rgba(212, 175, 55, 0.08);
+}
+
+.a-legend-item.is-dimmed { opacity: 0.4; }
+
+.a-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.a-legend-count {
+  font-weight: 700;
+  color: #111827;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Horizontal bar chart (client types) ---------- */
+.a-bar-row {
+  display: grid;
+  grid-template-columns: 100px 1fr 42px;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 0.85rem;
+}
+
+.a-bar-row:last-child { margin-bottom: 0; }
+
+.a-bar-label {
+  font-size: 0.8rem;
+  color: #4b5563;
+  text-transform: capitalize;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.a-bar-track {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(212, 175, 55, 0.1);
+  overflow: hidden;
+}
+
+.a-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  width: 0%;
+  background: linear-gradient(90deg, #d4af37, #b8941f);
+  transition: width 0.9s cubic-bezier(.22, 1, .36, 1);
+}
+
+.a-bar-value {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #111827;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Card mini-sparkline (footer accent) ---------- */
+.a-spark {
+  display: block;
+  margin-top: 8px;
+  width: 100%;
+  height: 28px;
+  overflow: visible;
+}
+
+.a-spark path {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.a-spark .a-spark-fill { stroke: none; opacity: 0.14; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 900px) {
+  .a-charts-grid,
+  .a-charts-grid-secondary {
+    grid-template-columns: 1fr;
+  }
+  .analytics-hero { min-height: 26vh; padding: 2.25rem 1rem 1.75rem; }
+}

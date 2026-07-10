@@ -2857,6 +2857,10 @@ body {
   color: #10b981;
 }
 
+.card-icon.red {
+  color: #ef4444;
+}
+
 .card-title {
   flex: 1;
 }
