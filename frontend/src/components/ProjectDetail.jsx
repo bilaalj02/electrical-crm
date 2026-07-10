@@ -372,12 +372,23 @@ function ProjectDetail({ projectId, onBack }) {
     setPhotoCommentText('');
   };
 
-  // Returns the display URL for a photo — Cloudinary URLs are already absolute,
-  // legacy local uploads start with /uploads and need the server prefix.
   const getPhotoUrl = (url) => {
     if (!url) return '';
     if (url.startsWith('http')) return url;
-    return API_URL.replace('/api', '') + url;
+    // Legacy local path — file no longer exists on Railway (ephemeral filesystem)
+    return '';
+  };
+
+  const handleImgError = (e) => {
+    e.target.style.display = 'none';
+    const placeholder = e.target.parentNode.querySelector('.photo-missing');
+    if (!placeholder) {
+      const div = document.createElement('div');
+      div.className = 'photo-missing';
+      div.textContent = 'Photo missing — please re-upload';
+      div.style.cssText = 'display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#f3f4f6;color:#6b7280;font-size:12px;padding:8px;text-align:center;border-radius:4px;';
+      e.target.parentNode.appendChild(div);
+    }
   };
 
   const formatDate = (date) => {
@@ -484,7 +495,7 @@ function ProjectDetail({ projectId, onBack }) {
                         className={`comparison-photo ${selectedBeforePhoto?._id === photo._id ? 'selected' : ''}`}
                         onClick={() => setSelectedBeforePhoto(photo)}
                       >
-                        <img src={getPhotoUrl(photo.url)} alt={photo.label} />
+                        <img src={getPhotoUrl(photo.url)} alt={photo.label} onError={handleImgError} />
                         <p>{photo.label}</p>
                       </div>
                     ))}
@@ -499,7 +510,7 @@ function ProjectDetail({ projectId, onBack }) {
                         className={`comparison-photo ${selectedAfterPhoto?._id === photo._id ? 'selected' : ''}`}
                         onClick={() => setSelectedAfterPhoto(photo)}
                       >
-                        <img src={getPhotoUrl(photo.url)} alt={photo.label} />
+                        <img src={getPhotoUrl(photo.url)} alt={photo.label} onError={handleImgError} />
                         <p>{photo.label}</p>
                       </div>
                     ))}
@@ -510,11 +521,11 @@ function ProjectDetail({ projectId, onBack }) {
                 <div className="comparison-viewer">
                   <div className="comparison-side">
                     <h4>Before</h4>
-                    <img src={getPhotoUrl(selectedBeforePhoto.url)} alt="Before" />
+                    <img src={getPhotoUrl(selectedBeforePhoto.url)} alt="Before" onError={handleImgError} />
                   </div>
                   <div className="comparison-side">
                     <h4>After</h4>
-                    <img src={getPhotoUrl(selectedAfterPhoto.url)} alt="After" />
+                    <img src={getPhotoUrl(selectedAfterPhoto.url)} alt="After" onError={handleImgError} />
                   </div>
                 </div>
               )}
@@ -539,7 +550,7 @@ function ProjectDetail({ projectId, onBack }) {
                       <div className="activity-body">
                         {activity.type === 'photo_upload' ? (
                           <div className="activity-photo" onClick={() => openLightbox(activity.data)}>
-                            <img src={getPhotoUrl(activity.data.url)} alt={activity.data.label} />
+                            <img src={getPhotoUrl(activity.data.url)} alt={activity.data.label} onError={handleImgError} />
                             <p>{activity.data.label}</p>
                           </div>
                         ) : (
@@ -634,7 +645,7 @@ function ProjectDetail({ projectId, onBack }) {
                         {dayPhotos.map(photo => (
                           <div key={photo._id} className="timeline-photo-card">
                             <div className="photo-thumbnail" onClick={() => openLightbox(photo)}>
-                              <img src={getPhotoUrl(photo.url)} alt={photo.label} />
+                              <img src={getPhotoUrl(photo.url)} alt={photo.label} onError={handleImgError} />
                             </div>
                             <div className="photo-info">
                               <div className="photo-label">{photo.label}</div>
@@ -660,7 +671,7 @@ function ProjectDetail({ projectId, onBack }) {
                   {photos.map(photo => (
                     <div key={photo._id} className="photo-card">
                       <div className="photo-thumbnail" onClick={() => openLightbox(photo)}>
-                        <img src={getPhotoUrl(photo.url)} alt={photo.label} />
+                        <img src={getPhotoUrl(photo.url)} alt={photo.label} onError={handleImgError} />
                         <div className="photo-overlay">
                           <FiZoomIn size={24} />
                         </div>
@@ -919,7 +930,7 @@ function ProjectDetail({ projectId, onBack }) {
             <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
               {/* Image panel */}
               <div style={{ flex: '0 0 65%', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '500px' }}>
-                <img src={getPhotoUrl(selectedPhoto.url)} alt={selectedPhoto.label} style={{ maxWidth: '100%', maxHeight: '85vh', objectFit: 'contain' }} />
+                <img src={getPhotoUrl(selectedPhoto.url)} alt={selectedPhoto.label} onError={handleImgError} style={{ maxWidth: '100%', maxHeight: '85vh', objectFit: 'contain' }} />
               </div>
               {/* Info + comments panel */}
               <div style={{ flex: '0 0 35%', display: 'flex', flexDirection: 'column', overflow: 'hidden', borderLeft: '1px solid #e5e7eb' }}>

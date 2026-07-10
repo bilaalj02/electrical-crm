@@ -18,10 +18,10 @@ router.post('/upload/:projectId', auth, upload.array('photos', 10), async (req, 
     // Verify project exists
     const project = await Project.findById(projectId);
     if (!project) {
-      // Clean up uploaded files
-      req.files.forEach(file => {
-        fs.unlinkSync(file.path);
-      });
+      // Clean up Cloudinary uploads that were already processed
+      await Promise.all(req.files.map(file =>
+        cloudinary.uploader.destroy(file.filename).catch(() => {})
+      ));
       return res.status(404).json({ error: 'Project not found' });
     }
 
@@ -325,6 +325,34 @@ router.get('/stats/:projectId', auth, async (req, res) => {
     console.error('Error fetching photo stats:', error);
     res.status(500).json({ error: error.message });
   }
+});
+
+/**
+ * GET /api/photos/stale
+ * Lists photos that still have local /uploads paths (Railway ephemeral — file is gone).
+ * Admin only.
+ */
+router.get('/stale', auth, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin only' });
+  }
+  const stale = await Photo.find({ url: { $not: /^https?:\/\// } })
+    .populate('project', 'name')
+    .select('_id originalName url project uploadedAt');
+  res.json({ count: stale.length, photos: stale });
+});
+
+/**
+ * DELETE /api/photos/stale
+ * Deletes all photo DB records with local /uploads paths (files no longer exist on Railway).
+ * Admin only. Users must re-upload these photos.
+ */
+router.delete('/stale', auth, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin only' });
+  }
+  const result = await Photo.deleteMany({ url: { $not: /^https?:\/\// } });
+  res.json({ message: `Removed ${result.deletedCount} stale photo record(s). Please re-upload those photos.`, deletedCount: result.deletedCount });
 });
 
 module.exports = router;
