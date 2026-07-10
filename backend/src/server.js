@@ -25,7 +25,9 @@ const app = express();
 
 app.set('trust proxy', 1); // Railway sits behind a proxy — needed for rate-limit/IP detection to see the real client IP
 
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' }, // allow images/files served from this API to load on the Vercel frontend
+}));
 
 const allowedOrigins = [
   process.env.FRONTEND_URL,
