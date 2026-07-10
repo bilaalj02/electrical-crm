@@ -1,6 +1,7 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 // Ensure upload directories exist
 const uploadDir = path.join(__dirname, '../../uploads/projects');
@@ -14,8 +15,13 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    // Generate unique filename: timestamp-random-originalname
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    // These files are served back over a public, unauthenticated static
+    // route (/uploads — see server.js), so the random component of the
+    // filename is the *only* thing standing between "anyone with the URL"
+    // and "anyone on the internet who can enumerate it". Math.random() is a
+    // predictable, non-cryptographic PRNG — not suitable for that job.
+    // crypto.randomBytes gives 128 bits of real entropy instead.
+    const uniqueSuffix = Date.now() + '-' + crypto.randomBytes(16).toString('hex');
     const ext = path.extname(file.originalname);
     const nameWithoutExt = path.basename(file.originalname, ext);
     cb(null, nameWithoutExt + '-' + uniqueSuffix + ext);

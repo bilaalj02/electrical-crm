@@ -1,6 +1,7 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 const uploadDir = path.join(__dirname, '../../uploads/integrations');
 if (!fs.existsSync(uploadDir)) {
@@ -12,7 +13,11 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    // Deleted right after text extraction (see integrationRoutes.js), but
+    // still briefly reachable over the public /uploads static route in the
+    // meantime — same reasoning as upload.js: use real entropy, not
+    // Math.random(), for the unguessable part of the name.
+    const uniqueSuffix = Date.now() + '-' + crypto.randomBytes(16).toString('hex');
     const ext = path.extname(file.originalname);
     const nameWithoutExt = path.basename(file.originalname, ext);
     cb(null, nameWithoutExt + '-' + uniqueSuffix + ext);

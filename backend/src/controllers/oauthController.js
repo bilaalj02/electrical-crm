@@ -4,15 +4,24 @@ const CryptoJS = require('crypto-js');
 const axios = require('axios');
 const { signState, verifyState } = require('../utils/oauthState');
 
-// Encryption helper functions
+// Encryption helper functions — every OAuth access/refresh token (Gmail,
+// Microsoft, QuickBooks) is encrypted with this key before being stored.
+// No fallback: a silent default here would mean that if ENCRYPTION_KEY were
+// ever missing from an environment's config (e.g. an unset var on a fresh
+// deploy), every token would be encrypted with the same publicly-known
+// string in this open-source-visible file instead of failing loudly —
+// fail fast instead so a missing key is caught at startup, not discovered
+// as a live vulnerability later.
+if (!process.env.ENCRYPTION_KEY) {
+  throw new Error('ENCRYPTION_KEY environment variable is required and must not be empty.');
+}
+
 const encrypt = (text) => {
-  const encryptionKey = process.env.ENCRYPTION_KEY || 'default-key-change-in-production';
-  return CryptoJS.AES.encrypt(text, encryptionKey).toString();
+  return CryptoJS.AES.encrypt(text, process.env.ENCRYPTION_KEY).toString();
 };
 
 const decrypt = (encryptedText) => {
-  const encryptionKey = process.env.ENCRYPTION_KEY || 'default-key-change-in-production';
-  const bytes = CryptoJS.AES.decrypt(encryptedText, encryptionKey);
+  const bytes = CryptoJS.AES.decrypt(encryptedText, process.env.ENCRYPTION_KEY);
   return bytes.toString(CryptoJS.enc.Utf8);
 };
 
