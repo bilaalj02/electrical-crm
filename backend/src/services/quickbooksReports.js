@@ -110,6 +110,26 @@ function parseTopCustomers(report, limit = 5) {
   }
 }
 
+// Parses an AgedReceivables report into aging buckets. Uses QBO's own column
+// titles as labels (e.g. "Current", "1 - 30", "31 - 60"...) rather than
+// assuming exact bucket boundaries — those vary slightly by QBO account
+// settings, and the real titles are already meaningful on their own.
+function parseAgedReceivables(report) {
+  try {
+    const columns = report?.Columns?.Column || [];
+    const bucketColumns = columns.slice(1, -1); // skip the "Customer" label column and trailing "Total" column
+    const rows = report?.Rows?.Row || [];
+    const totalRow = rows.find((row) => row.group === 'GrandTotal' || String(row?.Summary?.ColData?.[0]?.value).toUpperCase() === 'TOTAL');
+    const values = totalRow?.Summary?.ColData?.slice(1) || [];
+
+    return bucketColumns
+      .map((col, i) => ({ label: col.ColTitle, value: toNumber(values[i]?.value) }))
+      .filter((b) => b.label);
+  } catch {
+    return [];
+  }
+}
+
 function sixMonthRange() {
   const end = new Date();
   const start = new Date(end.getFullYear(), end.getMonth() - 5, 1);
@@ -122,10 +142,12 @@ function sixMonthRange() {
 async function getFinancialSnapshot(qbo) {
   const range = sixMonthRange();
 
-  const [plReport, invoiceResult, incomeReport] = await Promise.all([
+  const [plReport, invoiceResult, incomeReport, agedReport] = await Promise.all([
     qboReport(qbo, 'reportProfitAndLoss', { ...range, summarize_column_by: 'Month' }),
     qboFind(qbo, 'findInvoices'),
-    qboReport(qbo, 'reportCustomerIncome', range)
+    qboReport(qbo, 'reportCustomerIncome', range),
+    // Aging is an as-of-today snapshot, not a period report — no date range.
+    qboReport(qbo, 'reportAgedReceivables', {})
   ]);
 
   const { breakdown, outstandingTotal } = summarizeInvoices(invoiceResult.Invoice || []);
@@ -134,7 +156,8 @@ async function getFinancialSnapshot(qbo) {
     monthlyTrend: parseMonthlyTrend(plReport),
     invoiceBreakdown: breakdown,
     outstandingTotal,
-    topCustomers: parseTopCustomers(incomeReport)
+    topCustomers: parseTopCustomers(incomeReport, 10),
+    agedReceivables: parseAgedReceivables(agedReport)
   };
 }
 

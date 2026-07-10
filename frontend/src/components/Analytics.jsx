@@ -4,6 +4,11 @@ import { jsPDF } from 'jspdf';
 import { FiBarChart2, FiTrendingUp, FiDollarSign, FiDownload, FiChevronDown, FiChevronUp, FiBriefcase, FiUsers, FiMail, FiLink, FiRefreshCw } from 'react-icons/fi';
 import { showToast } from './Toast';
 import NotificationModal from './NotificationModal';
+import {
+  prefersReducedMotion, useReveal, useTilt,
+  AnimatedNumber, TrendChart, DonutChart, BarChart, Bar3DChart
+} from './AnalyticsCharts';
+import AnalyticsSectionDetail from './AnalyticsSectionDetail';
 import './Analytics.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -20,75 +25,6 @@ const STATUS_COLORS = {
   cancelled: '#a8483f'
 };
 const FALLBACK_COLOR = '#d4af37';
-
-const prefersReducedMotion = () =>
-  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-// ---------- Reusable motion hooks ----------
-//
-// These all return CALLBACK refs, not useRef() objects. This component has
-// an early `if (loading) return <simple div>` before its real content
-// renders — with a plain useRef()+useEffect(), the effect fires once on
-// that first (loading) render, captures ref.current as null, and — since
-// its dependency array never changes — never re-runs once the real
-// elements mount on a later render. Callback refs sidestep this entirely:
-// React invokes them exactly when a node actually attaches, however many
-// renders that takes. (Caught by testing this live — every effect was
-// silently no-op-ing until this was fixed.)
-
-// One-time perspective/opacity reveal once a section scrolls into view.
-function useReveal() {
-  const cleanupRef = useRef(null);
-  return useCallback((el) => {
-    if (cleanupRef.current) { cleanupRef.current(); cleanupRef.current = null; }
-    if (!el) return;
-    if (prefersReducedMotion()) { el.classList.add('is-visible'); return; }
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          el.classList.add('is-visible');
-          io.unobserve(el);
-        }
-      });
-    }, { threshold: 0.15 });
-    io.observe(el);
-    cleanupRef.current = () => io.disconnect();
-  }, []);
-}
-
-// Smooth mouse-tilt-follow on hover — direct DOM mutation (not setState) so
-// it stays perfectly smooth at mousemove frequency without re-rendering.
-function useTilt(maxTilt = 8) {
-  const cleanupRef = useRef(null);
-  return useCallback((el) => {
-    if (cleanupRef.current) { cleanupRef.current(); cleanupRef.current = null; }
-    if (!el || prefersReducedMotion()) return;
-    let raf = null;
-    const handleMove = (e) => {
-      const r = el.getBoundingClientRect();
-      const px = (e.clientX - r.left) / r.width;
-      const py = (e.clientY - r.top) / r.height;
-      const ry = (px - 0.5) * maxTilt;
-      const rx = (0.5 - py) * maxTilt;
-      el.classList.add('a-tilting');
-      if (raf) cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        el.style.transform = `perspective(900px) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg) translateY(-4px)`;
-      });
-    };
-    const handleLeave = () => {
-      el.classList.remove('a-tilting');
-      el.style.transform = '';
-    };
-    el.addEventListener('mousemove', handleMove);
-    el.addEventListener('mouseleave', handleLeave);
-    cleanupRef.current = () => {
-      el.removeEventListener('mousemove', handleMove);
-      el.removeEventListener('mouseleave', handleLeave);
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, [maxTilt]);
-}
 
 // Hero: continuous mouse-tilt + scroll-linked recede, both via direct DOM
 // mutation driven by rAF — never triggers a React re-render, so it stays
@@ -161,277 +97,6 @@ function useHeroMotion() {
 }
 
 // Animated count-up, restarts only when `to` changes.
-function AnimatedNumber({ to = 0, prefix = '', decimals = 0, duration = 1200 }) {
-  const [value, setValue] = useState(0);
-  const ref = useRef(null);
-  const startedRef = useRef(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    if (prefersReducedMotion()) { setValue(to); return; }
-
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting && !startedRef.current) {
-          startedRef.current = true;
-          const start = performance.now();
-          const from = 0;
-          const step = (ts) => {
-            const p = Math.min(1, (ts - start) / duration);
-            const eased = 1 - Math.pow(1 - p, 3);
-            setValue(from + (to - from) * eased);
-            if (p < 1) requestAnimationFrame(step);
-            else setValue(to);
-          };
-          requestAnimationFrame(step);
-          io.unobserve(el);
-        }
-      });
-    }, { threshold: 0.2 });
-    io.observe(el);
-    return () => io.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [to]);
-
-  const formatted = decimals > 0 ? value.toFixed(decimals) : Math.round(value).toLocaleString();
-  return <span ref={ref}>{prefix}{decimals > 0 ? Number(formatted).toLocaleString() : formatted}</span>;
-}
-
-// ---------- Chart: animated revenue trend (line + area) ----------
-function TrendChart({ points, title = 'Revenue Trend', headerExtra }) {
-  const revealRef = useReveal();
-  const pathRef = useRef(null);
-  const [tooltip, setTooltip] = useState(null);
-  const [drawn, setDrawn] = useState(false);
-  const hasRevealedRef = useRef(false);
-
-  const width = 560, height = 200, padX = 24, padY = 24;
-  const max = Math.max(1, ...points.map((p) => p.value));
-  const stepX = (width - padX * 2) / Math.max(1, points.length - 1);
-  const coords = points.map((p, i) => ({
-    x: padX + i * stepX,
-    y: height - padY - (p.value / max) * (height - padY * 2),
-    ...p
-  }));
-  const linePath = coords.map((c, i) => `${i === 0 ? 'M' : 'L'} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`).join(' ');
-  const areaPath = `${linePath} L ${coords[coords.length - 1]?.x.toFixed(1) || padX} ${height - padY} L ${padX} ${height - padY} Z`;
-
-  const playDrawIn = useCallback((duration = 1.1) => {
-    const path = pathRef.current;
-    if (!path || prefersReducedMotion()) return;
-    const len = path.getTotalLength();
-    path.style.transition = 'none';
-    path.style.strokeDasharray = `${len}`;
-    path.style.strokeDashoffset = `${len}`;
-    path.getBoundingClientRect(); // force reflow so the transition actually starts from the offset value
-    path.style.transition = `stroke-dashoffset ${duration}s cubic-bezier(.22,1,.36,1)`;
-    path.style.strokeDashoffset = '0';
-  }, []);
-
-  useEffect(() => {
-    const el = revealRef.current;
-    if (!el) return;
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          hasRevealedRef.current = true;
-          playDrawIn(1.1);
-          setTimeout(() => setDrawn(true), prefersReducedMotion() ? 0 : 400);
-          io.unobserve(el);
-        }
-      });
-    }, { threshold: 0.2 });
-    io.observe(el);
-    return () => io.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Re-plays the draw-in whenever the underlying data actually changes (e.g.
-  // a time-range dropdown swapping 3/6/12 months) — the chart "reforms"
-  // instead of silently snapping to the new shape.
-  const pointsKey = points.map((p) => `${p.label}:${p.value}`).join('|');
-  const prevKeyRef = useRef(pointsKey);
-  useEffect(() => {
-    if (!hasRevealedRef.current || prevKeyRef.current === pointsKey) {
-      prevKeyRef.current = pointsKey;
-      return;
-    }
-    prevKeyRef.current = pointsKey;
-    playDrawIn(0.8);
-  }, [pointsKey, playDrawIn]);
-
-  return (
-    <div className="a-chart-card a-reveal" ref={revealRef} style={{ position: 'relative' }}>
-      <div className="a-chart-head">
-        <h3><FiTrendingUp style={{ verticalAlign: '-2px', marginRight: 6, color: '#d4af37' }} />{title}</h3>
-        {headerExtra || <span>Last {points.length} months</span>}
-      </div>
-      <svg className="a-trend-svg" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet">
-        <defs>
-          <linearGradient id="aTrendGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#d4af37" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="#d4af37" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        {[0.25, 0.5, 0.75].map((f) => (
-          <line key={f} x1={padX} x2={width - padX} y1={height - padY - f * (height - padY * 2)} y2={height - padY - f * (height - padY * 2)} stroke="#e5e7eb" strokeWidth="1" />
-        ))}
-        <path className={`a-trend-area ${drawn ? 'is-drawn' : ''}`} d={areaPath} fill="url(#aTrendGradient)" />
-        <path ref={pathRef} className="a-trend-path" d={linePath} />
-        {coords.map((c, i) => (
-          <circle
-            key={i}
-            className={`a-trend-dot ${tooltip?.i === i ? 'is-active' : ''}`}
-            cx={c.x} cy={c.y} r={tooltip?.i === i ? 6 : 4}
-            onMouseEnter={() => setTooltip({ i, x: c.x, y: c.y, label: c.label, value: c.value })}
-            onMouseLeave={() => setTooltip(null)}
-          />
-        ))}
-        {coords.map((c, i) => (
-          <text key={`lbl-${i}`} className="a-trend-axis-label" x={c.x} y={height - 4} textAnchor="middle">{c.label}</text>
-        ))}
-      </svg>
-      {tooltip && (
-        <div
-          className="a-chart-tooltip is-visible"
-          style={{ left: `${(tooltip.x / width) * 100}%`, top: `${(tooltip.y / height) * 100}%` }}
-        >
-          {tooltip.label}: ${Math.round(tooltip.value).toLocaleString()}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ---------- Chart: animated donut ----------
-function DonutChart({ title, segments, size = 168 }) {
-  const revealRef = useReveal();
-  const [progress, setProgress] = useState(0);
-  const [active, setActive] = useState(null);
-  const total = segments.reduce((s, seg) => s + seg.value, 0) || 1;
-  const r = size / 2 - 14;
-  const circumference = 2 * Math.PI * r;
-
-  useEffect(() => {
-    const el = revealRef.current;
-    if (!el) return;
-    if (prefersReducedMotion()) { setProgress(1); return; }
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          const start = performance.now();
-          const step = (ts) => {
-            const p = Math.min(1, (ts - start) / 900);
-            setProgress(1 - Math.pow(1 - p, 3));
-            if (p < 1) requestAnimationFrame(step);
-          };
-          requestAnimationFrame(step);
-          io.unobserve(el);
-        }
-      });
-    }, { threshold: 0.2 });
-    io.observe(el);
-    return () => io.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  let cumulative = 0;
-  const arcs = segments.map((seg) => {
-    const arcLen = (seg.value / total) * circumference;
-    const dashoffset = -cumulative;
-    cumulative += arcLen;
-    return { ...seg, arcLen, dashoffset };
-  });
-
-  return (
-    <div className="a-chart-card a-reveal" ref={revealRef}>
-      <div className="a-chart-head">
-        <h3>{title}</h3>
-        <span>{total} total</span>
-      </div>
-      <div className="a-donut-wrap">
-        <div className="a-donut-figure">
-          <svg className="a-donut-svg" width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-            <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#f3f4f6" strokeWidth="14" />
-            {arcs.map((a, i) => (
-              <circle
-                key={i}
-                className={`a-donut-arc ${active === i ? 'is-active' : ''}`}
-                cx={size / 2} cy={size / 2} r={r}
-                stroke={a.color}
-                strokeWidth={active === i ? 17 : 14}
-                strokeDasharray={`${a.arcLen * progress} ${circumference - a.arcLen * progress}`}
-                strokeDashoffset={a.dashoffset}
-                style={{ color: a.color }}
-                onMouseEnter={() => setActive(i)}
-                onMouseLeave={() => setActive(null)}
-              />
-            ))}
-          </svg>
-          <div className="a-donut-center">
-            <div className="a-donut-total">{active !== null ? arcs[active].value : total}</div>
-            <div className="a-donut-caption">{active !== null ? arcs[active].label : 'Total'}</div>
-          </div>
-        </div>
-        <div className="a-legend">
-          {segments.map((seg, i) => (
-            <div
-              key={i}
-              className={`a-legend-item ${active === i ? 'is-active' : ''} ${active !== null && active !== i ? 'is-dimmed' : ''}`}
-              onMouseEnter={() => setActive(i)}
-              onMouseLeave={() => setActive(null)}
-            >
-              <span className="a-legend-swatch" style={{ background: seg.color }} />
-              {seg.label}
-              <span className="a-legend-count">{seg.value}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------- Chart: animated horizontal bars ----------
-function BarChart({ title, rows }) {
-  const revealRef = useReveal();
-  const [drawn, setDrawn] = useState(false);
-  const max = Math.max(1, ...rows.map((r) => r.value));
-
-  useEffect(() => {
-    const el = revealRef.current;
-    if (!el) return;
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          requestAnimationFrame(() => setDrawn(true));
-          io.unobserve(el);
-        }
-      });
-    }, { threshold: 0.2 });
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-
-  return (
-    <div className="a-chart-card a-reveal" ref={revealRef}>
-      <div className="a-chart-head">
-        <h3>{title}</h3>
-      </div>
-      {rows.map((row, i) => (
-        <div className="a-bar-row" key={i}>
-          <div className="a-bar-label">{row.label}</div>
-          <div className="a-bar-track">
-            <div className="a-bar-fill" style={{ width: drawn ? `${(row.value / max) * 100}%` : '0%', transitionDelay: `${i * 80}ms` }} />
-          </div>
-          <div className="a-bar-value">{row.value}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // Small sparkline used inside KPI card footers — purely decorative motion
 // derived from real trend data, not random noise.
 function MiniSpark({ values, color }) {
@@ -455,10 +120,12 @@ function MiniSpark({ values, color }) {
 function Analytics({ onNavigate }) {
   const [stats, setStats] = useState({ jobs: null, clients: null, emails: null });
   const [jobs, setJobs] = useState([]);
+  const [clientsList, setClientsList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [qbData, setQbData] = useState(null);
   const [qbLoading, setQbLoading] = useState(true);
   const [revenueRange, setRevenueRange] = useState(6);
+  const [selectedSection, setSelectedSection] = useState(null);
   const [expandedSections, setExpandedSections] = useState({
     revenue: true,
     quickbooks: true,
@@ -516,11 +183,12 @@ function Analytics({ onNavigate }) {
     try {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
-      const [jobsRes, clientsRes, emailsRes, allJobsRes] = await Promise.all([
+      const [jobsRes, clientsRes, emailsRes, allJobsRes, allClientsRes] = await Promise.all([
         axios.get(`${API_URL}/jobs/stats`, { headers }),
         axios.get(`${API_URL}/clients/stats`, { headers }),
         axios.get(`${API_URL}/emails/stats/summary`, { headers }),
-        axios.get(`${API_URL}/jobs?limit=1000`, { headers })
+        axios.get(`${API_URL}/jobs?limit=1000`, { headers }),
+        axios.get(`${API_URL}/clients?limit=1000`, { headers })
       ]);
 
       setStats({
@@ -529,6 +197,7 @@ function Analytics({ onNavigate }) {
         emails: emailsRes.data
       });
       setJobs(allJobsRes.data.jobs || []);
+      setClientsList(allClientsRes.data.clients || []);
     } catch (error) {
       console.error('Error fetching analytics:', error);
       showToast('Failed to load analytics data', 'error');
@@ -924,6 +593,11 @@ function Analytics({ onNavigate }) {
       ].filter((s) => s.value > 0)
     : [];
 
+  // Already returned by /api/emails/stats/summary but unused until now.
+  const emailsByAccountRows = (stats.emails?.byAccount || [])
+    .filter((a) => a._id)
+    .map((a) => ({ label: a._id, value: a.count }));
+
   // QuickBooks's own numbers — pulled live from QBO, not from whatever's
   // already been synced into Client/Job — kept separate from the CRM-derived
   // charts above.
@@ -938,6 +612,117 @@ function Analytics({ onNavigate }) {
       ].filter((s) => s.value > 0)
     : [];
   const qbTopCustomerRows = (qbData?.topCustomers || []).map((c) => ({ label: c.name, value: c.total }));
+  const qbAgedReceivablesRows = (qbData?.agedReceivables || []).map((b) => ({ label: b.label, value: b.value, display: formatCurrency(b.value) }));
+
+  // ---------- Deeper analytics for the drill-down sub-pages ----------
+  const REVENUE_STATUSES = ['completed', 'paid', 'invoiced'];
+
+  // Top clients by revenue — real job-level data; `client` is already
+  // populated on each job from GET /api/jobs?limit=1000.
+  const topClientsByRevenue = (() => {
+    const totals = new Map();
+    jobs.forEach((j) => {
+      if (!REVENUE_STATUSES.includes(j.status) || !j.costs?.finalTotal) return;
+      const name = j.client?.name || j.client?.company || 'Unknown client';
+      totals.set(name, (totals.get(name) || 0) + j.costs.finalTotal);
+    });
+    return Array.from(totals.entries())
+      .map(([label, value]) => ({ label, value, display: formatCurrency(value) }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  })();
+
+  // Job value distribution — real job sizes, a genuine "job mix" view.
+  const jobValueDistribution = (() => {
+    const buckets = [
+      { label: '<$500', min: 0, max: 500, value: 0 },
+      { label: '$500-2k', min: 500, max: 2000, value: 0 },
+      { label: '$2k-5k', min: 2000, max: 5000, value: 0 },
+      { label: '$5k+', min: 5000, max: Infinity, value: 0 }
+    ];
+    jobs.forEach((j) => {
+      if (!REVENUE_STATUSES.includes(j.status) || !j.costs?.finalTotal) return;
+      const v = j.costs.finalTotal;
+      const bucket = buckets.find((b) => v >= b.min && v < b.max);
+      if (bucket) bucket.value += 1;
+    });
+    return buckets.map((b) => ({ label: b.label, value: b.value }));
+  })();
+
+  // Profit margin by month, same bucketing shape as getMonthlyRevenue but
+  // margin instead of raw revenue — uses the same range dropdown.
+  const profitMarginTrend = (() => {
+    const now = new Date();
+    const months = [];
+    for (let i = revenueRange - 1; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({ key: `${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleString('en-US', { month: 'short' }), revenue: 0, expenses: 0 });
+    }
+    jobs.forEach((j) => {
+      if (!j.actualExpenses?.finalTotal || !j.costs?.finalTotal) return;
+      const dateStr = j.completionDate || j.scheduledDate || j.createdAt;
+      if (!dateStr) return;
+      const d = new Date(dateStr);
+      if (Number.isNaN(d.getTime())) return;
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      const bucket = months.find((m) => m.key === key);
+      if (bucket) { bucket.revenue += j.costs.finalTotal; bucket.expenses += j.actualExpenses.finalTotal; }
+    });
+    return months.map((m) => ({
+      label: m.label,
+      value: m.revenue > 0 ? Math.round(((m.revenue - m.expenses) / m.revenue) * 100) : 0
+    }));
+  })();
+
+  // Completion velocity — average days scheduled → completed, real jobs only.
+  const completionVelocityDays = (() => {
+    const durations = jobs
+      .filter((j) => j.scheduledDate && j.completionDate)
+      .map((j) => (new Date(j.completionDate) - new Date(j.scheduledDate)) / (1000 * 60 * 60 * 24))
+      .filter((d) => Number.isFinite(d) && d >= 0);
+    if (durations.length === 0) return null;
+    return Math.round((durations.reduce((s, d) => s + d, 0) / durations.length) * 10) / 10;
+  })();
+
+  // Jobs created vs. completed per month.
+  const jobsVelocityTrend = (() => {
+    const now = new Date();
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({ key: `${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleString('en-US', { month: 'short' }), created: 0, completed: 0 });
+    }
+    jobs.forEach((j) => {
+      if (j.createdAt) {
+        const d = new Date(j.createdAt);
+        const bucket = months.find((m) => m.key === `${d.getFullYear()}-${d.getMonth()}`);
+        if (bucket) bucket.created += 1;
+      }
+      if (j.completionDate) {
+        const d = new Date(j.completionDate);
+        const bucket = months.find((m) => m.key === `${d.getFullYear()}-${d.getMonth()}`);
+        if (bucket) bucket.completed += 1;
+      }
+    });
+    return months;
+  })();
+
+  // New clients per month — real client records, not job-derived.
+  const newClientsPerMonth = (() => {
+    const now = new Date();
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({ key: `${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleString('en-US', { month: 'short' }), value: 0 });
+    }
+    clientsList.forEach((c) => {
+      if (!c.createdAt) return;
+      const d = new Date(c.createdAt);
+      const bucket = months.find((m) => m.key === `${d.getFullYear()}-${d.getMonth()}`);
+      if (bucket) bucket.value += 1;
+    });
+    return months;
+  })();
 
   if (loading) {
     return (
@@ -968,11 +753,32 @@ function Analytics({ onNavigate }) {
         </button>
       </div>
 
+      {selectedSection ? (
+        <AnalyticsSectionDetail
+          section={selectedSection}
+          onBack={() => setSelectedSection(null)}
+          onNavigate={onNavigate}
+          data={{
+            stats, profitability, avgJobValue, monthlyRevenue, revenueRange, setRevenueRange,
+            profitMarginTrend, topClientsByRevenue, jobValueDistribution, formatCurrency,
+            qbData, qbLoading, qbIncomeTrend, qbTotalIncome, qbTotalExpenses,
+            qbInvoiceSegments, qbTopCustomerRows, qbAgedReceivablesRows,
+            statusSegments, completedJobsCount, activeJobsCount, completionPct,
+            completionVelocityDays, jobsVelocityTrend,
+            clientTypeRows, newClientsPerMonth,
+            emailSegments, emailsByAccountRows
+          }}
+        />
+      ) : (
+      <>
       {/* Revenue Analytics - Collapsible */}
       <div className="analytics-section-collapsible a-reveal is-visible">
         <div className="section-header" onClick={() => toggleSection('revenue')}>
           <h2><FiDollarSign /> Revenue Analytics</h2>
-          {expandedSections.revenue ? <FiChevronUp /> : <FiChevronDown />}
+          <div className="a-section-header-right">
+            <button className="a-view-full-link" onClick={(e) => { e.stopPropagation(); setSelectedSection('revenue'); }}>View Full Report →</button>
+            {expandedSections.revenue ? <FiChevronUp /> : <FiChevronDown />}
+          </div>
         </div>
         {expandedSections.revenue && (
           <div className="section-content">
@@ -1051,7 +857,10 @@ function Analytics({ onNavigate }) {
       <div className="analytics-section-collapsible a-reveal" ref={qbSectionRef}>
         <div className="section-header" onClick={() => toggleSection('quickbooks')}>
           <h2><FiLink /> QuickBooks Financials</h2>
-          {expandedSections.quickbooks ? <FiChevronUp /> : <FiChevronDown />}
+          <div className="a-section-header-right">
+            <button className="a-view-full-link" onClick={(e) => { e.stopPropagation(); setSelectedSection('quickbooks'); }}>View Full Report →</button>
+            {expandedSections.quickbooks ? <FiChevronUp /> : <FiChevronDown />}
+          </div>
         </div>
         {expandedSections.quickbooks && (
           <div className="section-content">
@@ -1119,7 +928,10 @@ function Analytics({ onNavigate }) {
       <div className="analytics-section-collapsible a-reveal" ref={jobsHeadRef}>
         <div className="section-header" onClick={() => toggleSection('jobs')}>
           <h2><FiBriefcase /> Jobs Overview</h2>
-          {expandedSections.jobs ? <FiChevronUp /> : <FiChevronDown />}
+          <div className="a-section-header-right">
+            <button className="a-view-full-link" onClick={(e) => { e.stopPropagation(); setSelectedSection('jobs'); }}>View Full Report →</button>
+            {expandedSections.jobs ? <FiChevronUp /> : <FiChevronDown />}
+          </div>
         </div>
         {expandedSections.jobs && (
           <div className="section-content">
@@ -1162,7 +974,10 @@ function Analytics({ onNavigate }) {
       <div className="analytics-section-collapsible a-reveal" ref={clientsHeadRef}>
         <div className="section-header" onClick={() => toggleSection('clients')}>
           <h2><FiUsers /> Client Metrics</h2>
-          {expandedSections.clients ? <FiChevronUp /> : <FiChevronDown />}
+          <div className="a-section-header-right">
+            <button className="a-view-full-link" onClick={(e) => { e.stopPropagation(); setSelectedSection('clients'); }}>View Full Report →</button>
+            {expandedSections.clients ? <FiChevronUp /> : <FiChevronDown />}
+          </div>
         </div>
         {expandedSections.clients && (
           <div className="section-content">
@@ -1199,7 +1014,10 @@ function Analytics({ onNavigate }) {
       <div className="analytics-section-collapsible a-reveal" ref={emailsHeadRef}>
         <div className="section-header" onClick={() => toggleSection('emails')}>
           <h2><FiMail /> Email Statistics</h2>
-          {expandedSections.emails ? <FiChevronUp /> : <FiChevronDown />}
+          <div className="a-section-header-right">
+            <button className="a-view-full-link" onClick={(e) => { e.stopPropagation(); setSelectedSection('emails'); }}>View Full Report →</button>
+            {expandedSections.emails ? <FiChevronUp /> : <FiChevronDown />}
+          </div>
         </div>
         {expandedSections.emails && (
           <div className="section-content">
@@ -1235,6 +1053,8 @@ function Analytics({ onNavigate }) {
           </div>
         )}
       </div>
+      </>
+      )}
 
       <NotificationModal
         isOpen={confirmModal.isOpen}

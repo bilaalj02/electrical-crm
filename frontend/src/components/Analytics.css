@@ -15,6 +15,7 @@
   .a-trend-path,
   .a-trend-area,
   .a-bar-fill,
+  .a-detail-page,
   .a-count {
     animation: none !important;
     transition: none !important;
@@ -211,6 +212,75 @@
   font-weight: 700;
   color: #1f2937;
   margin: 0;
+}
+
+/* ---------- Section header: "View Full Report" + chevron, grouped ---------- */
+.a-section-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.a-view-full-link {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #b8941f;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 2px;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.a-view-full-link:hover {
+  color: #8a6c1d;
+  transform: translateX(2px);
+}
+
+/* ---------- Drill-down detail page ---------- */
+.a-detail-page {
+  animation: aFadeUp 0.4s cubic-bezier(.22, 1, .36, 1) forwards;
+}
+
+.a-detail-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.a-detail-back {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #1f2937;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 999px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.a-detail-back:hover {
+  background: rgba(212, 175, 55, 0.1);
+  border-color: rgba(212, 175, 55, 0.5);
+  transform: translateX(-2px);
+}
+
+.a-detail-crumb-sep {
+  color: #d1d5db;
+  font-size: 0.9rem;
+}
+
+.a-detail-crumb-current {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1f2937;
 }
 
 .a-range-select {
@@ -456,6 +526,92 @@
   color: #111827;
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Pseudo-3D extruded bar chart ---------- */
+.a-bar3d-group {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.75rem;
+  padding: 0 0.75rem;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.a-bar3d-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.a-bar3d {
+  position: relative;
+  width: 30px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.a-bar3d-front {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 30px;
+  height: 0;
+  background: linear-gradient(180deg, #e3c565, #b8941f);
+  transition: height 0.7s cubic-bezier(.22, 1, .36, 1);
+}
+
+.a-bar3d-top {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 30px;
+  height: 9px;
+  background: #f2dd9a;
+  transform: skewX(-40deg) translateX(4.5px);
+  transform-origin: bottom left;
+  transition: bottom 0.7s cubic-bezier(.22, 1, .36, 1);
+}
+
+.a-bar3d-side {
+  position: absolute;
+  bottom: 0;
+  left: 30px;
+  width: 9px;
+  height: 0;
+  background: #8a6c1d;
+  transform: skewY(-50deg) translateY(4.5px);
+  transform-origin: top left;
+  transition: height 0.7s cubic-bezier(.22, 1, .36, 1);
+}
+
+.a-bar3d-value {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #111827;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.a-bar3d-label {
+  margin-top: 2px;
+  font-size: 0.68rem;
+  color: #9ca3af;
+  max-width: 64px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .a-bar3d-front,
+  .a-bar3d-top,
+  .a-bar3d-side {
+    transition: none !important;
+  }
 }
 
 /* ---------- Card mini-sparkline (footer accent) ---------- */
