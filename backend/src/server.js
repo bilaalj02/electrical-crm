@@ -34,6 +34,7 @@ app.use(helmet());
 // and offers no protection against automated scraping/abuse.
 const allowedOrigins = [
   process.env.FRONTEND_URL,
+  'https://meselectrical-crm.vercel.app', // hardcoded as a guaranteed fallback — FRONTEND_URL on Railway turned out not to match this exactly, which took the live site's login down until this was added
   'http://localhost:5174',
   'http://localhost:5173'
 ].filter(Boolean);
