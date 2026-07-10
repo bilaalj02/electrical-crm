@@ -28,6 +28,11 @@ const calendarEventSchema = new mongoose.Schema({
     type: String,
     default: '#d4af37'
   },
+  // Linked job (when event was created from a job sync)
+  jobId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Job'
+  },
   // If synced to Google/Outlook
   googleEventId: String,
   googleEventLink: String,

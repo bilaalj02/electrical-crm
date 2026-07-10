@@ -229,10 +229,6 @@ function Calendar() {
   };
 
   const syncJobToCalendar = async (jobId) => {
-    if (!connectedAccounts.google) {
-      showToast('Please connect a Google account first to sync to calendar.', 'error');
-      return;
-    }
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(
@@ -241,8 +237,9 @@ function Calendar() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (response.data.success) {
-        showToast('Job synced to Google Calendar!', 'success');
+        showToast(response.data.message, 'success');
         await fetchJobs();
+        fetchManualEvents();
         if (response.data.eventLink) window.open(response.data.eventLink, '_blank');
       }
     } catch (error) {

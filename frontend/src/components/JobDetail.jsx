@@ -77,17 +77,15 @@ function JobDetail({ job, onClose, onEdit, onDelete, onEnterExpenses, onUpdate }
       );
 
       if (response.data.success) {
-        setCalendarMessage('Synced to Google Calendar!');
-        setTimeout(() => setCalendarMessage(''), 3000);
-
-        // Open the calendar event in a new tab
+        setCalendarMessage(response.data.message);
+        setTimeout(() => setCalendarMessage(''), 5000);
         if (response.data.eventLink) {
           window.open(response.data.eventLink, '_blank');
         }
       }
     } catch (error) {
       console.error('Error syncing to calendar:', error);
-      setCalendarMessage(error.response?.data?.message || 'Failed to sync. Make sure you have a Google account connected.');
+      setCalendarMessage(error.response?.data?.message || 'Failed to sync to calendar.');
       setTimeout(() => setCalendarMessage(''), 5000);
     } finally {
       setSyncingCalendar(false);

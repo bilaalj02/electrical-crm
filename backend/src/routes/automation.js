@@ -6,6 +6,7 @@ const { createJobEvent, updateJobEvent, deleteJobEvent } = require('../services/
 const Email = require('../models/Email');
 const Job = require('../models/Job');
 const Client = require('../models/Client');
+const CalendarEvent = require('../models/CalendarEvent');
 
 /**
  * Auto-classify emails as work-related or not using AI
@@ -200,8 +201,12 @@ router.post('/create-job-from-email', auth, async (req, res) => {
 });
 
 /**
- * Sync job to Google Calendar
+ * Sync job to calendar
  * POST /api/automation/sync-to-calendar/:jobId
+ *
+ * Always creates/updates a local CalendarEvent so the job appears on the
+ * in-app Calendar page. Also attempts Google Calendar sync if the user has
+ * a connected Gmail account — Google failure is non-fatal.
  */
 router.post('/sync-to-calendar/:jobId', auth, async (req, res) => {
   try {
@@ -215,28 +220,70 @@ router.post('/sync-to-calendar/:jobId', auth, async (req, res) => {
       return res.status(400).json({ message: 'Job must have a scheduled date to sync to calendar' });
     }
 
-    let result;
+    const scheduledDate = new Date(job.scheduledDate);
+    const endDate = new Date(scheduledDate.getTime() + 2 * 60 * 60 * 1000); // default 2hr block
+    const title = `${job.title}${job.client?.name ? ' — ' + job.client.name : ''}`;
+    const location = job.client?.address
+      ? [job.client.address.street, job.client.address.city, job.client.address.state].filter(Boolean).join(', ')
+      : '';
+    const description = `Job #${job.jobNumber}\nClient: ${job.client?.name || 'N/A'}\nPhone: ${job.client?.phone || 'N/A'}\n\n${job.description || ''}`.trim();
 
-    // Update existing event or create new one
-    if (job.calendarEventId) {
-      result = await updateJobEvent(req.user.userId, job.calendarEventId, job);
+    // --- Local calendar (always) ---
+    let localEvent = await CalendarEvent.findOne({ jobId: job._id });
+    if (localEvent) {
+      localEvent.title = title;
+      localEvent.description = description;
+      localEvent.location = location;
+      localEvent.startDate = scheduledDate;
+      localEvent.endDate = endDate;
+      await localEvent.save();
     } else {
-      result = await createJobEvent(req.user.userId, job);
+      localEvent = await CalendarEvent.create({
+        userId: req.user._id,
+        jobId: job._id,
+        title,
+        description,
+        location,
+        startDate: scheduledDate,
+        endDate,
+        color: '#3b82f6',
+      });
     }
 
-    if (!result.success) {
-      return res.status(500).json({ message: 'Failed to sync to calendar', error: result.error });
+    // --- Google Calendar (best-effort) ---
+    let googleEventLink = null;
+    let googleSynced = false;
+    try {
+      let result;
+      if (job.calendarEventId) {
+        result = await updateJobEvent(req.user.userId, job.calendarEventId, job);
+      } else {
+        result = await createJobEvent(req.user.userId, job);
+      }
+      if (result.success) {
+        job.calendarEventId = result.eventId;
+        job.calendarEventLink = result.eventLink;
+        googleEventLink = result.eventLink;
+        googleSynced = true;
+        if (localEvent) {
+          localEvent.googleEventId = result.eventId;
+          localEvent.googleEventLink = result.eventLink;
+          await localEvent.save();
+        }
+      }
+    } catch (googleErr) {
+      console.warn('Google Calendar sync skipped (no account connected or token expired):', googleErr.message);
     }
 
-    // Save calendar event details
-    job.calendarEventId = result.eventId;
-    job.calendarEventLink = result.eventLink;
     await job.save();
 
     res.json({
       success: true,
-      message: 'Job synced to Google Calendar',
-      eventLink: result.eventLink
+      message: googleSynced
+        ? 'Job synced to Google Calendar and in-app calendar'
+        : 'Job added to in-app calendar (connect Google Calendar in Integrations to also sync there)',
+      eventLink: googleEventLink,
+      googleSynced,
     });
   } catch (error) {
     console.error('Error syncing to calendar:', error);
@@ -245,7 +292,7 @@ router.post('/sync-to-calendar/:jobId', auth, async (req, res) => {
 });
 
 /**
- * Remove job from Google Calendar
+ * Remove job from calendar
  * DELETE /api/automation/remove-from-calendar/:jobId
  */
 router.delete('/remove-from-calendar/:jobId', auth, async (req, res) => {
@@ -256,24 +303,24 @@ router.delete('/remove-from-calendar/:jobId', auth, async (req, res) => {
       return res.status(404).json({ message: 'Job not found' });
     }
 
-    if (!job.calendarEventId) {
-      return res.status(400).json({ message: 'Job is not linked to a calendar event' });
+    // Remove from local calendar (always)
+    await CalendarEvent.deleteOne({ jobId: job._id });
+
+    // Remove from Google Calendar (best-effort)
+    if (job.calendarEventId) {
+      try {
+        await deleteJobEvent(req.user.userId, job.calendarEventId);
+      } catch (googleErr) {
+        console.warn('Google Calendar removal skipped:', googleErr.message);
+      }
+      job.calendarEventId = undefined;
+      job.calendarEventLink = undefined;
+      await job.save();
     }
-
-    const result = await deleteJobEvent(req.user.userId, job.calendarEventId);
-
-    if (!result.success) {
-      return res.status(500).json({ message: 'Failed to remove from calendar', error: result.error });
-    }
-
-    // Clear calendar event details
-    job.calendarEventId = undefined;
-    job.calendarEventLink = undefined;
-    await job.save();
 
     res.json({
       success: true,
-      message: 'Job removed from Google Calendar'
+      message: 'Job removed from calendar'
     });
   } catch (error) {
     console.error('Error removing from calendar:', error);
