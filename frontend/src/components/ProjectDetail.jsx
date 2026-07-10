@@ -436,7 +436,7 @@ function ProjectDetail({ projectId, onBack }) {
         </div>
       </div>
 
-      {/* View Tabs */}
+      {/* View Tabs + Upload Button */}
       <div className="view-tabs">
         <button
           className={`view-tab ${currentView === 'grid' ? 'active' : ''}`}
@@ -570,6 +570,10 @@ function ProjectDetail({ projectId, onBack }) {
                     />
                   </div>
                 </div>
+                <label className="btn-primary" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <FiUpload /> Upload Photos
+                  <input type="file" multiple accept="image/*" onChange={handleFileSelect} style={{ display: 'none' }} />
+                </label>
               </div>
 
               <div className="category-filter">
