@@ -36,6 +36,9 @@
   padding: 3rem 1.5rem 2.5rem;
   background: linear-gradient(180deg, rgba(212, 175, 55, 0.06) 0%, rgba(245, 247, 250, 0) 70%);
   perspective: 1400px;
+  cursor: default;
+  --spot-x: 50%;
+  --spot-y: 40%;
 }
 
 .analytics-hero-glow {
@@ -97,27 +100,48 @@
 @keyframes aBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
 .analytics-hero-title {
+  position: relative;
   font-size: clamp(2.75rem, 8vw, 5.5rem);
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.02em;
   margin: 0;
-  color: #1f2937;
-  background: linear-gradient(180deg, #3d3320 0%, #1f2937 55%, #1f2937 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: #0d0f14;
   text-shadow:
-    0 1px 0 rgba(212, 175, 55, 0.5),
-    0 2px 0 rgba(212, 175, 55, 0.45),
-    0 3px 0 rgba(212, 175, 55, 0.4),
-    0 4px 0 rgba(212, 175, 55, 0.32),
-    0 5px 0 rgba(212, 175, 55, 0.24),
-    0 8px 16px rgba(31, 41, 55, 0.18),
-    0 16px 32px rgba(212, 175, 55, 0.12);
+    0 1px 0 rgba(212, 175, 55, 0.55),
+    0 2px 0 rgba(212, 175, 55, 0.4),
+    0 0 22px rgba(212, 175, 55, 0.5),
+    0 0 46px rgba(212, 175, 55, 0.32),
+    0 0 80px rgba(212, 175, 55, 0.2),
+    0 10px 24px rgba(0, 0, 0, 0.18);
   transform: perspective(1200px) rotateX(-38deg) translateY(24px) scale(0.85);
   opacity: 0;
   animation: aTitleIn 1s cubic-bezier(.16, 1, .3, 1) 0.1s forwards;
+}
+
+/* Cursor-following gold radiance — a second copy of the same text, clipped
+   and lit only where the mouse is (via --spot-x/--spot-y, written in JS),
+   blended softly on top of the black text beneath it. */
+.analytics-hero-title::after {
+  content: 'ANALYTICS';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at var(--spot-x, 50%) var(--spot-y, 40%),
+    rgba(212, 175, 55, 0.9) 0%,
+    rgba(212, 175, 55, 0.4) 22%,
+    rgba(212, 175, 55, 0) 45%
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  mix-blend-mode: soft-light;
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .analytics-hero-title::after { display: none; }
 }
 
 @keyframes aTitleIn {

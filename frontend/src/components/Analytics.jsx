@@ -117,13 +117,18 @@ function useHeroMotion() {
       const scrollOpacity = 1 - scrolledPast * 0.85;
       const scrollLift = scrolledPast * -40;
 
-      const tiltY = (mouseX - 0.5) * 10;
-      const tiltX = (0.5 - mouseY) * 6;
+      const tiltY = (mouseX - 0.5) * 34;
+      const tiltX = (0.5 - mouseY) * 20;
 
       inner.style.transform =
         `translateY(${scrollLift}px) scale(${Math.max(0.7, scrollScale)}) ` +
         `rotateX(${(scrollRotate + tiltX).toFixed(2)}deg) rotateY(${tiltY.toFixed(2)}deg)`;
       inner.style.opacity = Math.max(0, scrollOpacity).toFixed(2);
+
+      // Cursor-following metallic shine on the title text (a ::after clipped
+      // to the same text, brightened where the mouse is via these vars).
+      hero.style.setProperty('--spot-x', `${(mouseX * 100).toFixed(1)}%`);
+      hero.style.setProperty('--spot-y', `${(mouseY * 100).toFixed(1)}%`);
     };
 
     const requestApply = () => {
@@ -446,8 +451,12 @@ function Analytics({ onNavigate }) {
   const pendingCardRef = useTilt();
   const profitCardRef = useTilt();
   const clientsCardRef = useTilt();
+  const clientsActiveCardRef = useTilt();
   const emailsCardRef = useTilt();
   const workRef = useTilt();
+  const jobsTotalCardRef = useTilt();
+  const jobsCompletedCardRef = useTilt();
+  const jobsActiveCardRef = useTilt();
   const jobsHeadRef = useReveal();
   const clientsHeadRef = useReveal();
   const emailsHeadRef = useReveal();
@@ -577,9 +586,23 @@ function Analytics({ onNavigate }) {
     .filter((s) => s._id)
     .map((s) => ({ label: s._id.replace(/-/g, ' '), value: s.count, color: STATUS_COLORS[s._id] || FALLBACK_COLOR }));
 
+  // jobs/stats has no completedJobs/activeJobs fields (that was the source of
+  // the NaN% bug) — derive real counts from byStatus instead.
+  const jobsByStatusMap = Object.fromEntries((stats.jobs?.byStatus || []).map((s) => [s._id, s.count]));
+  const completedJobsCount = jobsByStatusMap['completed'] || 0;
+  const activeJobsCount = (jobsByStatusMap['in-progress'] || 0) + (jobsByStatusMap['scheduled'] || 0) + (jobsByStatusMap['approved'] || 0);
+  const completionPct = getPercentage(completedJobsCount, stats.jobs?.total);
+
   const clientTypeRows = (stats.clients?.byType || [])
     .filter((t) => t._id)
     .map((t) => ({ label: t._id, value: t.count }));
+
+  const emailSegments = stats.emails
+    ? [
+        { label: 'work related', value: stats.emails.workRelated || 0, color: '#3b82f6' },
+        { label: 'not classified', value: stats.emails.notClassified || 0, color: '#9ca3af' }
+      ].filter((s) => s.value > 0)
+    : [];
 
   // QuickBooks's own numbers — pulled live from QBO, not from whatever's
   // already been synced into Client/Job — kept separate from the CRM-derived
@@ -755,23 +778,37 @@ function Analytics({ onNavigate }) {
         </div>
         {expandedSections.jobs && (
           <div className="section-content">
-            <div className="status-breakdown">
-              <h3>Jobs by Status</h3>
-              <div className="status-bar">
-                <div
-                  className="status-fill completed"
-                  style={{ width: `${getPercentage(stats.jobs?.completedJobs, stats.jobs?.total)}%` }}
-                  title={`Completed: ${stats.jobs?.completedJobs || 0}`}
-                >
-                  {getPercentage(stats.jobs?.completedJobs, stats.jobs?.total)}%
+            <div className="dashboard-grid">
+              <div className="dashboard-card a-tilt" ref={jobsTotalCardRef}>
+                <div className="card-header">
+                  <div className="card-icon gold"><FiBriefcase /></div>
+                  <div className="card-title"><h3>Total Jobs</h3><p>All Time</p></div>
                 </div>
+                <div className="card-value"><AnimatedNumber to={stats.jobs?.total || 0} /></div>
               </div>
-              <div className="status-legend">
-                <span>Completed: {stats.jobs?.completedJobs || 0}</span>
-                <span>Active: {stats.jobs?.activeJobs || 0}</span>
-                <span>Total: {stats.jobs?.total || 0}</span>
+
+              <div className="dashboard-card a-tilt" ref={jobsCompletedCardRef}>
+                <div className="card-header">
+                  <div className="card-icon green"><FiTrendingUp /></div>
+                  <div className="card-title"><h3>Completed</h3><p>{completionPct}% completion rate</p></div>
+                </div>
+                <div className="card-value"><AnimatedNumber to={completedJobsCount} /></div>
+              </div>
+
+              <div className="dashboard-card a-tilt" ref={jobsActiveCardRef}>
+                <div className="card-header">
+                  <div className="card-icon orange"><FiBarChart2 /></div>
+                  <div className="card-title"><h3>Active</h3><p>Scheduled + In Progress</p></div>
+                </div>
+                <div className="card-value"><AnimatedNumber to={activeJobsCount} /></div>
               </div>
             </div>
+
+            {statusSegments.length > 0 && (
+              <div style={{ marginTop: '1.25rem' }}>
+                <BarChart title="Jobs by Status" rows={statusSegments} />
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -791,8 +828,16 @@ function Analytics({ onNavigate }) {
                   <div className="card-title"><h3>Total Clients</h3><p>Database</p></div>
                 </div>
                 <div className="card-value"><AnimatedNumber to={stats.clients?.total || 0} /></div>
+              </div>
+
+              <div className="dashboard-card a-tilt" ref={clientsActiveCardRef}>
+                <div className="card-header">
+                  <div className="card-icon green"><FiTrendingUp /></div>
+                  <div className="card-title"><h3>Active vs Prospects</h3><p>Current Pipeline</p></div>
+                </div>
+                <div className="card-value"><AnimatedNumber to={stats.clients?.active || 0} /></div>
                 <div className="card-footer">
-                  <span>{stats.clients?.active || 0} active clients</span>
+                  <span>{stats.clients?.prospects || 0} prospects</span>
                 </div>
               </div>
             </div>
@@ -836,6 +881,12 @@ function Analytics({ onNavigate }) {
                 </div>
               </div>
             </div>
+
+            {emailSegments.length > 0 && (
+              <div className="a-charts-grid-secondary" style={{ marginTop: '1.25rem' }}>
+                <DonutChart title="Email Classification" segments={emailSegments} />
+              </div>
+            )}
           </div>
         )}
       </div>
