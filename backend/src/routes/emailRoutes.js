@@ -1,13 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const Email = require('../models/Email');
+const { auth } = require('../middleware/auth');
 // const emailSyncService = require('../services/emailSyncService'); // Disabled - using new OAuth system
 
 /**
  * GET /api/emails
  * Get all emails with filtering and pagination
  */
-router.get('/', async (req, res) => {
+router.get('/', auth, async (req, res) => {
   try {
     const {
       page = 1,
@@ -99,7 +100,7 @@ router.get('/', async (req, res) => {
  * GET /api/emails/:id
  * Get a single email by ID
  */
-router.get('/:id', async (req, res) => {
+router.get('/:id', auth, async (req, res) => {
   try {
     const email = await Email.findById(req.params.id);
 
@@ -118,7 +119,7 @@ router.get('/:id', async (req, res) => {
  * PATCH /api/emails/:id
  * Update email (mark as read, classify, link to job, etc.)
  */
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', auth, async (req, res) => {
   try {
     const { isRead, isStarred, isWorkRelated, jobId } = req.body;
 
@@ -149,7 +150,7 @@ router.patch('/:id', async (req, res) => {
  * POST /api/emails/sync
  * Trigger email sync for all accounts
  */
-router.post('/sync', async (req, res) => {
+router.post('/sync', auth, async (req, res) => {
   try {
     // Old sync disabled - use new OAuth system: /api/email-sync/sync/:accountId
     res.status(501).json({
@@ -166,7 +167,7 @@ router.post('/sync', async (req, res) => {
  * POST /api/emails/sync/:accountType
  * Trigger email sync for a specific account
  */
-router.post('/sync/:accountType', async (req, res) => {
+router.post('/sync/:accountType', auth, async (req, res) => {
   try {
     // Old sync disabled - use new OAuth system
     res.status(501).json({
@@ -183,7 +184,7 @@ router.post('/sync/:accountType', async (req, res) => {
  * GET /api/emails/stats/summary
  * Get email statistics
  */
-router.get('/stats/summary', async (req, res) => {
+router.get('/stats/summary', auth, async (req, res) => {
   try {
     const total = await Email.countDocuments();
     const unread = await Email.countDocuments({ isRead: false });
@@ -228,7 +229,7 @@ router.get('/stats/summary', async (req, res) => {
  * POST /api/emails/send
  * Send an email through a connected account
  */
-router.post('/send', async (req, res) => {
+router.post('/send', auth, async (req, res) => {
   try {
     const { accountId, to, cc, subject, body } = req.body;
 

@@ -1,9 +1,9 @@
-const crypto = require('crypto');
 const OAuthClient = require('intuit-oauth');
 const QuickBooks = require('node-quickbooks');
 const Integration = require('../models/Integration');
 const { encrypt, decrypt } = require('./oauthController');
 const { logIntegrationError } = require('../utils/errorLog');
+const { signState, verifyState } = require('../utils/oauthState');
 
 const getOAuthClient = () => {
   return new OAuthClient({
@@ -13,42 +13,6 @@ const getOAuthClient = () => {
     redirectUri: process.env.QUICKBOOKS_REDIRECT_URI
   });
 };
-
-// ---- CSRF-safe OAuth `state` parameter ----
-// The state param round-trips through Intuit's servers, so it must be
-// unforgeable: signed with a server-only secret and time-boxed, not just
-// the raw userId (which an attacker could guess and use to forge a
-// callback that links their QuickBooks company to another user's account).
-const STATE_TTL_MS = 15 * 60 * 1000; // 15 minutes — long enough for a real login, short enough to block replay
-
-function signState(userId) {
-  const nonce = crypto.randomBytes(16).toString('hex');
-  const timestamp = Date.now().toString();
-  const payload = `${userId}.${nonce}.${timestamp}`;
-  const signature = crypto.createHmac('sha256', process.env.ENCRYPTION_KEY).update(payload).digest('hex');
-  return `${payload}.${signature}`;
-}
-
-// Returns the verified userId, or null if the state is missing, malformed,
-// expired, or the signature doesn't match (forged/tampered — a CSRF attempt
-// on the OAuth callback).
-function verifyState(state) {
-  if (!state || typeof state !== 'string') return null;
-  const parts = state.split('.');
-  if (parts.length !== 4) return null;
-  const [userId, nonce, timestamp, signature] = parts;
-
-  const payload = `${userId}.${nonce}.${timestamp}`;
-  const expectedSignature = crypto.createHmac('sha256', process.env.ENCRYPTION_KEY).update(payload).digest('hex');
-
-  const sigBuf = Buffer.from(signature, 'hex');
-  const expectedBuf = Buffer.from(expectedSignature, 'hex');
-  if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) return null;
-
-  if (Date.now() - Number(timestamp) > STATE_TTL_MS) return null;
-
-  return userId;
-}
 
 // Marks an integration as needing the user to reconnect (distinct from a
 // deliberate disconnect) and returns a typed error that routes/frontend can

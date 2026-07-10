@@ -2,6 +2,7 @@ const { google } = require('googleapis');
 const EmailAccount = require('../models/EmailAccount');
 const CryptoJS = require('crypto-js');
 const axios = require('axios');
+const { signState, verifyState } = require('../utils/oauthState');
 
 // Encryption helper functions
 const encrypt = (text) => {
@@ -40,7 +41,7 @@ const getGmailAuthUrl = (req, res) => {
       access_type: 'offline',
       scope: scopes,
       prompt: 'consent',
-      state: req.user._id.toString()
+      state: signState(req.user._id.toString())
     });
 
     res.json({ authUrl });
@@ -70,7 +71,7 @@ const getGoogleAuthUrl = (req, res) => {
       access_type: 'offline',
       scope: scopes,
       prompt: 'consent',
-      state: req.user._id.toString()
+      state: signState(req.user._id.toString())
     });
 
     res.json({ authUrl });
@@ -88,7 +89,12 @@ const handleGoogleCallback = (req, res) => handleGmailCallback(req, res);
 const handleGmailCallback = async (req, res) => {
   try {
     const { code, state } = req.query;
-    const userId = state;
+    const userId = verifyState(state);
+
+    if (!userId) {
+      console.error('Gmail/Google OAuth callback rejected: invalid or expired state (possible CSRF attempt)');
+      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5174'}?error=invalid_state`);
+    }
 
     if (!code) {
       return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5174'}?error=no_code`);
@@ -229,7 +235,7 @@ const getMicrosoftAuthUrl = (req, res) => {
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
       `&response_mode=query` +
       `&scope=${encodeURIComponent(scopes.join(' '))}` +
-      `&state=${userId}` +
+      `&state=${signState(userId)}` +
       `&prompt=consent`;
 
     res.json({ authUrl });
@@ -243,11 +249,16 @@ const getMicrosoftAuthUrl = (req, res) => {
 const handleMicrosoftCallback = async (req, res) => {
   try {
     const { code, state, error, error_description } = req.query;
-    const userId = state;
 
     if (error) {
       console.error('Microsoft OAuth error:', error, error_description);
       return res.redirect(`${process.env.FRONTEND_URL}?error=${error}`);
+    }
+
+    const userId = verifyState(state);
+    if (!userId) {
+      console.error('Microsoft OAuth callback rejected: invalid or expired state (possible CSRF attempt)');
+      return res.redirect(`${process.env.FRONTEND_URL}?error=invalid_state`);
     }
 
     if (!code) {
