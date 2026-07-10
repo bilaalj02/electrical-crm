@@ -27,26 +27,24 @@ app.set('trust proxy', 1); // Railway sits behind a proxy — needed for rate-li
 
 app.use(helmet());
 
-// CORS: only the real frontend origins, not a wildcard — the API is
-// authenticated with a Bearer token (not cookies), so wildcard CORS doesn't
-// enable classic cookie-based CSRF, but it does let any website make
-// requests using a token it obtained some other way (e.g. XSS elsewhere),
-// and offers no protection against automated scraping/abuse.
 const allowedOrigins = [
   process.env.FRONTEND_URL,
-  'https://meselectrical-crm.vercel.app', // hardcoded as a guaranteed fallback — FRONTEND_URL on Railway turned out not to match this exactly, which took the live site's login down until this was added
+  'https://meselectrical-crm.vercel.app',
   'http://localhost:5174',
-  'http://localhost:5173'
+  'http://localhost:5173',
+  'http://localhost:3000',
 ].filter(Boolean);
+
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
     callback(new Error('Not allowed by CORS'));
-  }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// Brute-force protection on login — the only unauthenticated endpoint where
-// an attacker gets to guess a secret. 10 attempts per 15 min per IP.
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
@@ -56,8 +54,6 @@ const loginLimiter = rateLimit({
 });
 app.use('/api/auth/login', loginLimiter);
 
-// General abuse/DoS guardrail on everything else — generous enough to
-// never bother a real user, just to stop unbounded scripted abuse.
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 1000,

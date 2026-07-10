@@ -429,11 +429,6 @@ function Jobs({ initialJobId, onConsumeInitial }) {
             fetchJobs();
             fetchStats();
           }}
-          onEnterExpenses={(job) => {
-            setJobForExpenses(job);
-            setExpenseModalOpen(true);
-            setSelectedJob(null);
-          }}
         />
       )}
 
