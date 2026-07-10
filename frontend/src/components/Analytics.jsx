@@ -199,11 +199,12 @@ function AnimatedNumber({ to = 0, prefix = '', decimals = 0, duration = 1200 }) 
 }
 
 // ---------- Chart: animated revenue trend (line + area) ----------
-function TrendChart({ points, title = 'Revenue Trend' }) {
+function TrendChart({ points, title = 'Revenue Trend', headerExtra }) {
   const revealRef = useReveal();
   const pathRef = useRef(null);
   const [tooltip, setTooltip] = useState(null);
   const [drawn, setDrawn] = useState(false);
+  const hasRevealedRef = useRef(false);
 
   const width = 560, height = 200, padX = 24, padY = 24;
   const max = Math.max(1, ...points.map((p) => p.value));
@@ -216,21 +217,26 @@ function TrendChart({ points, title = 'Revenue Trend' }) {
   const linePath = coords.map((c, i) => `${i === 0 ? 'M' : 'L'} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`).join(' ');
   const areaPath = `${linePath} L ${coords[coords.length - 1]?.x.toFixed(1) || padX} ${height - padY} L ${padX} ${height - padY} Z`;
 
+  const playDrawIn = useCallback((duration = 1.1) => {
+    const path = pathRef.current;
+    if (!path || prefersReducedMotion()) return;
+    const len = path.getTotalLength();
+    path.style.transition = 'none';
+    path.style.strokeDasharray = `${len}`;
+    path.style.strokeDashoffset = `${len}`;
+    path.getBoundingClientRect(); // force reflow so the transition actually starts from the offset value
+    path.style.transition = `stroke-dashoffset ${duration}s cubic-bezier(.22,1,.36,1)`;
+    path.style.strokeDashoffset = '0';
+  }, []);
+
   useEffect(() => {
     const el = revealRef.current;
     if (!el) return;
     const io = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
-          const path = pathRef.current;
-          if (path && !prefersReducedMotion()) {
-            const len = path.getTotalLength();
-            path.style.strokeDasharray = `${len}`;
-            path.style.strokeDashoffset = `${len}`;
-            path.getBoundingClientRect(); // force reflow so the transition actually starts from the offset value
-            path.style.transition = 'stroke-dashoffset 1.1s cubic-bezier(.22,1,.36,1)';
-            path.style.strokeDashoffset = '0';
-          }
+          hasRevealedRef.current = true;
+          playDrawIn(1.1);
           setTimeout(() => setDrawn(true), prefersReducedMotion() ? 0 : 400);
           io.unobserve(el);
         }
@@ -241,11 +247,25 @@ function TrendChart({ points, title = 'Revenue Trend' }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Re-plays the draw-in whenever the underlying data actually changes (e.g.
+  // a time-range dropdown swapping 3/6/12 months) — the chart "reforms"
+  // instead of silently snapping to the new shape.
+  const pointsKey = points.map((p) => `${p.label}:${p.value}`).join('|');
+  const prevKeyRef = useRef(pointsKey);
+  useEffect(() => {
+    if (!hasRevealedRef.current || prevKeyRef.current === pointsKey) {
+      prevKeyRef.current = pointsKey;
+      return;
+    }
+    prevKeyRef.current = pointsKey;
+    playDrawIn(0.8);
+  }, [pointsKey, playDrawIn]);
+
   return (
     <div className="a-chart-card a-reveal" ref={revealRef} style={{ position: 'relative' }}>
       <div className="a-chart-head">
         <h3><FiTrendingUp style={{ verticalAlign: '-2px', marginRight: 6, color: '#d4af37' }} />{title}</h3>
-        <span>Last {points.length} months</span>
+        {headerExtra || <span>Last {points.length} months</span>}
       </div>
       <svg className="a-trend-svg" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet">
         <defs>
@@ -438,6 +458,7 @@ function Analytics({ onNavigate }) {
   const [loading, setLoading] = useState(true);
   const [qbData, setQbData] = useState(null);
   const [qbLoading, setQbLoading] = useState(true);
+  const [revenueRange, setRevenueRange] = useState(6);
   const [expandedSections, setExpandedSections] = useState({
     revenue: true,
     quickbooks: true,
@@ -451,6 +472,7 @@ function Analytics({ onNavigate }) {
   const revenueCardRef = useTilt();
   const pendingCardRef = useTilt();
   const profitCardRef = useTilt();
+  const avgJobValueCardRef = useTilt();
   const clientsCardRef = useTilt();
   const clientsActiveCardRef = useTilt();
   const emailsCardRef = useTilt();
@@ -526,149 +548,287 @@ function Analytics({ onNavigate }) {
       const pageH = pdf.internal.pageSize.getHeight();
       const margin = 16;
       const contentW = pageW - margin * 2;
+      const headerH = 26;
+      const footerH = 14;
       let y = margin;
 
       const gold = [212, 175, 55];
-      const dark = [31, 41, 55];
+      const goldDark = [184, 148, 31];
+      const dark = [26, 32, 44];
       const gray = [107, 114, 128];
-
-      const ensureSpace = (needed) => {
-        if (y + needed > pageH - margin) {
-          pdf.addPage();
-          y = margin;
-        }
-      };
+      const lightGray = [243, 244, 246];
+      const white = [255, 255, 255];
+      const red = [220, 38, 38];
+      const green = [16, 185, 129];
 
       const money = (n) => `$${Math.round(n || 0).toLocaleString()}`;
 
-      const addSectionHeader = (title) => {
-        ensureSpace(14);
-        y += 4;
+      // Reusable page chrome — every page (including the cover) gets the same
+      // header band and footer, so ensureSpace() can add a page mid-section
+      // without the report losing its branding partway through.
+      const drawHeader = (subtitle = 'Detailed Breakdown') => {
+        pdf.setFillColor(...dark);
+        pdf.rect(0, 0, pageW, headerH, 'F');
+        pdf.setFillColor(...gold);
+        pdf.rect(0, headerH, pageW, 1, 'F');
+        pdf.setFontSize(15);
+        pdf.setFont(undefined, 'bold');
+        pdf.setTextColor(...gold);
+        pdf.text('MES Electrical', margin, 12);
+        pdf.setFontSize(9.5);
+        pdf.setFont(undefined, 'normal');
+        pdf.setTextColor(...white);
+        pdf.text(subtitle, margin, 19);
+        pdf.setFontSize(8);
+        pdf.setTextColor(210, 210, 210);
+        const generatedOn = new Date().toLocaleDateString('en-US', { dateStyle: 'medium' });
+        pdf.text(`Generated ${generatedOn}`, pageW - margin, 12, { align: 'right' });
+      };
+
+      const drawFooter = () => {
+        const pageCount = pdf.internal.getNumberOfPages();
+        const current = pdf.internal.getCurrentPageInfo().pageNumber;
+        pdf.setDrawColor(220, 220, 220);
+        pdf.setLineWidth(0.2);
+        pdf.line(margin, pageH - footerH, pageW - margin, pageH - footerH);
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(...gray);
+        pdf.text('MES Electrical CRM — Confidential', margin, pageH - 7);
+        pdf.text(`Page ${current} of ${pageCount}`, pageW - margin, pageH - 7, { align: 'right' });
+      };
+
+      const ensureSpace = (needed, subtitle) => {
+        if (y + needed > pageH - footerH) {
+          pdf.addPage();
+          drawHeader(subtitle);
+          y = headerH + 10;
+        }
+      };
+
+      const addSectionHeader = (title, subtitle) => {
+        ensureSpace(16, subtitle);
+        y += 3;
+        pdf.setFillColor(...gold);
+        pdf.rect(margin, y - 4, 3, 6, 'F');
         pdf.setFontSize(13);
         pdf.setFont(undefined, 'bold');
         pdf.setTextColor(...dark);
-        pdf.text(title, margin, y);
-        pdf.setDrawColor(...gold);
-        pdf.setLineWidth(0.6);
-        pdf.line(margin, y + 2, pageW - margin, y + 2);
-        y += 8;
+        pdf.text(title, margin + 6, y);
+        pdf.setDrawColor(225, 225, 225);
+        pdf.setLineWidth(0.3);
+        pdf.line(margin, y + 3, pageW - margin, y + 3);
+        y += 9;
       };
 
-      const addRow = (label, value) => {
-        ensureSpace(7);
-        pdf.setFontSize(10);
+      const addRow = (label, value, opts = {}) => {
+        ensureSpace(7.5, opts.subtitle);
+        if (opts.shaded) {
+          pdf.setFillColor(...lightGray);
+          pdf.rect(margin, y - 4.2, contentW, 6.6, 'F');
+        }
+        pdf.setFontSize(9.5);
         pdf.setFont(undefined, 'normal');
         pdf.setTextColor(...gray);
-        pdf.text(label, margin, y);
+        pdf.text(String(label), margin + 2, y);
         pdf.setFont(undefined, 'bold');
-        pdf.setTextColor(...dark);
-        pdf.text(String(value), pageW - margin, y, { align: 'right' });
-        y += 6.5;
+        pdf.setTextColor(...(opts.color || dark));
+        pdf.text(String(value), pageW - margin - 2, y, { align: 'right' });
+        y += 6.6;
       };
 
-      const addBarRow = (label, value, max, displayValue) => {
+      const addBarRow = (label, value, max, displayValue, color) => {
         ensureSpace(8);
-        pdf.setFontSize(9);
+        pdf.setFontSize(8.5);
         pdf.setFont(undefined, 'normal');
         pdf.setTextColor(...dark);
-        pdf.text(String(label), margin, y + 3);
-        const barX = margin + 42;
-        const barW = contentW - 42 - 16;
-        pdf.setFillColor(245, 235, 210);
-        pdf.rect(barX, y, barW, 4, 'F');
-        const fillW = max > 0 ? Math.max(1, (value / max) * barW) : 0;
-        pdf.setFillColor(...gold);
-        pdf.rect(barX, y, fillW, 4, 'F');
+        const labelText = String(label).length > 24 ? String(label).slice(0, 23) + '…' : String(label);
+        pdf.text(labelText, margin, y + 3);
+        const barX = margin + 44;
+        const barW = contentW - 44 - 18;
+        pdf.setFillColor(...lightGray);
+        pdf.roundedRect(barX, y, barW, 4, 1, 1, 'F');
+        const fillW = max > 0 ? Math.max(2, (value / max) * barW) : 0;
+        pdf.setFillColor(...(color || gold));
+        pdf.roundedRect(barX, y, fillW, 4, 1, 1, 'F');
+        pdf.setFontSize(8.5);
         pdf.setFont(undefined, 'bold');
+        pdf.setTextColor(...dark);
         pdf.text(String(displayValue ?? value), pageW - margin, y + 3, { align: 'right' });
         y += 7.5;
       };
 
-      // ---------- Header ----------
-      pdf.setFillColor(...dark);
-      pdf.rect(0, 0, pageW, 24, 'F');
-      pdf.setFontSize(16);
-      pdf.setFont(undefined, 'bold');
-      pdf.setTextColor(...gold);
-      pdf.text('MES Electrical', margin, 14);
-      pdf.setFontSize(10);
-      pdf.setFont(undefined, 'normal');
-      pdf.setTextColor(255, 255, 255);
-      pdf.text('Analytics Report', margin, 20);
-      pdf.setFontSize(9);
-      pdf.setTextColor(230, 230, 230);
-      const generatedOn = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
-      pdf.text(`Generated ${generatedOn}`, pageW - margin, 14, { align: 'right' });
-      y = 32;
+      // A KPI tile grid for the executive summary — the "most important
+      // things first" the user asked for, sized for 3-per-row on Letter.
+      const addKPIGrid = (tiles) => {
+        const cols = 3;
+        const gap = 5;
+        const tileW = (contentW - gap * (cols - 1)) / cols;
+        const tileH = 26;
+        tiles.forEach((tile, i) => {
+          const col = i % cols;
+          if (col === 0 && i > 0) y += tileH + gap;
+          ensureSpace(tileH + gap);
+          const x = margin + col * (tileW + gap);
+          pdf.setFillColor(...dark);
+          pdf.roundedRect(x, y, tileW, tileH, 2, 2, 'F');
+          pdf.setFillColor(...(tile.accent || gold));
+          pdf.rect(x, y, tileW, 1.4, 'F');
+          pdf.setFontSize(8);
+          pdf.setFont(undefined, 'normal');
+          pdf.setTextColor(200, 200, 200);
+          pdf.text(tile.label, x + 4, y + 8);
+          pdf.setFontSize(15);
+          pdf.setFont(undefined, 'bold');
+          pdf.setTextColor(...(tile.accent || gold));
+          pdf.text(tile.value, x + 4, y + 17);
+          if (tile.sub) {
+            pdf.setFontSize(7.5);
+            pdf.setFont(undefined, 'normal');
+            pdf.setTextColor(190, 190, 190);
+            pdf.text(tile.sub, x + 4, y + 22.5);
+          }
+        });
+        y += tileH + 10;
+      };
 
-      // ---------- Revenue Analytics ----------
-      addSectionHeader('Revenue Analytics');
-      addRow('Total Revenue (All Time)', money(stats.jobs?.totalRevenue));
+      // ================= COVER / EXECUTIVE SUMMARY =================
+      drawHeader('Performance Report — Executive Summary');
+      y = headerH + 14;
+
+      pdf.setFontSize(18);
+      pdf.setFont(undefined, 'bold');
+      pdf.setTextColor(...dark);
+      pdf.text('Executive Summary', margin, y);
+      y += 8;
+
+      const overdueCount = qbData?.connected ? (qbData.invoiceBreakdown?.overdue || 0) : 0;
+      const outstanding = qbData?.connected ? (qbData.outstandingTotal || 0) : (stats.jobs?.pendingRevenue || 0);
+      const narrative =
+        `${stats.jobs?.total || 0} total jobs on record, ${completedJobsCount} completed ` +
+        `(${completionPct}% completion rate) for ${money(stats.jobs?.totalRevenue)} in revenue at a ` +
+        `${profitability.avgProfitMargin.toFixed(1)}% average profit margin. ` +
+        `${money(outstanding)} is currently outstanding` +
+        (overdueCount > 0 ? `, including ${overdueCount} overdue invoice${overdueCount === 1 ? '' : 's'} that need follow-up.` : '.');
+      pdf.setFontSize(10.5);
+      pdf.setFont(undefined, 'normal');
+      pdf.setTextColor(...gray);
+      const narrativeLines = pdf.splitTextToSize(narrative, contentW);
+      pdf.text(narrativeLines, margin, y);
+      y += narrativeLines.length * 5.5 + 6;
+
+      addKPIGrid([
+        { label: 'TOTAL REVENUE', value: money(stats.jobs?.totalRevenue), sub: 'All time' },
+        { label: 'OUTSTANDING A/R', value: money(outstanding), sub: overdueCount > 0 ? `${overdueCount} overdue` : 'On track', accent: overdueCount > 0 ? red : gold },
+        { label: 'AVG PROFIT MARGIN', value: `${profitability.avgProfitMargin.toFixed(1)}%`, sub: `${money(profitability.totalProfit)} profit` },
+        { label: 'JOB COMPLETION', value: `${completionPct}%`, sub: `${completedJobsCount} of ${stats.jobs?.total || 0} jobs` },
+        { label: 'ACTIVE PIPELINE', value: String(activeJobsCount), sub: 'Scheduled + in progress' },
+        { label: 'ACTIVE CLIENTS', value: String(stats.clients?.active || 0), sub: `${stats.clients?.prospects || 0} prospects` }
+      ]);
+
+      pdf.setFontSize(11);
+      pdf.setFont(undefined, 'bold');
+      pdf.setTextColor(...dark);
+      pdf.text('What this report covers', margin, y);
+      y += 6;
+      ['Revenue Analytics — monthly trend, margins, and pending revenue',
+       'QuickBooks Financials — live income, expenses, and receivables (if connected)',
+       'Jobs Overview — full status breakdown and completion metrics',
+       'Client Metrics — active pipeline and client mix',
+       'Email Statistics — inbound volume and work-related classification'
+      ].forEach((line) => {
+        ensureSpace(6);
+        pdf.setFontSize(9.5);
+        pdf.setFont(undefined, 'normal');
+        pdf.setTextColor(...gray);
+        pdf.text(`•  ${line}`, margin + 2, y);
+        y += 5.5;
+      });
+
+      // ================= DETAILED BREAKDOWN =================
+      pdf.addPage();
+      drawHeader('Detailed Breakdown');
+      y = headerH + 12;
+
+      addSectionHeader('Revenue Analytics', 'Detailed Breakdown');
+      addRow('Total Revenue (All Time)', money(stats.jobs?.totalRevenue), { shaded: true });
       addRow('Pending Revenue (In Progress)', money(stats.jobs?.pendingRevenue));
-      addRow('Unpaid Invoices', stats.jobs?.unpaidInvoices || 0);
+      addRow('Unpaid Invoices', stats.jobs?.unpaidInvoices || 0, { shaded: true });
       addRow('Avg Profit Margin', `${profitability.avgProfitMargin.toFixed(1)}%`);
-      addRow('Profit (Completed Jobs)', money(profitability.totalProfit));
-      y += 2;
+      addRow('Profit (Completed Jobs)', money(profitability.totalProfit), { shaded: true, color: green });
+      y += 3;
       if (monthlyRevenue.length > 0) {
+        pdf.setFontSize(9);
+        pdf.setFont(undefined, 'bold');
+        pdf.setTextColor(...gray);
+        pdf.text('MONTHLY TREND', margin, y);
+        y += 5;
         const maxRev = Math.max(1, ...monthlyRevenue.map((m) => m.value));
         monthlyRevenue.forEach((m) => addBarRow(m.label, m.value, maxRev, money(m.value)));
       }
 
-      // ---------- QuickBooks Financials ----------
       if (qbData?.connected && !qbData?.reconnectRequired) {
-        addSectionHeader('QuickBooks Financials (Live)');
-        addRow('Total Income (Last 6 Months)', money(qbTotalIncome));
+        addSectionHeader('QuickBooks Financials (Live)', 'Detailed Breakdown');
+        addRow('Total Income (Last 6 Months)', money(qbTotalIncome), { shaded: true, color: green });
         addRow('Total Expenses (Last 6 Months)', money(qbTotalExpenses));
-        addRow('Outstanding A/R', money(qbData.outstandingTotal));
+        addRow('Outstanding A/R', money(qbData.outstandingTotal), { shaded: true, color: qbData.outstandingTotal > 0 ? red : dark });
         if (qbData.invoiceBreakdown) {
           addRow('Invoices — Paid', qbData.invoiceBreakdown.paid || 0);
-          addRow('Invoices — Open', qbData.invoiceBreakdown.open || 0);
-          addRow('Invoices — Overdue', qbData.invoiceBreakdown.overdue || 0);
+          addRow('Invoices — Open', qbData.invoiceBreakdown.open || 0, { shaded: true });
+          addRow('Invoices — Overdue', qbData.invoiceBreakdown.overdue || 0, { color: qbData.invoiceBreakdown.overdue > 0 ? red : dark });
         }
         if (qbTopCustomerRows.length > 0) {
-          y += 2;
+          y += 3;
+          pdf.setFontSize(9);
+          pdf.setFont(undefined, 'bold');
+          pdf.setTextColor(...gray);
+          pdf.text('TOP CUSTOMERS', margin, y);
+          y += 5;
           const maxCust = Math.max(1, ...qbTopCustomerRows.map((c) => c.value));
           qbTopCustomerRows.forEach((c) => addBarRow(c.label, c.value, maxCust, money(c.value)));
         }
       }
 
-      // ---------- Jobs Overview ----------
-      addSectionHeader('Jobs Overview');
-      addRow('Total Jobs', stats.jobs?.total || 0);
-      addRow('Completed', `${completedJobsCount} (${completionPct}%)`);
-      addRow('Active (Scheduled + In Progress)', activeJobsCount);
+      addSectionHeader('Jobs Overview', 'Detailed Breakdown');
+      addRow('Total Jobs', stats.jobs?.total || 0, { shaded: true });
+      addRow('Completed', `${completedJobsCount} (${completionPct}%)`, { color: green });
+      addRow('Active (Scheduled + In Progress)', activeJobsCount, { shaded: true });
       if (statusSegments.length > 0) {
-        y += 2;
+        y += 3;
+        pdf.setFontSize(9);
+        pdf.setFont(undefined, 'bold');
+        pdf.setTextColor(...gray);
+        pdf.text('BY STATUS', margin, y);
+        y += 5;
         const maxStatus = Math.max(1, ...statusSegments.map((s) => s.value));
         statusSegments.forEach((s) => addBarRow(s.label, s.value, maxStatus));
       }
 
-      // ---------- Client Metrics ----------
-      addSectionHeader('Client Metrics');
-      addRow('Total Clients', stats.clients?.total || 0);
+      addSectionHeader('Client Metrics', 'Detailed Breakdown');
+      addRow('Total Clients', stats.clients?.total || 0, { shaded: true });
       addRow('Active', stats.clients?.active || 0);
-      addRow('Prospects', stats.clients?.prospects || 0);
+      addRow('Prospects', stats.clients?.prospects || 0, { shaded: true });
       if (clientTypeRows.length > 0) {
-        y += 2;
+        y += 3;
+        pdf.setFontSize(9);
+        pdf.setFont(undefined, 'bold');
+        pdf.setTextColor(...gray);
+        pdf.text('BY TYPE', margin, y);
+        y += 5;
         const maxType = Math.max(1, ...clientTypeRows.map((c) => c.value));
         clientTypeRows.forEach((c) => addBarRow(c.label, c.value, maxType));
       }
 
-      // ---------- Email Statistics ----------
-      addSectionHeader('Email Statistics');
-      addRow('Total Emails', stats.emails?.total || 0);
+      addSectionHeader('Email Statistics', 'Detailed Breakdown');
+      addRow('Total Emails', stats.emails?.total || 0, { shaded: true });
       addRow('Unread', stats.emails?.unread || 0);
-      addRow('Work Related', stats.emails?.workRelated || 0);
+      addRow('Work Related', stats.emails?.workRelated || 0, { shaded: true });
       addRow('Not Classified', stats.emails?.notClassified || 0);
 
-      // ---------- Footer / page numbers ----------
+      // Footer on every page, drawn last so it reflects the final page count.
       const pageCount = pdf.internal.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
         pdf.setPage(i);
-        pdf.setFontSize(8);
-        pdf.setTextColor(...gray);
-        pdf.text(`Page ${i} of ${pageCount}`, pageW - margin, pageH - 8, { align: 'right' });
-        pdf.text('MES Electrical CRM', margin, pageH - 8);
+        drawFooter();
       }
 
       pdf.save(`MES_Analytics_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
@@ -736,7 +896,7 @@ function Analytics({ onNavigate }) {
   }, [jobs]);
 
   const profitability = calculateProfitability();
-  const monthlyRevenue = getMonthlyRevenue(6);
+  const monthlyRevenue = getMonthlyRevenue(revenueRange);
   const revenueSparkValues = monthlyRevenue.map((m) => m.value);
 
   const statusSegments = (stats.jobs?.byStatus || [])
@@ -749,6 +909,9 @@ function Analytics({ onNavigate }) {
   const completedJobsCount = jobsByStatusMap['completed'] || 0;
   const activeJobsCount = (jobsByStatusMap['in-progress'] || 0) + (jobsByStatusMap['scheduled'] || 0) + (jobsByStatusMap['approved'] || 0);
   const completionPct = getPercentage(completedJobsCount, stats.jobs?.total);
+  // Real revenue-per-job figure — a core estimating/pricing benchmark for an
+  // electrical contractor, not shown anywhere else on this page before.
+  const avgJobValue = completedJobsCount > 0 ? (stats.jobs?.totalRevenue || 0) / completedJobsCount : 0;
 
   const clientTypeRows = (stats.clients?.byType || [])
     .filter((t) => t._id)
@@ -847,10 +1010,35 @@ function Analytics({ onNavigate }) {
                   <span className="trend">{formatCurrency(profitability.totalProfit)} profit from {profitability.count} jobs</span>
                 </div>
               </div>
+
+              <div className="dashboard-card a-tilt" ref={avgJobValueCardRef}>
+                <div className="card-header">
+                  <div className="card-icon blue"><FiBriefcase /></div>
+                  <div className="card-title"><h3>Avg Job Value</h3><p>Per Completed Job</p></div>
+                </div>
+                <div className="card-value"><AnimatedNumber to={avgJobValue} prefix="$" /></div>
+                <div className="card-footer">
+                  <span>Key estimating benchmark</span>
+                </div>
+              </div>
             </div>
 
             <div className="a-charts-grid" style={{ marginTop: '1.25rem' }}>
-              <TrendChart points={monthlyRevenue} />
+              <TrendChart
+                points={monthlyRevenue}
+                headerExtra={
+                  <select
+                    className="a-range-select"
+                    value={revenueRange}
+                    onChange={(e) => setRevenueRange(Number(e.target.value))}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <option value={3}>Last 3 months</option>
+                    <option value={6}>Last 6 months</option>
+                    <option value={12}>Last 12 months</option>
+                  </select>
+                }
+              />
               <DonutChart title="Jobs by Status" segments={statusSegments.length ? statusSegments : [{ label: 'No data', value: 1, color: '#e5e7eb' }]} />
             </div>
           </div>

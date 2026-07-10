@@ -213,6 +213,25 @@
   margin: 0;
 }
 
+.a-range-select {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #b8941f;
+  background: rgba(212, 175, 55, 0.08);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.a-range-select:hover,
+.a-range-select:focus {
+  background: rgba(212, 175, 55, 0.16);
+  border-color: rgba(212, 175, 55, 0.55);
+  outline: none;
+}
+
 .a-chart-head span {
   font-size: 0.8rem;
   color: #9ca3af;
