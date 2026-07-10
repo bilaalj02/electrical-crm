@@ -178,7 +178,7 @@ router.post('/create-job-from-email', auth, async (req, res) => {
     // Create calendar event if requested
     if (createCalendarEvent && job.scheduledDate) {
       const populatedJob = await Job.findById(job._id).populate('client');
-      const calendarResult = await createJobEvent(req.user.userId, populatedJob);
+      const calendarResult = await createJobEvent(req.user._id, populatedJob);
 
       if (calendarResult.success) {
         job.calendarEventId = calendarResult.eventId;
@@ -256,9 +256,9 @@ router.post('/sync-to-calendar/:jobId', auth, async (req, res) => {
     try {
       let result;
       if (job.calendarEventId) {
-        result = await updateJobEvent(req.user.userId, job.calendarEventId, job);
+        result = await updateJobEvent(req.user._id, job.calendarEventId, job);
       } else {
-        result = await createJobEvent(req.user.userId, job);
+        result = await createJobEvent(req.user._id, job);
       }
       if (result.success) {
         job.calendarEventId = result.eventId;
@@ -309,7 +309,7 @@ router.delete('/remove-from-calendar/:jobId', auth, async (req, res) => {
     // Remove from Google Calendar (best-effort)
     if (job.calendarEventId) {
       try {
-        await deleteJobEvent(req.user.userId, job.calendarEventId);
+        await deleteJobEvent(req.user._id, job.calendarEventId);
       } catch (googleErr) {
         console.warn('Google Calendar removal skipped:', googleErr.message);
       }
@@ -356,9 +356,9 @@ router.post('/bulk-sync-calendar', auth, async (req, res) => {
 
         let result;
         if (job.calendarEventId) {
-          result = await updateJobEvent(req.user.userId, job.calendarEventId, job);
+          result = await updateJobEvent(req.user._id, job.calendarEventId, job);
         } else {
-          result = await createJobEvent(req.user.userId, job);
+          result = await createJobEvent(req.user._id, job);
         }
 
         if (result.success) {

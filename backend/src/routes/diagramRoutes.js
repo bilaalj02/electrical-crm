@@ -101,7 +101,15 @@ router.get('/custom-symbols', protect, async (req, res) => {
 router.post('/custom-symbols', protect, async (req, res) => {
   try {
     const sym = new CustomSymbol({
-      ...req.body,
+      id: req.body.id,
+      name: req.body.name,
+      category: req.body.category,
+      subcategory: req.body.subcategory,
+      svg: req.body.svg,
+      connectionPoints: req.body.connectionPoints,
+      tags: req.body.tags,
+      standards: req.body.standards,
+      isCustom: true,
       createdBy: req.user._id,
     });
     const saved = await sym.save();

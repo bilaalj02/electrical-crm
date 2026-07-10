@@ -294,7 +294,7 @@ router.get('/stats/:projectId', auth, async (req, res) => {
     const totalPhotos = await Photo.countDocuments({ project: projectId });
 
     const byCategory = await Photo.aggregate([
-      { $match: { project: mongoose.Types.ObjectId(projectId) } },
+      { $match: { project: new mongoose.Types.ObjectId(projectId) } },
       {
         $group: {
           _id: '$category',
@@ -304,7 +304,7 @@ router.get('/stats/:projectId', auth, async (req, res) => {
     ]);
 
     const totalSize = await Photo.aggregate([
-      { $match: { project: mongoose.Types.ObjectId(projectId) } },
+      { $match: { project: new mongoose.Types.ObjectId(projectId) } },
       {
         $group: {
           _id: null,

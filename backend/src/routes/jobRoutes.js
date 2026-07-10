@@ -52,9 +52,13 @@ router.get('/', auth, async (req, res) => {
       ];
     }
 
+    // Whitelist sortBy to prevent NoSQL injection via sort parameter
+    const allowedSortFields = ['scheduledDate', 'createdAt', 'updatedAt', 'title', 'status', 'priority', 'jobNumber'];
+    const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'scheduledDate';
+
     // Execute query
     const jobs = await Job.find(filter)
-      .sort({ [sortBy]: sortOrder === 'desc' ? -1 : 1 })
+      .sort({ [safeSortBy]: sortOrder === 'desc' ? -1 : 1 })
       .limit(limit * 1)
       .skip((page - 1) * limit)
       .populate('client')
@@ -209,7 +213,7 @@ router.get('/:id', auth, async (req, res) => {
  * POST /api/jobs
  * Create a new job
  */
-router.post('/', auth, async (req, res) => {
+router.post('/', auth, authorize('admin', 'manager'), async (req, res) => {
   try {
     // Generate job number
     const jobNumber = await Job.generateJobNumber();
@@ -252,8 +256,16 @@ router.patch('/:id', auth, authorize('admin', 'manager'), async (req, res) => {
 
     const previousAssigned = JSON.stringify(job.assignedTo || []);
 
-    // Update job fields (allows actualExpenses to be included)
-    Object.assign(job, req.body);
+    // Whitelist allowed update fields to prevent mass-assignment
+    const allowed = [
+      'title', 'description', 'status', 'priority', 'scheduledDate',
+      'assignedTo', 'client', 'address', 'notes', 'quotedCosts',
+      'actualExpenses', 'paymentStatus', 'paymentAmount', 'paymentDate',
+      'completedDate', 'tags', 'type', 'materials'
+    ];
+    for (const field of allowed) {
+      if (field in req.body) job[field] = req.body[field];
+    }
 
     // Save to trigger pre-save middleware for calculations
     await job.save();
