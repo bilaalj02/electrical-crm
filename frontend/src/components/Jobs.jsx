@@ -37,8 +37,6 @@ function Jobs({ initialJobId, onConsumeInitial }) {
   }, [initialJobId]);
   const [showJobForm, setShowJobForm] = useState(false);
   const [editingJob, setEditingJob] = useState(null);
-  const [expenseModalOpen, setExpenseModalOpen] = useState(false);
-  const [jobForExpenses, setJobForExpenses] = useState(null);
 
   const [filtersExpanded, setFiltersExpanded] = useState(false);
 
@@ -439,21 +437,6 @@ function Jobs({ initialJobId, onConsumeInitial }) {
         />
       )}
 
-      {/* Expense Entry Modal */}
-      <ExpenseEntryModal
-        isOpen={expenseModalOpen}
-        onClose={() => {
-          setExpenseModalOpen(false);
-          setJobForExpenses(null);
-        }}
-        job={jobForExpenses}
-        onSave={() => {
-          fetchJobs();
-          fetchStats();
-          setExpenseModalOpen(false);
-          setJobForExpenses(null);
-        }}
-      />
 
       <NotificationModal
         isOpen={confirmModal.isOpen}
