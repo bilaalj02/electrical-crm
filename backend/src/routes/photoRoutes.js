@@ -4,8 +4,7 @@ const Photo = require('../models/Photo');
 const Project = require('../models/Project');
 const upload = require('../config/upload');
 const { auth } = require('../middleware/auth');
-const path = require('path');
-const fs = require('fs');
+const cloudinary = require('cloudinary').v2;
 
 /**
  * POST /api/photos/upload/:projectId
@@ -36,12 +35,12 @@ router.post('/upload/:projectId', auth, upload.array('photos', 10), async (req, 
       req.files.map(async (file, index) => {
         const photo = new Photo({
           project: projectId,
-          filename: file.filename,
+          filename: file.filename,      // Cloudinary public_id
           originalName: file.originalname,
-          path: file.path,
+          path: file.path,              // Cloudinary secure URL
           mimetype: file.mimetype,
-          size: file.size,
-          url: `/uploads/projects/${file.filename}`,
+          size: file.size || 0,
+          url: file.path,               // full Cloudinary URL — no server prefix needed
           label: labelsArray[index] || file.originalname,
           notes: notesArray[index] || '',
           category: categoriesArray[index] || 'other',
@@ -61,16 +60,6 @@ router.post('/upload/:projectId', auth, upload.array('photos', 10), async (req, 
     });
   } catch (error) {
     console.error('Error uploading photos:', error);
-    // Clean up uploaded files on error
-    if (req.files) {
-      req.files.forEach(file => {
-        try {
-          fs.unlinkSync(file.path);
-        } catch (err) {
-          console.error('Error deleting file:', err);
-        }
-      });
-    }
     res.status(500).json({ error: error.message });
   }
 });
@@ -173,13 +162,13 @@ router.delete('/:photoId', auth, async (req, res) => {
       return res.status(404).json({ error: 'Photo not found' });
     }
 
-    // Delete file from filesystem
-    try {
-      if (fs.existsSync(photo.path)) {
-        fs.unlinkSync(photo.path);
+    // Delete from Cloudinary
+    if (photo.filename) {
+      try {
+        await cloudinary.uploader.destroy(photo.filename);
+      } catch (err) {
+        console.error('Error deleting from Cloudinary:', err);
       }
-    } catch (err) {
-      console.error('Error deleting file:', err);
     }
 
     // Delete from database
@@ -213,16 +202,16 @@ router.delete('/project/:projectId/bulk', auth, async (req, res) => {
       project: projectId
     });
 
-    // Delete files from filesystem
-    photos.forEach(photo => {
-      try {
-        if (fs.existsSync(photo.path)) {
-          fs.unlinkSync(photo.path);
+    // Delete from Cloudinary
+    await Promise.all(photos.map(async (photo) => {
+      if (photo.filename) {
+        try {
+          await cloudinary.uploader.destroy(photo.filename);
+        } catch (err) {
+          console.error('Error deleting from Cloudinary:', err);
         }
-      } catch (err) {
-        console.error('Error deleting file:', err);
       }
-    });
+    }));
 
     // Delete from database
     const result = await Photo.deleteMany({

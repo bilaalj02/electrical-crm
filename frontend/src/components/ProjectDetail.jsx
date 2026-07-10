@@ -372,8 +372,12 @@ function ProjectDetail({ projectId, onBack }) {
     setPhotoCommentText('');
   };
 
-  const getServerUrl = () => {
-    return API_URL.replace('/api', '');
+  // Returns the display URL for a photo — Cloudinary URLs are already absolute,
+  // legacy local uploads start with /uploads and need the server prefix.
+  const getPhotoUrl = (url) => {
+    if (!url) return '';
+    if (url.startsWith('http')) return url;
+    return API_URL.replace('/api', '') + url;
   };
 
   const formatDate = (date) => {
@@ -480,7 +484,7 @@ function ProjectDetail({ projectId, onBack }) {
                         className={`comparison-photo ${selectedBeforePhoto?._id === photo._id ? 'selected' : ''}`}
                         onClick={() => setSelectedBeforePhoto(photo)}
                       >
-                        <img src={`${getServerUrl()}${photo.url}`} alt={photo.label} />
+                        <img src={getPhotoUrl(photo.url)} alt={photo.label} />
                         <p>{photo.label}</p>
                       </div>
                     ))}
@@ -495,7 +499,7 @@ function ProjectDetail({ projectId, onBack }) {
                         className={`comparison-photo ${selectedAfterPhoto?._id === photo._id ? 'selected' : ''}`}
                         onClick={() => setSelectedAfterPhoto(photo)}
                       >
-                        <img src={`${getServerUrl()}${photo.url}`} alt={photo.label} />
+                        <img src={getPhotoUrl(photo.url)} alt={photo.label} />
                         <p>{photo.label}</p>
                       </div>
                     ))}
@@ -506,11 +510,11 @@ function ProjectDetail({ projectId, onBack }) {
                 <div className="comparison-viewer">
                   <div className="comparison-side">
                     <h4>Before</h4>
-                    <img src={`${getServerUrl()}${selectedBeforePhoto.url}`} alt="Before" />
+                    <img src={getPhotoUrl(selectedBeforePhoto.url)} alt="Before" />
                   </div>
                   <div className="comparison-side">
                     <h4>After</h4>
-                    <img src={`${getServerUrl()}${selectedAfterPhoto.url}`} alt="After" />
+                    <img src={getPhotoUrl(selectedAfterPhoto.url)} alt="After" />
                   </div>
                 </div>
               )}
@@ -535,7 +539,7 @@ function ProjectDetail({ projectId, onBack }) {
                       <div className="activity-body">
                         {activity.type === 'photo_upload' ? (
                           <div className="activity-photo" onClick={() => openLightbox(activity.data)}>
-                            <img src={`${getServerUrl()}${activity.data.url}`} alt={activity.data.label} />
+                            <img src={getPhotoUrl(activity.data.url)} alt={activity.data.label} />
                             <p>{activity.data.label}</p>
                           </div>
                         ) : (
@@ -626,7 +630,7 @@ function ProjectDetail({ projectId, onBack }) {
                         {dayPhotos.map(photo => (
                           <div key={photo._id} className="timeline-photo-card">
                             <div className="photo-thumbnail" onClick={() => openLightbox(photo)}>
-                              <img src={`${getServerUrl()}${photo.url}`} alt={photo.label} />
+                              <img src={getPhotoUrl(photo.url)} alt={photo.label} />
                             </div>
                             <div className="photo-info">
                               <div className="photo-label">{photo.label}</div>
@@ -652,7 +656,7 @@ function ProjectDetail({ projectId, onBack }) {
                   {photos.map(photo => (
                     <div key={photo._id} className="photo-card">
                       <div className="photo-thumbnail" onClick={() => openLightbox(photo)}>
-                        <img src={`${getServerUrl()}${photo.url}`} alt={photo.label} />
+                        <img src={getPhotoUrl(photo.url)} alt={photo.label} />
                         <div className="photo-overlay">
                           <FiZoomIn size={24} />
                         </div>
@@ -911,7 +915,7 @@ function ProjectDetail({ projectId, onBack }) {
             <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
               {/* Image panel */}
               <div style={{ flex: '0 0 65%', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '500px' }}>
-                <img src={`${getServerUrl()}${selectedPhoto.url}`} alt={selectedPhoto.label} style={{ maxWidth: '100%', maxHeight: '85vh', objectFit: 'contain' }} />
+                <img src={getPhotoUrl(selectedPhoto.url)} alt={selectedPhoto.label} style={{ maxWidth: '100%', maxHeight: '85vh', objectFit: 'contain' }} />
               </div>
               {/* Info + comments panel */}
               <div style={{ flex: '0 0 35%', display: 'flex', flexDirection: 'column', overflow: 'hidden', borderLeft: '1px solid #e5e7eb' }}>
@@ -926,7 +930,7 @@ function ProjectDetail({ projectId, onBack }) {
                     <span><FiUser /> {selectedPhoto.uploadedBy?.name || 'Unknown'}</span>
                   </div>
                   <div className="lightbox-actions">
-                    <a href={`${getServerUrl()}${selectedPhoto.url}`} download={selectedPhoto.originalName} className="btn-download">
+                    <a href={getPhotoUrl(selectedPhoto.url)} download={selectedPhoto.originalName} className="btn-download">
                       <FiDownload /> Download
                     </a>
                     <button className="btn-edit" onClick={() => { setEditingPhoto(selectedPhoto); closeLightbox(); }}>
