@@ -18,6 +18,7 @@ import Integrations from './components/Integrations';
 const DiagramEditor = lazy(() => import('./components/DiagramEditor/DiagramEditor'));
 import mesLogo from './assets/mes-logo.png';
 import axios from 'axios';
+import Onboarding from './components/Onboarding';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 const SUPPORT_EMAIL = 'contact@coldsolutions.ca';
@@ -102,6 +103,7 @@ function App() {
 
         <nav className="sidebar-nav">
           <button
+            data-onboarding="nav-home"
             className={`sidebar-link ${currentPage === 'home' ? 'active' : ''}`}
             onClick={() => setCurrentPage('home')}
             title="Home"
@@ -113,6 +115,7 @@ function App() {
           {/* Admin only pages */}
           {user?.role === 'admin' && (
             <button
+              data-onboarding="nav-emails"
               className={`sidebar-link ${currentPage === 'emails' ? 'active' : ''}`}
               onClick={() => setCurrentPage('emails')}
               title="Emails"
@@ -123,6 +126,7 @@ function App() {
           )}
 
           <button
+            data-onboarding="nav-jobs"
             className={`sidebar-link ${currentPage === 'jobs' ? 'active' : ''}`}
             onClick={() => setCurrentPage('jobs')}
             title="Jobs"
@@ -134,6 +138,7 @@ function App() {
           {/* Admin only pages */}
           {user?.role === 'admin' && (
             <button
+              data-onboarding="nav-clients"
               className={`sidebar-link ${currentPage === 'clients' ? 'active' : ''}`}
               onClick={() => setCurrentPage('clients')}
               title="Clients"
@@ -144,6 +149,7 @@ function App() {
           )}
 
           <button
+            data-onboarding="nav-calendar"
             className={`sidebar-link ${currentPage === 'calendar' ? 'active' : ''}`}
             onClick={() => setCurrentPage('calendar')}
             title="Calendar"
@@ -153,6 +159,7 @@ function App() {
           </button>
 
           <button
+            data-onboarding="nav-projects"
             className={`sidebar-link ${currentPage === 'projects' ? 'active' : ''}`}
             onClick={() => setCurrentPage('projects')}
             title="Projects"
@@ -162,6 +169,7 @@ function App() {
           </button>
 
           <button
+            data-onboarding="nav-diagrams"
             className={`sidebar-link ${currentPage === 'diagrams' ? 'active' : ''}`}
             onClick={() => setCurrentPage('diagrams')}
             title="Diagrams"
@@ -174,6 +182,7 @@ function App() {
           {user?.role === 'admin' && (
             <>
               <button
+                data-onboarding="nav-analytics"
                 className={`sidebar-link ${currentPage === 'analytics' ? 'active' : ''}`}
                 onClick={() => setCurrentPage('analytics')}
                 title="Analytics"
@@ -182,6 +191,7 @@ function App() {
                 {sidebarOpen && <span>Analytics</span>}
               </button>
               <button
+                data-onboarding="nav-marketing"
                 className={`sidebar-link ${currentPage === 'marketing' ? 'active' : ''}`}
                 onClick={() => setCurrentPage('marketing')}
                 title="Marketing"
@@ -190,6 +200,7 @@ function App() {
                 {sidebarOpen && <span>Marketing</span>}
               </button>
               <button
+                data-onboarding="nav-integrations"
                 className={`sidebar-link ${currentPage === 'integrations' ? 'active' : ''}`}
                 onClick={() => setCurrentPage('integrations')}
                 title="Integrations"
@@ -204,6 +215,7 @@ function App() {
         {/* User Menu */}
         <div className="sidebar-user-menu">
           <button
+            data-onboarding="nav-user-avatar"
             className="user-menu-trigger"
             onClick={() => setUserMenuOpen(!userMenuOpen)}
             title={user?.name || 'User menu'}
@@ -215,7 +227,7 @@ function App() {
 
           {userMenuOpen && (
             <div className="user-dropdown">
-              <button className="user-dropdown-item" onClick={() => {
+              <button data-onboarding="nav-settings" className="user-dropdown-item" onClick={() => {
                 setCurrentPage('settings');
                 setUserMenuOpen(false);
               }}>
@@ -369,6 +381,8 @@ function App() {
       />
 
       <ToastContainer />
+
+      <Onboarding onNavigate={navigate} />
     </div>
   );
 }

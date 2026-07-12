@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FiUsers, FiMail, FiTrash2, FiUserPlus, FiX, FiRefreshCw, FiSettings as FiSettingsIcon, FiUser, FiSave, FiPhone } from 'react-icons/fi';
+import { FiUsers, FiMail, FiTrash2, FiUserPlus, FiX, FiRefreshCw, FiSettings as FiSettingsIcon, FiUser, FiSave, FiPhone, FiPlayCircle } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import NotificationModal from './NotificationModal';
 import { showToast } from './Toast';
+const resetOnboarding = (userId) => localStorage.removeItem(`onboarding_complete_${userId}`);
 import './Settings.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -296,9 +297,28 @@ export default function Settings() {
                   Email cannot be changed. Contact admin if needed.
                 </small>
 
-                <button type="submit" className="btn-primary" disabled={savingProfile} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <FiSave /> {savingProfile ? 'Saving...' : 'Save Profile'}
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                  <button type="submit" className="btn-primary" disabled={savingProfile} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <FiSave /> {savingProfile ? 'Saving...' : 'Save Profile'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      resetOnboarding(user?._id || user?.id);
+                      window.location.reload();
+                    }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '6px',
+                      background: 'transparent', border: '1px solid #374151',
+                      borderRadius: '8px', padding: '8px 16px', fontSize: '13px',
+                      color: '#9ca3af', cursor: 'pointer', transition: 'border-color 0.15s, color 0.15s'
+                    }}
+                    onMouseOver={(e) => { e.currentTarget.style.borderColor = '#d4af37'; e.currentTarget.style.color = '#d4af37'; }}
+                    onMouseOut={(e) => { e.currentTarget.style.borderColor = '#374151'; e.currentTarget.style.color = '#9ca3af'; }}
+                  >
+                    <FiPlayCircle /> Restart Tour
+                  </button>
+                </div>
               </form>
 
               {/* Read-only info */}

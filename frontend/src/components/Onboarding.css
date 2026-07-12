@@ -1,0 +1,285 @@
+/* Onboarding overlay */
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  pointer-events: none;
+}
+
+/* Welcome modal */
+.onboarding-welcome-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 9100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: all;
+}
+
+.onboarding-welcome-card {
+  background: #1e2130;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 16px;
+  padding: 40px 44px;
+  max-width: 460px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  animation: onboard-pop 0.25s ease;
+}
+
+.onboarding-welcome-logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #111827;
+  border: 2px solid rgba(212, 175, 55, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+  overflow: hidden;
+}
+
+.onboarding-welcome-card h2 {
+  color: #f9fafb;
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 10px;
+}
+
+.onboarding-welcome-card p {
+  color: #9ca3af;
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0 0 28px;
+}
+
+.onboarding-welcome-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.onboarding-btn-primary {
+  background: #d4af37;
+  color: #111;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.onboarding-btn-primary:hover {
+  background: #b8941f;
+}
+
+.onboarding-btn-ghost {
+  background: transparent;
+  color: #6b7280;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.onboarding-btn-ghost:hover {
+  border-color: #6b7280;
+  color: #9ca3af;
+}
+
+/* Spotlight backdrop — dark with cutout */
+.onboarding-spotlight-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9050;
+  pointer-events: all;
+}
+
+/* Tooltip card */
+.onboarding-tooltip {
+  position: fixed;
+  z-index: 9200;
+  background: #1e2130;
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  border-radius: 12px;
+  padding: 20px 22px;
+  width: 300px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+  pointer-events: all;
+  animation: onboard-fade 0.2s ease;
+}
+
+.onboarding-tooltip-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.onboarding-tooltip-step {
+  font-size: 11px;
+  font-weight: 600;
+  color: #d4af37;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.onboarding-tooltip-close {
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  font-size: 18px;
+  margin-top: -2px;
+  transition: color 0.15s;
+}
+
+.onboarding-tooltip-close:hover {
+  color: #f9fafb;
+}
+
+.onboarding-tooltip h3 {
+  color: #f9fafb;
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+
+.onboarding-tooltip p {
+  color: #9ca3af;
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0 0 18px;
+}
+
+.onboarding-tooltip-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.onboarding-dots {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.onboarding-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #374151;
+  transition: background 0.15s;
+}
+
+.onboarding-dot.active {
+  background: #d4af37;
+  width: 18px;
+  border-radius: 3px;
+}
+
+.onboarding-tooltip-nav {
+  display: flex;
+  gap: 8px;
+}
+
+.onboarding-btn-back {
+  background: transparent;
+  color: #6b7280;
+  border: 1px solid #374151;
+  border-radius: 7px;
+  padding: 7px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.onboarding-btn-back:hover {
+  border-color: #6b7280;
+  color: #9ca3af;
+}
+
+.onboarding-btn-next {
+  background: #d4af37;
+  color: #111;
+  border: none;
+  border-radius: 7px;
+  padding: 7px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.onboarding-btn-next:hover {
+  background: #b8941f;
+}
+
+/* Spotlight highlight ring around target element */
+.onboarding-highlight-ring {
+  position: fixed;
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 4px rgba(212, 175, 55, 0.8),
+    0 0 0 9999px rgba(0, 0, 0, 0.55);
+  z-index: 9100;
+  pointer-events: none;
+  transition: all 0.3s ease;
+}
+
+/* Tooltip arrow */
+.onboarding-tooltip::before {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #1e2130;
+  border-left: 1px solid rgba(212, 175, 55, 0.35);
+  border-top: 1px solid rgba(212, 175, 55, 0.35);
+  transform: rotate(45deg);
+}
+
+.onboarding-tooltip.arrow-left::before {
+  left: -6px;
+  top: 22px;
+}
+
+.onboarding-tooltip.arrow-right::before {
+  right: -6px;
+  top: 22px;
+  transform: rotate(225deg);
+}
+
+.onboarding-tooltip.arrow-top::before {
+  top: -6px;
+  left: 22px;
+  transform: rotate(135deg);
+}
+
+.onboarding-tooltip.arrow-bottom::before {
+  bottom: -6px;
+  left: 22px;
+  transform: rotate(-45deg);
+}
+
+@keyframes onboard-pop {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes onboard-fade {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

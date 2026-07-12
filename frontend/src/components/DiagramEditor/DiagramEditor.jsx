@@ -6,12 +6,14 @@ import Canvas             from './Canvas.jsx';
 import PropertiesPanel    from './PropertiesPanel.jsx';
 import ExportModal        from './ExportModal.jsx';
 import CustomSymbolCreator from './CustomSymbolCreator.jsx';
+import DiagramTour from './DiagramTour.jsx';
 import { setCustomSymbols } from './symbols/electricalSymbols.js';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5000';
 
 export default function DiagramEditor() {
   const canvasRef = useRef(null);
+  const tourRestartRef = useRef(null);
 
   // Tool & canvas state
   const [activeTool,   setActiveTool]   = useState('select');
@@ -182,6 +184,21 @@ export default function DiagramEditor() {
             Saved {lastSaved.toLocaleTimeString()}
           </span>
         )}
+        <button
+          title="Take the diagram editor tour"
+          onClick={() => {
+            if (tourRestartRef.current) tourRestartRef.current();
+          }}
+          style={{
+            marginLeft: 'auto', background: 'transparent', border: '1px solid rgba(201,168,76,0.35)',
+            borderRadius: '50%', width: '26px', height: '26px', cursor: 'pointer',
+            color: 'var(--de-gold)', fontSize: '13px', fontWeight: 700,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0, transition: 'background 0.15s',
+          }}
+          onMouseOver={e => e.currentTarget.style.background = 'rgba(201,168,76,0.12)'}
+          onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+        >?</button>
       </div>
 
       {/* Toolbar */}
@@ -278,6 +295,8 @@ export default function DiagramEditor() {
           onClose={() => setShowCreator(false)}
         />
       )}
+
+      <DiagramTour onRestart={tourRestartRef} />
     </div>
   );
 }

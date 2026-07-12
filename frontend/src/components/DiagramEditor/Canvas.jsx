@@ -709,6 +709,7 @@ const CanvasComponent = forwardRef(function CanvasComponent(
     <div
       ref={containerRef}
       className="de-canvas-wrap"
+      data-diagram-tour="dt-canvas"
       style={{ cursor: activeTool === 'select' ? 'default' : 'crosshair' }}
       onDragOver={handleDragOver}
       onDrop={handleDrop}

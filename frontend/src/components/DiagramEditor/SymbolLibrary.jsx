@@ -63,7 +63,7 @@ export default function SymbolLibrary({ onDragStart, onSymbolDrop, onAddCustom }
   }, [query]);
 
   return (
-    <div className="de-library">
+    <div className="de-library" data-diagram-tour="dt-library">
       <div className="de-library-header">
         <h3>Symbol Library</h3>
         <div className="de-search-box">

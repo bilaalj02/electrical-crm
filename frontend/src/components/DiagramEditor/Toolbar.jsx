@@ -20,8 +20,8 @@ const Btn = ({ icon, tip, onClick, active, danger, success, disabled, children }
 );
 
 // Labeled group cluster
-const Group = ({ label, children }) => (
-  <div className="de-tool-group">
+const Group = ({ label, children, tourId }) => (
+  <div className="de-tool-group" data-diagram-tour={tourId}>
     <div className="de-tool-group-inner">{children}</div>
     <span className="de-tool-group-label">{label}</span>
   </div>
@@ -56,6 +56,7 @@ export default function Toolbar({
 
       {/* ── Diagram name ── */}
       <input
+        data-diagram-tour="dt-name"
         className="de-diagram-name-input"
         value={diagramName}
         onChange={e => onDiagramNameChange(e.target.value)}
@@ -65,7 +66,7 @@ export default function Toolbar({
       <div className="de-toolbar-divider" />
 
       {/* ── DRAW ── */}
-      <Group label="Draw">
+      <Group label="Draw" tourId="dt-draw">
         {DRAW_TOOLS.map(t => (
           <Btn key={t.id} icon={t.icon} tip={t.tip}
             active={activeTool === t.id}
@@ -76,7 +77,7 @@ export default function Toolbar({
       <div className="de-toolbar-divider" />
 
       {/* ── EDIT ── */}
-      <Group label="Edit">
+      <Group label="Edit" tourId="dt-edit">
         <Btn tip="Undo (Ctrl+Z)" onClick={onUndo} disabled={!canUndo}
           icon="M3 7v6h6M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
         <Btn tip="Redo (Ctrl+Y)" onClick={onRedo} disabled={!canRedo}
@@ -100,7 +101,7 @@ export default function Toolbar({
       <div className="de-toolbar-divider" />
 
       {/* ── ARRANGE ── */}
-      <Group label="Arrange">
+      <Group label="Arrange" tourId="dt-arrange">
         <Btn tip="Align Left"     onClick={onAlignLeft}   icon="M4 6h16M4 12h10M4 18h14" />
         <Btn tip="Align Center"   onClick={onAlignCenter} icon="M4 6h16M7 12h10M5 18h14" />
         <Btn tip="Align Right"    onClick={onAlignRight}  icon="M4 6h16M10 12h10M6 18h14" />
@@ -112,7 +113,7 @@ export default function Toolbar({
       <div className="de-toolbar-divider" />
 
       {/* ── VIEW ── */}
-      <Group label="View">
+      <Group label="View" tourId="dt-view">
         <Btn tip="Toggle Grid" onClick={onToggleGrid} active={gridVisible}
           icon="M3 3h18M3 9h18M3 15h18M9 3v18M15 3v18" />
         <Btn tip="Toggle Snap" onClick={onToggleSnap} active={snapEnabled}
@@ -130,7 +131,7 @@ export default function Toolbar({
       <div className="de-toolbar-divider" />
 
       {/* ── FILE ── */}
-      <Group label="File">
+      <Group label="File" tourId="dt-file">
         <Btn tip="Save (Ctrl+S)" onClick={onSave} success>
           <Icon d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2zM17 21v-8H7v8M7 3v5h8" />
           {saving && <span className="de-btn-saving-dot" />}
