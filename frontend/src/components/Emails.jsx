@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
-import { FiMail, FiRefreshCw, FiFilter, FiSearch, FiPlus, FiCheck, FiX, FiEdit, FiSend, FiMinus, FiMaximize2, FiMinimize2 } from 'react-icons/fi';
+import { FiMail, FiRefreshCw, FiFilter, FiSearch, FiPlus, FiCheck, FiX, FiEdit, FiSend, FiMinus, FiMaximize2, FiMinimize2, FiTrash2 } from 'react-icons/fi';
 import NotificationModal from './NotificationModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -35,6 +35,8 @@ function Emails() {
   const [emailContentWidth, setEmailContentWidth] = useState(null); // null means auto flex
   const [isResizingContent, setIsResizingContent] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   // Notification modal state
   const [notification, setNotification] = useState({
@@ -256,6 +258,84 @@ function Emails() {
     } catch (error) {
       console.error('Error classifying email:', error);
     }
+  };
+
+  const toggleSelectEmail = (emailId) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(emailId)) next.delete(emailId);
+      else next.add(emailId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) =>
+      prev.size === emails.length && emails.length > 0 ? new Set() : new Set(emails.map((e) => e._id))
+    );
+  };
+
+  const deleteEmail = (emailId) => {
+    setNotification({
+      isOpen: true,
+      type: 'confirm',
+      title: 'Delete Email',
+      message: 'Are you sure you want to delete this email? This cannot be undone.',
+      onConfirm: async () => {
+        try {
+          await axios.delete(`${API_URL}/emails/${emailId}`);
+          setEmails((prev) => prev.filter((e) => e._id !== emailId));
+          setSelectedIds((prev) => {
+            const next = new Set(prev);
+            next.delete(emailId);
+            return next;
+          });
+          if (selectedEmail?._id === emailId) setSelectedEmail(null);
+          fetchStats();
+        } catch (error) {
+          console.error('Error deleting email:', error);
+          setNotification({
+            isOpen: true,
+            type: 'error',
+            title: 'Error',
+            message: 'Failed to delete email. Please try again.',
+            onConfirm: null
+          });
+        }
+      }
+    });
+  };
+
+  const bulkDeleteEmails = () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setNotification({
+      isOpen: true,
+      type: 'confirm',
+      title: 'Delete Emails',
+      message: `Are you sure you want to delete ${ids.length} email${ids.length === 1 ? '' : 's'}? This cannot be undone.`,
+      onConfirm: async () => {
+        setBulkDeleting(true);
+        try {
+          await axios.delete(`${API_URL}/emails/bulk`, { data: { ids } });
+          setEmails((prev) => prev.filter((e) => !selectedIds.has(e._id)));
+          if (selectedEmail && selectedIds.has(selectedEmail._id)) setSelectedEmail(null);
+          setSelectedIds(new Set());
+          fetchStats();
+        } catch (error) {
+          console.error('Error bulk deleting emails:', error);
+          setNotification({
+            isOpen: true,
+            type: 'error',
+            title: 'Error',
+            message: 'Failed to delete emails. Please try again.',
+            onConfirm: null
+          });
+        } finally {
+          setBulkDeleting(false);
+        }
+      }
+    });
   };
 
   const autoClassifyEmails = async () => {
@@ -747,6 +827,36 @@ function Emails() {
           >
             {sidebarCollapsed ? '▶' : '◀'}
           </button>
+          {emails.length > 0 && (
+            <div className="email-select-bar">
+              <label className="email-select-all">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.size === emails.length && emails.length > 0}
+                  ref={(el) => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < emails.length; }}
+                  onChange={toggleSelectAll}
+                />
+                {!sidebarCollapsed && <span>{selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select all'}</span>}
+              </label>
+              {selectedIds.size > 0 && (
+                <div className="email-select-actions">
+                  <button
+                    className="btn-danger email-bulk-delete-btn"
+                    onClick={bulkDeleteEmails}
+                    disabled={bulkDeleting}
+                    title="Delete selected"
+                  >
+                    {bulkDeleting ? '...' : (sidebarCollapsed ? '🗑' : 'Delete')}
+                  </button>
+                  {!sidebarCollapsed && (
+                    <button className="email-select-cancel" onClick={() => setSelectedIds(new Set())}>
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           {loading && emails.length === 0 ? (
             <div className="loading">Loading emails...</div>
           ) : emails.length === 0 ? (
@@ -764,11 +874,18 @@ function Emails() {
                 return (
                   <div
                     key={email._id}
-                    className={`email-item-compact ${!email.isRead ? 'unread' : ''} ${selectedEmail?._id === email._id ? 'selected' : ''}`}
+                    className={`email-item-compact ${!email.isRead ? 'unread' : ''} ${selectedEmail?._id === email._id ? 'selected' : ''} ${selectedIds.has(email._id) ? 'checked' : ''}`}
                     onClick={() => setSelectedEmail(email)}
                   >
                     <div className="compact-header">
                       <div className="compact-indicator">
+                        <input
+                          type="checkbox"
+                          className="email-item-checkbox"
+                          checked={selectedIds.has(email._id)}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={() => toggleSelectEmail(email._id)}
+                        />
                         {!email.isRead && <div className="unread-dot"></div>}
                         {email.isWorkRelated && <div className="work-badge">💼</div>}
                       </div>
@@ -784,11 +901,20 @@ function Emails() {
               return (
                 <div
                   key={email._id}
-                  className={`email-item ${!email.isRead ? 'unread' : ''} ${selectedEmail?._id === email._id ? 'selected' : ''}`}
+                  className={`email-item ${!email.isRead ? 'unread' : ''} ${selectedEmail?._id === email._id ? 'selected' : ''} ${selectedIds.has(email._id) ? 'checked' : ''}`}
                   onClick={() => setSelectedEmail(email)}
                 >
                   <div className="email-header">
-                    <div className="email-from">{email.from?.name || email.from?.email}</div>
+                    <div className="email-from-group">
+                      <input
+                        type="checkbox"
+                        className="email-item-checkbox"
+                        checked={selectedIds.has(email._id)}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={() => toggleSelectEmail(email._id)}
+                      />
+                      <div className="email-from">{email.from?.name || email.from?.email}</div>
+                    </div>
                     <div className="email-meta">
                       <span className={`badge ${email.accountType}`}>{email.accountType}</span>
                       <span className="email-date">{formatDate(email.date)}</span>
@@ -919,6 +1045,14 @@ function Emails() {
               </button>
               <button className="btn" onClick={() => toggleRead(selectedEmail._id, selectedEmail.isRead)}>
                 Mark as {selectedEmail.isRead ? 'Unread' : 'Read'}
+              </button>
+              <button
+                className="btn-danger"
+                onClick={() => deleteEmail(selectedEmail._id)}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                title="Delete this email"
+              >
+                <FiTrash2 /> Delete
               </button>
               {selectedEmail.isWorkRelated === null ? (
                 <>

@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Email = require('../models/Email');
 const { auth } = require('../middleware/auth');
 // const emailSyncService = require('../services/emailSyncService'); // Disabled - using new OAuth system
@@ -142,6 +143,55 @@ router.patch('/:id', auth, async (req, res) => {
     res.json(email);
   } catch (error) {
     console.error('Error updating email:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * DELETE /api/emails/bulk
+ * Delete multiple emails at once. Declared before DELETE /:id so Express
+ * doesn't match "bulk" as an :id value.
+ */
+router.delete('/bulk', auth, async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'Provide a non-empty array of email ids to delete' });
+    }
+
+    const validIds = ids.filter((id) => mongoose.Types.ObjectId.isValid(id));
+    if (validIds.length === 0) {
+      return res.status(400).json({ error: 'No valid email ids provided' });
+    }
+
+    const result = await Email.deleteMany({ _id: { $in: validIds } });
+
+    res.json({
+      success: true,
+      deletedCount: result.deletedCount
+    });
+  } catch (error) {
+    console.error('Error bulk deleting emails:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * DELETE /api/emails/:id
+ * Delete a single email
+ */
+router.delete('/:id', auth, async (req, res) => {
+  try {
+    const email = await Email.findByIdAndDelete(req.params.id);
+
+    if (!email) {
+      return res.status(404).json({ error: 'Email not found' });
+    }
+
+    res.json({ success: true, message: 'Email deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting email:', error);
     res.status(500).json({ error: error.message });
   }
 });
