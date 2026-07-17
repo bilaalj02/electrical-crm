@@ -53,6 +53,23 @@ function IntegrationDetail({ provider, onBack }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provider]);
 
+  // Sync options must be visible the moment the user lands on this page, not
+  // hidden behind an extra click they might not notice — auto-open the panel
+  // for the first connected Outlook account once, on initial load only (a
+  // ref, not state, so re-fetches after sync/save don't force it back open
+  // if the user has since closed it).
+  const autoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (autoOpenedRef.current) return;
+    if (!detail?.accounts?.length) return;
+    const firstMicrosoft = detail.accounts.find((acc) => acc.provider === 'microsoft');
+    if (firstMicrosoft) {
+      autoOpenedRef.current = true;
+      openFolderPicker(firstMicrosoft);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detail]);
+
   // ---------- Email providers (Gmail / Outlook) ----------
   const connectEmail = async () => {
     try {
