@@ -8,7 +8,9 @@ const {
   getMicrosoftAuthUrl,
   handleMicrosoftCallback,
   getEmailAccounts,
-  disconnectEmailAccount
+  disconnectEmailAccount,
+  getEmailAccountFolders,
+  updateEmailAccountScope
 } = require('../controllers/oauthController');
 const {
   getQuickBooksAuthUrl,
@@ -35,5 +37,7 @@ router.get('/quickbooks/callback', handleQuickBooksCallback);
 // Email account management
 router.get('/accounts', auth, getEmailAccounts);
 router.delete('/accounts/:accountId', auth, disconnectEmailAccount);
+router.get('/accounts/:accountId/folders', auth, getEmailAccountFolders);
+router.patch('/accounts/:accountId/scope', auth, updateEmailAccountScope);
 
 module.exports = router;

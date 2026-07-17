@@ -19,6 +19,7 @@ router.get('/', auth, async (req, res) => {
       isRead,
       search,
       folder,
+      folderId,
       sortBy = 'date',
       sortOrder = 'desc'
     } = req.query;
@@ -43,11 +44,19 @@ router.get('/', auth, async (req, res) => {
       }
     }
 
-    // Handle folder filter (inbox/sent based on labels)
+    // Handle folder filter (inbox/sent based on labels — Gmail's existing,
+    // working scheme; left as-is)
     if (folder === 'sent') {
       filter.labels = { $in: ['SENT'] };
     } else if (folder === 'inbox') {
       filter.labels = { $nin: ['SENT'] };
+    }
+
+    // Real Outlook folder filter (separate from the Gmail-only folder=
+    // param above — Outlook mail now records its real source folder,
+    // see folderId/folderName on the Email model)
+    if (folderId) {
+      filter.folderId = folderId;
     }
 
     if (isWorkRelated !== undefined) {
@@ -93,6 +102,52 @@ router.get('/', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching emails:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/emails/folders
+ * Live folder tree per connected Outlook account, grouped by account.
+ * Originally this showed only folders with already-synced email, which
+ * meant a brand-new (still-empty) folder was invisible until something had
+ * synced from it — not what you want when browsing/picking a folder that
+ * was just created. Now reuses the same live Graph walk the sync-scope
+ * picker uses (_fetchMicrosoftFolderTree), so a folder shows up the moment
+ * it exists in the real mailbox, synced or not. Declared before GET /:id
+ * so Express doesn't match "folders" as an :id value (same reasoning as
+ * DELETE /bulk above DELETE /:id further down this file).
+ */
+router.get('/folders', auth, async (req, res) => {
+  try {
+    const EmailAccount = require('../models/EmailAccount');
+    const { getAuthenticatedMicrosoftClient, _fetchMicrosoftFolderTree } = require('../controllers/oauthController');
+
+    // Outlook only — Gmail folder browsing is out of scope, same boundary
+    // as the sync-scope picker.
+    // Full documents needed here, not just email: getAuthenticatedMicrosoftClient
+    // reads accessToken/refreshToken/tokenExpiry and calls account.save() if it
+    // has to refresh an expired token.
+    const accounts = await EmailAccount.find({ isActive: true, provider: 'microsoft' });
+
+    const result = [];
+    for (const account of accounts) {
+      try {
+        const accessToken = await getAuthenticatedMicrosoftClient(account);
+        const tree = await _fetchMicrosoftFolderTree(accessToken);
+        result.push({
+          accountEmail: account.email,
+          folders: tree.map((f) => ({ folderId: f.id, folderName: f.path, depth: f.depth }))
+        });
+      } catch (error) {
+        console.error(`Error fetching live folders for ${account.email}:`, error.message);
+        result.push({ accountEmail: account.email, folders: [], error: 'Failed to load folders' });
+      }
+    }
+
+    res.json({ accounts: result });
+  } catch (error) {
+    console.error('Error fetching email folders:', error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -171,7 +171,7 @@ router.post('/create-job-from-email', auth, async (req, res) => {
     // Link email to job
     if (emailId) {
       await Email.findByIdAndUpdate(emailId, {
-        linkedJob: job._id
+        jobId: job._id
       });
     }
 

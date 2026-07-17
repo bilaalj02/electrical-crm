@@ -1,6 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import './App.css';
-import { FiMail, FiBriefcase, FiUsers, FiHome, FiBarChart2, FiCalendar, FiChevronLeft, FiChevronRight, FiUser, FiLogOut, FiSettings as FiSettingsIcon, FiBell, FiFolder, FiZap, FiSend, FiLink, FiHelpCircle } from 'react-icons/fi';
+import { FiMail, FiBriefcase, FiUsers, FiHome, FiBarChart2, FiCalendar, FiChevronLeft, FiChevronRight, FiChevronDown, FiUser, FiLogOut, FiSettings as FiSettingsIcon, FiBell, FiFolder, FiZap, FiSend, FiLink, FiHelpCircle } from 'react-icons/fi';
 import { ToastContainer } from './components/Toast';
 import { useAuth } from './context/AuthContext';
 import Login from './components/Login';
@@ -32,6 +32,10 @@ const getInitialPage = () => {
   // Direct links to /integrations (e.g. the Connect/Disconnect URLs registered
   // with QuickBooks) should land on that page after login, not default to Home.
   if (window.location.pathname.replace(/\/+$/, '') === '/integrations') return 'integrations';
+  // Gmail/Outlook OAuth redirects land here with ?oauth=success or ?error — the
+  // toast-handling logic for those lives on the Emails page, so route there
+  // regardless of which page (Emails or Integrations) started the connect flow.
+  if (params.get('oauth') === 'success' || params.get('error')) return 'emails';
   return 'home';
 };
 
@@ -48,6 +52,10 @@ function App() {
   // Deep-link navigation from Home shortcuts
   const [pendingJobId, setPendingJobId]       = useState(null);
   const [pendingClientId, setPendingClientId] = useState(null);
+  const [pendingFolderId, setPendingFolderId] = useState(null);
+
+  // Sidebar Emails folder dropdown — "the home of the subfolders"
+  const [emailFolderGroups, setEmailFolderGroups] = useState([]);
 
   const navigate = (page, options = {}) => {
     setCurrentPage(page);
@@ -73,6 +81,34 @@ function App() {
     } catch (error) {
       console.error('Error fetching potential jobs count:', error);
     }
+  };
+
+  // Lazy-loaded on first expand rather than on every page load — most
+  // sessions never open this dropdown.
+  const fetchEmailFolders = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/emails/folders`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setEmailFolderGroups(response.data.accounts || []);
+    } catch (error) {
+      console.error('Error fetching email folders:', error);
+    }
+  };
+
+  const toggleEmailDropdown = () => {
+    const opening = !emailDropdownOpen;
+    setEmailDropdownOpen(opening);
+    if (opening && emailFolderGroups.length === 0) {
+      fetchEmailFolders();
+    }
+  };
+
+  const goToEmailFolder = (folderId, folderName) => {
+    setCurrentPage('emails');
+    setPendingFolderId({ id: folderId, name: folderName });
+    setEmailDropdownOpen(false);
   };
 
   if (loading) {
@@ -114,15 +150,61 @@ function App() {
 
           {/* Admin only pages */}
           {user?.role === 'admin' && (
-            <button
-              data-onboarding="nav-emails"
-              className={`sidebar-link ${currentPage === 'emails' ? 'active' : ''}`}
-              onClick={() => setCurrentPage('emails')}
-              title="Emails"
-            >
-              <FiMail className="sidebar-icon" />
-              {sidebarOpen && <span>Emails</span>}
-            </button>
+            <div className="sidebar-dropdown">
+              <div className="sidebar-link-wrapper">
+                <button
+                  data-onboarding="nav-emails"
+                  className={`sidebar-link ${currentPage === 'emails' ? 'active' : ''}`}
+                  onClick={() => setCurrentPage('emails')}
+                  title="Emails"
+                >
+                  <FiMail className="sidebar-icon" />
+                  {sidebarOpen && <span>Emails</span>}
+                </button>
+                {sidebarOpen && (
+                  <button
+                    className="dropdown-toggle"
+                    onClick={toggleEmailDropdown}
+                    title="Browse folders"
+                  >
+                    <FiChevronDown style={{ transform: emailDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                  </button>
+                )}
+              </div>
+
+              {emailDropdownOpen && sidebarOpen && (
+                <div className="dropdown-menu">
+                  {emailFolderGroups.length === 0 && (
+                    <div className="dropdown-item" style={{ cursor: 'default', opacity: 0.6 }}>
+                      <span className="dropdown-item-text">No folders found</span>
+                    </div>
+                  )}
+                  {emailFolderGroups.map((group) => (
+                    <div key={group.accountEmail}>
+                      <div
+                        className="dropdown-item"
+                        style={{ cursor: 'default', fontWeight: 600, opacity: 0.8, fontSize: '0.78rem' }}
+                        title={group.accountEmail}
+                      >
+                        <span className="dropdown-item-text">{group.accountEmail}</span>
+                      </div>
+                      {group.folders.map((folder) => (
+                        <button
+                          key={folder.folderId}
+                          className="dropdown-item"
+                          style={{ paddingLeft: `${1 + folder.depth * 1}rem` }}
+                          onClick={() => goToEmailFolder(folder.folderId, folder.folderName)}
+                          title={folder.folderName}
+                        >
+                          <FiFolder />
+                          <span className="dropdown-item-text">{folder.folderName.split('/').pop()}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           <button
@@ -299,7 +381,12 @@ function App() {
         ) : (
           <div className="content-wrapper">
             {currentPage === 'home' && <Home onNavigate={navigate} />}
-            {currentPage === 'emails' && user?.role === 'admin' && <Emails />}
+            {currentPage === 'emails' && user?.role === 'admin' && (
+              <Emails
+                initialFolder={pendingFolderId}
+                onConsumeInitial={() => setPendingFolderId(null)}
+              />
+            )}
             {currentPage === 'jobs' && (
               <Jobs
                 initialJobId={pendingJobId}

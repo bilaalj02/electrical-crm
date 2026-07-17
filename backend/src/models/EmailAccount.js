@@ -35,6 +35,14 @@ const emailAccountSchema = new mongoose.Schema({
   },
   syncToken: {
     type: String
+  },
+  syncScope: {
+    mode: { type: String, enum: ['all', 'selected'], default: 'all' },
+    selectedIds: { type: [String], default: [] }, // Microsoft mailFolder IDs
+    // Opt-in processing beyond the always-on email+attachment sync — mirrors
+    // Integration.enabledDataTypes' shape. Empty by default ("only if the
+    // user requests so"). Currently supported key: 'job_client_detection'.
+    enabledFeatures: { type: [String], default: [] }
   }
 }, {
   timestamps: true

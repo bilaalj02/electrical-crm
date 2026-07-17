@@ -49,6 +49,12 @@ const emailSchema = new mongoose.Schema({
     required: true
   },
   labels: [String],
+  // Outlook only (Gmail keeps its existing labels-based inbox/sent split).
+  // folderId is the Microsoft mailFolder ID the message currently lives in;
+  // folderName is a human-readable full path (e.g. "Invoices/2026") built
+  // from the same folder-tree walk used by the sync-scope folder picker.
+  folderId: String,
+  folderName: String,
   isRead: {
     type: Boolean,
     default: false
@@ -65,7 +71,9 @@ const emailSchema = new mongoose.Schema({
     filename: String,
     mimeType: String,
     size: Number,
-    attachmentId: String
+    attachmentId: String,
+    url: String,      // Cloudinary secure_url — present once downloaded/stored
+    publicId: String   // Cloudinary public_id, for future deletion/management
   }],
   clientId: {
     type: mongoose.Schema.Types.ObjectId,

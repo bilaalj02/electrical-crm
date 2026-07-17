@@ -61,7 +61,7 @@ router.get('/', async (req, res) => {
         return {
           ...def,
           connected: accounts.length > 0,
-          accounts: accounts.map((a) => ({ id: a._id, email: a.email, lastSyncedAt: a.lastSyncedAt }))
+          accounts: accounts.map((a) => ({ id: a._id, email: a.email, provider: a.provider, lastSyncedAt: a.lastSyncedAt, syncScope: a.syncScope }))
         };
       }
 
@@ -100,7 +100,7 @@ router.get('/:provider', async (req, res) => {
       return res.json({
         ...def,
         connected: accounts.length > 0,
-        accounts: accounts.map((a) => ({ id: a._id, email: a.email, lastSyncedAt: a.lastSyncedAt }))
+        accounts: accounts.map((a) => ({ id: a._id, email: a.email, provider: a.provider, lastSyncedAt: a.lastSyncedAt, syncScope: a.syncScope }))
       });
     }
 

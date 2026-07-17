@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
-import { FiMail, FiRefreshCw, FiFilter, FiSearch, FiPlus, FiCheck, FiX, FiEdit, FiSend, FiMinus, FiMaximize2, FiMinimize2, FiTrash2 } from 'react-icons/fi';
+import { FiMail, FiRefreshCw, FiFilter, FiSearch, FiPlus, FiCheck, FiX, FiEdit, FiSend, FiMinus, FiMaximize2, FiMinimize2, FiTrash2, FiFolder } from 'react-icons/fi';
 import NotificationModal from './NotificationModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-function Emails() {
+function Emails({ initialFolder = null, onConsumeInitial } = {}) {
   const [emails, setEmails] = useState([]);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState(null);
@@ -51,8 +51,26 @@ function Emails() {
     accountType: '',
     isWorkRelated: '',
     isRead: '',
-    search: ''
+    search: '',
+    folderId: initialFolder?.id || ''
   });
+  const [activeFolderName, setActiveFolderName] = useState(initialFolder?.name || '');
+
+  // Sidebar folder-dropdown deep link — same pattern as Jobs/Clients'
+  // initialJobId/initialClientId in App.jsx.
+  useEffect(() => {
+    if (initialFolder?.id) {
+      setFilters((prev) => ({ ...prev, folderId: initialFolder.id }));
+      setActiveFolderName(initialFolder.name || '');
+      onConsumeInitial && onConsumeInitial();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFolder]);
+
+  const clearFolderFilter = () => {
+    setFilters((prev) => ({ ...prev, folderId: '' }));
+    setActiveFolderName('');
+  };
 
   const fetchEmails = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -71,6 +89,7 @@ function Emails() {
 
       if (filters.isRead) queryParams.append('isRead', filters.isRead);
       if (filters.search) queryParams.append('search', filters.search);
+      if (filters.folderId) queryParams.append('folderId', filters.folderId);
 
       const response = await axios.get(`${API_URL}/emails?${queryParams.toString()}`);
       setEmails(response.data.emails);
@@ -690,6 +709,24 @@ function Emails() {
           </div>
         )}
 
+        {activeFolderName && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '6px',
+            background: '#1a1a1a', color: '#d4af37', borderRadius: '20px',
+            padding: '6px 12px', fontSize: '12px', fontWeight: '600'
+          }}>
+            <FiFolder size={13} />
+            {activeFolderName}
+            <button
+              onClick={clearFolderFilter}
+              title="Clear folder filter"
+              style={{ background: 'none', border: 'none', color: '#d4af37', cursor: 'pointer', display: 'flex', padding: 0, marginLeft: '2px' }}
+            >
+              <FiX size={13} />
+            </button>
+          </div>
+        )}
+
         {/* Filters Box - Collapsible */}
         <div style={{
           background: 'linear-gradient(135deg, #fef9e7 0%, #fef5d4 100%)',
@@ -998,6 +1035,32 @@ function Emails() {
               <div className="meta-row"><strong>To:</strong> {selectedEmail.to?.map(t => t.email).join(', ')}</div>
               <div className="meta-row"><strong>Date:</strong> {new Date(selectedEmail.date).toLocaleString()}</div>
               <div className="meta-row"><strong>Account:</strong> <span className={`badge ${selectedEmail.accountType}`}>{selectedEmail.accountType}</span></div>
+              {selectedEmail.attachments?.length > 0 && (
+                <div className="meta-row" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                  <strong>Attachments:</strong>
+                  {selectedEmail.attachments.map((att, i) => (
+                    att.url ? (
+                      <a
+                        key={att.attachmentId || i}
+                        href={att.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ padding: '2px 10px', background: '#fef9e7', border: '1px solid #d4af37', borderRadius: '6px', fontSize: '13px', textDecoration: 'none', color: '#1f2937' }}
+                      >
+                        {att.filename}
+                      </a>
+                    ) : (
+                      <span
+                        key={att.attachmentId || i}
+                        title="Not available — file was too large to sync"
+                        style={{ padding: '2px 10px', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', color: '#9ca3af' }}
+                      >
+                        {att.filename}
+                      </span>
+                    )
+                  ))}
+                </div>
+              )}
             </div>
             <div className="detail-body" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               {selectedEmail.body?.html ? (
@@ -1064,7 +1127,7 @@ function Emails() {
                   Reclassify as {selectedEmail.isWorkRelated ? 'Non-Work' : 'Work'}
                 </button>
               )}
-              {selectedEmail.isWorkRelated && !selectedEmail.linkedJob && (
+              {selectedEmail.isWorkRelated && !selectedEmail.jobId && (
                 <button
                   className="btn btn-primary"
                   onClick={extractJobFromEmail}
@@ -1075,7 +1138,7 @@ function Emails() {
                   {extractingJob ? 'Extracting...' : 'Convert to Job'}
                 </button>
               )}
-              {selectedEmail.linkedJob && (
+              {selectedEmail.jobId && (
                 <span style={{
                   padding: '8px 12px',
                   background: '#d4af37',
