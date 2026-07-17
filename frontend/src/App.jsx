@@ -176,13 +176,17 @@ function App() {
                 <div className="dropdown-menu">
                   {emailFolderGroups.length === 0 && (
                     <div className="dropdown-item" style={{ cursor: 'default', opacity: 0.6 }}>
-                      No synced folders yet
+                      <span className="dropdown-item-text">No folders found</span>
                     </div>
                   )}
                   {emailFolderGroups.map((group) => (
                     <div key={group.accountEmail}>
-                      <div className="dropdown-item" style={{ cursor: 'default', fontWeight: 600, opacity: 0.8, fontSize: '0.78rem' }}>
-                        {group.accountEmail}
+                      <div
+                        className="dropdown-item"
+                        style={{ cursor: 'default', fontWeight: 600, opacity: 0.8, fontSize: '0.78rem' }}
+                        title={group.accountEmail}
+                      >
+                        <span className="dropdown-item-text">{group.accountEmail}</span>
                       </div>
                       {group.folders.map((folder) => (
                         <button
@@ -190,9 +194,10 @@ function App() {
                           className="dropdown-item"
                           style={{ paddingLeft: `${1 + folder.depth * 1}rem` }}
                           onClick={() => goToEmailFolder(folder.folderId, folder.folderName)}
+                          title={folder.folderName}
                         >
                           <FiFolder />
-                          {folder.folderName.split('/').pop()}
+                          <span className="dropdown-item-text">{folder.folderName.split('/').pop()}</span>
                         </button>
                       ))}
                     </div>

@@ -387,9 +387,10 @@ function IntegrationDetail({ provider, onBack }) {
                         <button
                           className="btn-secondary"
                           onClick={() => openFolderPicker(acc)}
+                          title="Choose which folders sync and what should happen to what's synced"
                           style={{ padding: '6px 12px', fontSize: '13px', whiteSpace: 'nowrap' }}
                         >
-                          Choose folders
+                          Sync settings
                         </button>
                       )}
                       <button className="icon-btn delete" onClick={() => disconnectEmailAccount(acc.id)} title="Disconnect">
@@ -403,6 +404,7 @@ function IntegrationDetail({ provider, onBack }) {
                           <p className="hint">Loading folders…</p>
                         ) : (
                           <>
+                            <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.9rem' }}>Which folders sync?</h4>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '0.75rem' }}>
                               <label className="checkbox-label">
                                 <input

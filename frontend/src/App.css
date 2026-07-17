@@ -1562,12 +1562,14 @@ body {
 .dropdown-menu {
   background: #1a1a1a;
   border-left: 3px solid #d4af37;
-  margin-left: 2.5rem;
+  margin-left: 1.5rem;
+  margin-right: 0.5rem;
   margin-top: 0.5rem;
   margin-bottom: 0.5rem;
   padding: 0.5rem 0;
   border-radius: 4px;
   animation: slideDown 0.2s ease;
+  overflow: hidden;
 }
 
 @keyframes slideDown {
@@ -1583,6 +1585,7 @@ body {
 
 .dropdown-item {
   width: 100%;
+  min-width: 0;
   padding: 0.75rem 1rem;
   background: none;
   border: none;
@@ -1603,6 +1606,14 @@ body {
 
 .dropdown-item svg {
   font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.dropdown-item-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* User Menu in Sidebar */
