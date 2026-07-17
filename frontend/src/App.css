@@ -1548,6 +1548,11 @@ body {
   right: 0;
   top: 0;
   height: 100%;
+  /* .sidebar-link is flex:1 and also position:relative, so it visually
+     spans the same area this absolutely-positioned toggle sits in —
+     explicit z-index removes any ambiguity about which one a real click
+     lands on, rather than relying on DOM-order stacking alone. */
+  z-index: 2;
 }
 
 .dropdown-toggle:hover {

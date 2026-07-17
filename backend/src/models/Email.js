@@ -49,6 +49,12 @@ const emailSchema = new mongoose.Schema({
     required: true
   },
   labels: [String],
+  // Outlook only (Gmail keeps its existing labels-based inbox/sent split).
+  // folderId is the Microsoft mailFolder ID the message currently lives in;
+  // folderName is a human-readable full path (e.g. "Invoices/2026") built
+  // from the same folder-tree walk used by the sync-scope folder picker.
+  folderId: String,
+  folderName: String,
   isRead: {
     type: Boolean,
     default: false

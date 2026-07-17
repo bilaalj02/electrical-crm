@@ -2,8 +2,10 @@ const { google } = require('googleapis');
 const axios = require('axios');
 const Email = require('../models/Email');
 const EmailAccount = require('../models/EmailAccount');
-const { getAuthenticatedClient, getAuthenticatedMicrosoftClient } = require('./oauthController');
+const Client = require('../models/Client');
+const { getAuthenticatedClient, getAuthenticatedMicrosoftClient, _fetchMicrosoftFolderTree } = require('./oauthController');
 const cloudinary = require('../config/cloudinary');
+const { isJobRequest } = require('../services/aiJobExtractor');
 
 async function notifyMCPNewEmail(emailId) {
   const mcpUrl = process.env.MCP_WEBHOOK_URL;
@@ -212,7 +214,11 @@ const fetchAndStoreMicrosoftAttachments = async (accessToken, messageId) => {
       const dataUri = `data:${att.contentType};base64,${att.contentBytes}`;
       const uploadResult = await cloudinary.uploader.upload(dataUri, {
         folder: 'mes-electrical/email-attachments',
-        resource_type: 'raw',
+        // 'auto' lets Cloudinary route images to its image pipeline and
+        // documents (PDF, DOCX, etc.) to 'raw' itself — hardcoding 'raw'
+        // for everything meant real images got stored suboptimally, and
+        // masked the fact that non-image documents need their own path.
+        resource_type: 'auto',
         public_id: `${messageId}-${att.id}`
       });
       result.push({
@@ -224,7 +230,11 @@ const fetchAndStoreMicrosoftAttachments = async (accessToken, messageId) => {
         publicId: uploadResult.public_id
       });
     } catch (error) {
-      console.error(`[emailController] Failed to store attachment "${att.name}" on message ${messageId}:`, error.message);
+      // Cloudinary's SDK throws a plain string (not an Error) for config
+      // problems like missing credentials — e.g. `throw "Must supply
+      // api_key"` — so error.message was silently logging `undefined`
+      // for exactly the class of failure most worth seeing clearly.
+      console.error(`[emailController] Failed to store attachment "${att.name}" on message ${messageId}:`, error?.message || error);
       result.push({ filename: att.name, mimeType: att.contentType, size: att.size, attachmentId: att.id });
     }
   }
@@ -236,8 +246,18 @@ const fetchAndStoreMicrosoftAttachments = async (accessToken, messageId) => {
 const syncMicrosoftEmails = async (req, res, emailAccount, maxResults) => {
   const accessToken = await getAuthenticatedMicrosoftClient(emailAccount);
 
-  const select = 'id,subject,from,toRecipients,ccRecipients,receivedDateTime,bodyPreview,body,isRead,hasAttachments,conversationId';
+  const select = 'id,subject,from,toRecipients,ccRecipients,receivedDateTime,bodyPreview,body,isRead,hasAttachments,conversationId,parentFolderId';
   const scope = emailAccount.syncScope;
+
+  // Folder identity — built once per sync call (not per message) so every
+  // synced email can record which real mailbox folder it came from. This
+  // also feeds the sidebar folder browser and fixes a pre-existing bug
+  // where Outlook mail was hardcoded to labels:[] and therefore always
+  // misclassified as "inbox" regardless of its real folder.
+  const folderTree = await _fetchMicrosoftFolderTree(accessToken);
+  const folderPathById = new Map(folderTree.map((f) => [f.id, f.path]));
+
+  const detectJobsAndClients = (scope?.enabledFeatures || []).includes('job_client_detection');
 
   let messages = [];
   if (scope?.mode === 'selected' && scope.selectedIds.length) {
@@ -278,6 +298,8 @@ const syncMicrosoftEmails = async (req, res, emailAccount, maxResults) => {
       ? await fetchAndStoreMicrosoftAttachments(accessToken, message.id)
       : [];
 
+    const senderEmail = message.from?.emailAddress?.address || '';
+
     // Create email record
     const newMsEmail = await Email.create({
       userId: req.user._id,
@@ -286,7 +308,7 @@ const syncMicrosoftEmails = async (req, res, emailAccount, maxResults) => {
       threadId: message.conversationId,
       from: {
         name: message.from?.emailAddress?.name || '',
-        email: message.from?.emailAddress?.address || ''
+        email: senderEmail
       },
       to: parseRecipients(message.toRecipients),
       cc: parseRecipients(message.ccRecipients),
@@ -298,11 +320,37 @@ const syncMicrosoftEmails = async (req, res, emailAccount, maxResults) => {
       snippet: message.bodyPreview || '',
       date: new Date(message.receivedDateTime),
       labels: [],
+      folderId: message.parentFolderId || null,
+      folderName: folderPathById.get(message.parentFolderId) || null,
       isRead: message.isRead,
       isStarred: false,
       hasAttachments: message.hasAttachments,
       attachments
     });
+
+    // Opt-in only ("only if the user requests so") — classifies work-
+    // relatedness and matches an EXISTING client by sender email. Does not
+    // create a new Client or Job; that stays a human-reviewed action via
+    // the existing "Convert to Job" button, which now correctly detects
+    // "already linked" via jobId (see the automation.js/Emails.jsx fix
+    // alongside this change).
+    if (detectJobsAndClients) {
+      try {
+        const analysis = await isJobRequest(newMsEmail.subject || '', newMsEmail.body?.text || '');
+        if (analysis.confidence > 0.7) {
+          newMsEmail.isWorkRelated = analysis.isJobRequest;
+          if (analysis.isJobRequest && senderEmail) {
+            const matchedClient = await Client.findOne({ email: senderEmail });
+            if (matchedClient) {
+              newMsEmail.clientId = matchedClient._id;
+            }
+          }
+          await newMsEmail.save();
+        }
+      } catch (error) {
+        console.error(`[emailController] job/client detection failed for message ${message.id}:`, error.message);
+      }
+    }
 
     // Notify MCP for AI classification (non-blocking, inbox only)
     if (!message.isDraft) {

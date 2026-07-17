@@ -108,7 +108,11 @@ function IntegrationDetail({ provider, onBack }) {
     if (!scopeDrafts[acc.id]) {
       setScopeDrafts((prev) => ({
         ...prev,
-        [acc.id]: { mode: acc.syncScope?.mode || 'all', selectedIds: acc.syncScope?.selectedIds || [] }
+        [acc.id]: {
+          mode: acc.syncScope?.mode || 'all',
+          selectedIds: acc.syncScope?.selectedIds || [],
+          enabledFeatures: acc.syncScope?.enabledFeatures || []
+        }
       }));
     }
     setLoadingFolders(true);
@@ -129,7 +133,7 @@ function IntegrationDetail({ provider, onBack }) {
 
   const toggleScopeFolder = (accountId, folderId) => {
     setScopeDrafts((prev) => {
-      const current = prev[accountId] || { mode: 'selected', selectedIds: [] };
+      const current = prev[accountId] || { mode: 'selected', selectedIds: [], enabledFeatures: [] };
       const selectedIds = current.selectedIds.includes(folderId)
         ? current.selectedIds.filter((id) => id !== folderId)
         : [...current.selectedIds, folderId];
@@ -137,8 +141,18 @@ function IntegrationDetail({ provider, onBack }) {
     });
   };
 
+  const toggleScopeFeature = (accountId, featureKey) => {
+    setScopeDrafts((prev) => {
+      const current = prev[accountId] || { mode: 'all', selectedIds: [], enabledFeatures: [] };
+      const enabledFeatures = current.enabledFeatures.includes(featureKey)
+        ? current.enabledFeatures.filter((f) => f !== featureKey)
+        : [...current.enabledFeatures, featureKey];
+      return { ...prev, [accountId]: { ...current, enabledFeatures } };
+    });
+  };
+
   const saveScope = async (accountId) => {
-    const draft = scopeDrafts[accountId] || { mode: 'all', selectedIds: [] };
+    const draft = scopeDrafts[accountId] || { mode: 'all', selectedIds: [], enabledFeatures: [] };
     setSavingScope(true);
     try {
       await axios.patch(`${API_URL}/oauth/accounts/${accountId}/scope`, draft, authHeaders());
@@ -413,18 +427,48 @@ function IntegrationDetail({ provider, onBack }) {
                             {scopeDrafts[acc.id]?.mode === 'selected' && (
                               <div className="qb-feature-list" style={{ marginBottom: '0.75rem' }}>
                                 {folderOptions.map((folder) => (
-                                  <label key={folder.id} className="checkbox-label" style={{ padding: '0.5rem 0.75rem', background: 'white', borderRadius: '6px' }}>
+                                  <label
+                                    key={folder.id}
+                                    className="checkbox-label"
+                                    title={folder.path}
+                                    style={{ padding: '0.5rem 0.75rem', paddingLeft: `${0.75 + (folder.depth || 0) * 1.25}rem`, background: 'white', borderRadius: '6px' }}
+                                  >
                                     <input
                                       type="checkbox"
                                       checked={(scopeDrafts[acc.id]?.selectedIds || []).includes(folder.id)}
                                       onChange={() => toggleScopeFolder(acc.id, folder.id)}
                                     />
+                                    {folder.depth > 0 && <span style={{ color: '#9ca3af' }}>↳ </span>}
                                     {folder.name}
                                   </label>
                                 ))}
                                 {folderOptions.length === 0 && <p className="hint">No folders found.</p>}
                               </div>
                             )}
+
+                            <h4 style={{ margin: '1rem 0 0.5rem', fontSize: '0.9rem' }}>What should sync?</h4>
+                            <div className="qb-feature-list" style={{ marginBottom: '0.75rem' }}>
+                              <label
+                                className="checkbox-label"
+                                title="Always on — the base email and attachment sync can't be turned off"
+                                style={{ padding: '0.5rem 0.75rem', background: '#f9fafb', borderRadius: '6px', opacity: 0.75 }}
+                              >
+                                <input type="checkbox" checked disabled />
+                                Emails &amp; attachments
+                              </label>
+                              <label
+                                className="checkbox-label"
+                                title="Uses AI to flag work-related emails and match them to an existing client — never creates a new Job automatically, that's still your call via Convert to Job"
+                                style={{ padding: '0.5rem 0.75rem', background: 'white', borderRadius: '6px' }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={(scopeDrafts[acc.id]?.enabledFeatures || []).includes('job_client_detection')}
+                                  onChange={() => toggleScopeFeature(acc.id, 'job_client_detection')}
+                                />
+                                Detect jobs &amp; clients in synced folders
+                              </label>
+                            </div>
 
                             <div style={{ display: 'flex', gap: '8px' }}>
                               <button className="btn-primary" onClick={() => saveScope(acc.id)} disabled={savingScope} style={{ padding: '6px 14px', fontSize: '13px' }}>

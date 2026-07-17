@@ -19,6 +19,7 @@ router.get('/', auth, async (req, res) => {
       isRead,
       search,
       folder,
+      folderId,
       sortBy = 'date',
       sortOrder = 'desc'
     } = req.query;
@@ -43,11 +44,19 @@ router.get('/', auth, async (req, res) => {
       }
     }
 
-    // Handle folder filter (inbox/sent based on labels)
+    // Handle folder filter (inbox/sent based on labels — Gmail's existing,
+    // working scheme; left as-is)
     if (folder === 'sent') {
       filter.labels = { $in: ['SENT'] };
     } else if (folder === 'inbox') {
       filter.labels = { $nin: ['SENT'] };
+    }
+
+    // Real Outlook folder filter (separate from the Gmail-only folder=
+    // param above — Outlook mail now records its real source folder,
+    // see folderId/folderName on the Email model)
+    if (folderId) {
+      filter.folderId = folderId;
     }
 
     if (isWorkRelated !== undefined) {
@@ -93,6 +102,53 @@ router.get('/', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching emails:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/emails/folders
+ * Distinct folders that actually have synced email, grouped by account —
+ * "browse what's synced," not a live Graph call. Declared before GET /:id
+ * so Express doesn't match "folders" as an :id value (same reasoning as
+ * DELETE /bulk above DELETE /:id further down this file).
+ */
+router.get('/folders', auth, async (req, res) => {
+  try {
+    const EmailAccount = require('../models/EmailAccount');
+
+    const distinctFolders = await Email.aggregate([
+      { $match: { folderId: { $ne: null } } },
+      {
+        $group: {
+          _id: { emailAccountId: '$emailAccountId', folderId: '$folderId', folderName: '$folderName' }
+        }
+      }
+    ]);
+
+    const accounts = await EmailAccount.find({ isActive: true }).select('email');
+    const accountEmailById = new Map(accounts.map((a) => [String(a._id), a.email]));
+
+    const byAccount = new Map();
+    for (const row of distinctFolders) {
+      const accountId = String(row._id.emailAccountId);
+      const accountEmail = accountEmailById.get(accountId) || 'Unknown account';
+      if (!byAccount.has(accountId)) {
+        byAccount.set(accountId, { accountEmail, folders: [] });
+      }
+      const folderName = row._id.folderName || '(Unknown folder)';
+      const depth = (folderName.match(/\//g) || []).length;
+      byAccount.get(accountId).folders.push({ folderId: row._id.folderId, folderName, depth });
+    }
+
+    const result = Array.from(byAccount.values()).map((group) => ({
+      ...group,
+      folders: group.folders.sort((a, b) => a.folderName.localeCompare(b.folderName))
+    }));
+
+    res.json({ accounts: result });
+  } catch (error) {
+    console.error('Error fetching email folders:', error);
     res.status(500).json({ error: error.message });
   }
 });
