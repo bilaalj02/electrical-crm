@@ -3,6 +3,7 @@ const axios = require('axios');
 const Email = require('../models/Email');
 const EmailAccount = require('../models/EmailAccount');
 const { getAuthenticatedClient, getAuthenticatedMicrosoftClient } = require('./oauthController');
+const cloudinary = require('../config/cloudinary');
 
 async function notifyMCPNewEmail(emailId) {
   const mcpUrl = process.env.MCP_WEBHOOK_URL;
@@ -188,21 +189,75 @@ const syncGmailEmails = async (req, res, emailAccount, maxResults) => {
   });
 };
 
+// Microsoft Graph only inlines attachment content (contentBytes) for
+// attachments under ~3MB. Larger attachments are skipped rather than
+// handled via a separate byte-range download flow — flagged, not built.
+const fetchAndStoreMicrosoftAttachments = async (accessToken, messageId) => {
+  const response = await axios.get(
+    `https://graph.microsoft.com/v1.0/me/messages/${messageId}/attachments`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+
+  const result = [];
+  for (const att of response.data.value || []) {
+    if (att['@odata.type'] !== '#microsoft.graph.fileAttachment') continue;
+
+    if (!att.contentBytes) {
+      console.warn(`[emailController] Skipping attachment "${att.name}" on message ${messageId} — no inline content (likely over the ~3MB inline limit)`);
+      result.push({ filename: att.name, mimeType: att.contentType, size: att.size, attachmentId: att.id });
+      continue;
+    }
+
+    try {
+      const dataUri = `data:${att.contentType};base64,${att.contentBytes}`;
+      const uploadResult = await cloudinary.uploader.upload(dataUri, {
+        folder: 'mes-electrical/email-attachments',
+        resource_type: 'raw',
+        public_id: `${messageId}-${att.id}`
+      });
+      result.push({
+        filename: att.name,
+        mimeType: att.contentType,
+        size: att.size,
+        attachmentId: att.id,
+        url: uploadResult.secure_url,
+        publicId: uploadResult.public_id
+      });
+    } catch (error) {
+      console.error(`[emailController] Failed to store attachment "${att.name}" on message ${messageId}:`, error.message);
+      result.push({ filename: att.name, mimeType: att.contentType, size: att.size, attachmentId: att.id });
+    }
+  }
+
+  return result;
+};
+
 // Sync Microsoft emails
 const syncMicrosoftEmails = async (req, res, emailAccount, maxResults) => {
   const accessToken = await getAuthenticatedMicrosoftClient(emailAccount);
 
-  // Get list of messages from Microsoft Graph API
-  const response = await axios.get(
-    `https://graph.microsoft.com/v1.0/me/messages?$top=${maxResults}&$select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,bodyPreview,body,isRead,hasAttachments,conversationId`,
-    {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`
-      }
-    }
-  );
+  const select = 'id,subject,from,toRecipients,ccRecipients,receivedDateTime,bodyPreview,body,isRead,hasAttachments,conversationId';
+  const scope = emailAccount.syncScope;
 
-  const messages = response.data.value || [];
+  let messages = [];
+  if (scope?.mode === 'selected' && scope.selectedIds.length) {
+    // Not attempting cross-folder pagination merging — maxResults is a
+    // per-folder cap, kept simple deliberately.
+    for (const folderId of scope.selectedIds) {
+      const folderResponse = await axios.get(
+        `https://graph.microsoft.com/v1.0/me/mailFolders/${folderId}/messages?$top=${maxResults}&$select=${select}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      messages = messages.concat(folderResponse.data.value || []);
+    }
+  } else {
+    const response = await axios.get(
+      `https://graph.microsoft.com/v1.0/me/messages?$top=${maxResults}&$select=${select}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    messages = response.data.value || [];
+  }
+
   let syncedCount = 0;
 
   for (const message of messages) {
@@ -218,6 +273,10 @@ const syncMicrosoftEmails = async (req, res, emailAccount, maxResults) => {
         email: r.emailAddress.address
       }));
     };
+
+    const attachments = message.hasAttachments
+      ? await fetchAndStoreMicrosoftAttachments(accessToken, message.id)
+      : [];
 
     // Create email record
     const newMsEmail = await Email.create({
@@ -242,7 +301,7 @@ const syncMicrosoftEmails = async (req, res, emailAccount, maxResults) => {
       isRead: message.isRead,
       isStarred: false,
       hasAttachments: message.hasAttachments,
-      attachments: []
+      attachments
     });
 
     // Notify MCP for AI classification (non-blocking, inbox only)

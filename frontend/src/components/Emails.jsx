@@ -998,6 +998,32 @@ function Emails() {
               <div className="meta-row"><strong>To:</strong> {selectedEmail.to?.map(t => t.email).join(', ')}</div>
               <div className="meta-row"><strong>Date:</strong> {new Date(selectedEmail.date).toLocaleString()}</div>
               <div className="meta-row"><strong>Account:</strong> <span className={`badge ${selectedEmail.accountType}`}>{selectedEmail.accountType}</span></div>
+              {selectedEmail.attachments?.length > 0 && (
+                <div className="meta-row" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                  <strong>Attachments:</strong>
+                  {selectedEmail.attachments.map((att, i) => (
+                    att.url ? (
+                      <a
+                        key={att.attachmentId || i}
+                        href={att.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ padding: '2px 10px', background: '#fef9e7', border: '1px solid #d4af37', borderRadius: '6px', fontSize: '13px', textDecoration: 'none', color: '#1f2937' }}
+                      >
+                        {att.filename}
+                      </a>
+                    ) : (
+                      <span
+                        key={att.attachmentId || i}
+                        title="Not available — file was too large to sync"
+                        style={{ padding: '2px 10px', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', color: '#9ca3af' }}
+                      >
+                        {att.filename}
+                      </span>
+                    )
+                  ))}
+                </div>
+              )}
             </div>
             <div className="detail-body" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               {selectedEmail.body?.html ? (

@@ -383,6 +383,81 @@ const getAuthenticatedMicrosoftClient = async (emailAccount) => {
   return accessToken;
 };
 
+// List folders available to sync from — Outlook/Microsoft only. Gmail
+// scoping is out of scope for this pass, so this deliberately doesn't
+// branch on provider === 'gmail' at all.
+const getEmailAccountFolders = async (req, res) => {
+  try {
+    const { accountId } = req.params;
+
+    const emailAccount = await EmailAccount.findOne({
+      _id: accountId,
+      userId: req.user._id,
+      isActive: true
+    });
+
+    if (!emailAccount) {
+      return res.status(404).json({ error: 'Email account not found' });
+    }
+
+    if (emailAccount.provider !== 'microsoft') {
+      return res.status(400).json({ error: 'Folder scoping is only available for Outlook accounts right now' });
+    }
+
+    const accessToken = await getAuthenticatedMicrosoftClient(emailAccount);
+    const response = await axios.get('https://graph.microsoft.com/v1.0/me/mailFolders?$top=100', {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+
+    const folders = (response.data.value || []).map((f) => ({
+      id: f.id,
+      name: f.displayName,
+      type: 'user'
+    }));
+
+    res.json({ folders });
+  } catch (error) {
+    console.error('Error fetching email account folders:', error);
+    res.status(500).json({ error: 'Failed to fetch folders' });
+  }
+};
+
+// Save which folders should sync for this account. Clearing syncToken
+// forces a clean re-list on the next sync rather than reusing a pagination
+// token captured under a different scope.
+const updateEmailAccountScope = async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const { mode, selectedIds } = req.body;
+
+    if (!['all', 'selected'].includes(mode)) {
+      return res.status(400).json({ error: "mode must be 'all' or 'selected'" });
+    }
+    if (mode === 'selected' && !Array.isArray(selectedIds)) {
+      return res.status(400).json({ error: 'selectedIds must be an array when mode is selected' });
+    }
+
+    const emailAccount = await EmailAccount.findOne({
+      _id: accountId,
+      userId: req.user._id,
+      isActive: true
+    });
+
+    if (!emailAccount) {
+      return res.status(404).json({ error: 'Email account not found' });
+    }
+
+    emailAccount.syncScope = { mode, selectedIds: mode === 'selected' ? selectedIds : [] };
+    emailAccount.syncToken = undefined;
+    await emailAccount.save();
+
+    res.json({ syncScope: emailAccount.syncScope });
+  } catch (error) {
+    console.error('Error updating email account scope:', error);
+    res.status(500).json({ error: 'Failed to save sync scope' });
+  }
+};
+
 module.exports = {
   getGmailAuthUrl,
   handleGmailCallback,
@@ -392,6 +467,8 @@ module.exports = {
   handleMicrosoftCallback,
   getEmailAccounts,
   disconnectEmailAccount,
+  getEmailAccountFolders,
+  updateEmailAccountScope,
   getAuthenticatedClient,
   getAuthenticatedMicrosoftClient,
   encrypt,

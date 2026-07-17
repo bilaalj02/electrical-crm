@@ -35,6 +35,10 @@ const emailAccountSchema = new mongoose.Schema({
   },
   syncToken: {
     type: String
+  },
+  syncScope: {
+    mode: { type: String, enum: ['all', 'selected'], default: 'all' },
+    selectedIds: { type: [String], default: [] } // Microsoft mailFolder IDs
   }
 }, {
   timestamps: true

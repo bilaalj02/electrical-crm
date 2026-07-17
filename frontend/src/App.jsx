@@ -32,6 +32,10 @@ const getInitialPage = () => {
   // Direct links to /integrations (e.g. the Connect/Disconnect URLs registered
   // with QuickBooks) should land on that page after login, not default to Home.
   if (window.location.pathname.replace(/\/+$/, '') === '/integrations') return 'integrations';
+  // Gmail/Outlook OAuth redirects land here with ?oauth=success or ?error — the
+  // toast-handling logic for those lives on the Emails page, so route there
+  // regardless of which page (Emails or Integrations) started the connect flow.
+  if (params.get('oauth') === 'success' || params.get('error')) return 'emails';
   return 'home';
 };
 

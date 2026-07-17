@@ -21,6 +21,13 @@ function IntegrationDetail({ provider, onBack }) {
   const [enabledTypes, setEnabledTypes] = useState([]);
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
 
+  const [syncingAccountId, setSyncingAccountId] = useState(null);
+  const [folderPickerId, setFolderPickerId] = useState(null); // account id whose picker is open
+  const [folderOptions, setFolderOptions] = useState([]);
+  const [loadingFolders, setLoadingFolders] = useState(false);
+  const [scopeDrafts, setScopeDrafts] = useState({}); // { [accountId]: { mode, selectedIds } }
+  const [savingScope, setSavingScope] = useState(false);
+
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState(null); // { clients: [], jobs: [], pricing: [] } with _checked flags
@@ -75,6 +82,74 @@ function IntegrationDetail({ provider, onBack }) {
         }
       }
     });
+  };
+
+  const syncEmailAccount = async (accountId) => {
+    setSyncingAccountId(accountId);
+    try {
+      const response = await axios.post(`${API_URL}/email-sync/sync/${accountId}`, {}, authHeaders());
+      const { syncedCount, totalMessages } = response.data;
+      showToast(`Synced ${syncedCount} new email(s) (${totalMessages} checked).`, 'success', 6000);
+      fetchDetail();
+    } catch (error) {
+      showToast(error.response?.data?.error || 'Sync failed. Please try again.', 'error', 7000);
+    } finally {
+      setSyncingAccountId(null);
+    }
+  };
+
+  // ---------- Outlook folder scoping ----------
+  const openFolderPicker = async (acc) => {
+    if (folderPickerId === acc.id) {
+      setFolderPickerId(null);
+      return;
+    }
+    setFolderPickerId(acc.id);
+    if (!scopeDrafts[acc.id]) {
+      setScopeDrafts((prev) => ({
+        ...prev,
+        [acc.id]: { mode: acc.syncScope?.mode || 'all', selectedIds: acc.syncScope?.selectedIds || [] }
+      }));
+    }
+    setLoadingFolders(true);
+    try {
+      const response = await axios.get(`${API_URL}/oauth/accounts/${acc.id}/folders`, authHeaders());
+      setFolderOptions(response.data.folders || []);
+    } catch (error) {
+      showToast(error.response?.data?.error || 'Failed to load folders', 'error');
+      setFolderOptions([]);
+    } finally {
+      setLoadingFolders(false);
+    }
+  };
+
+  const setScopeMode = (accountId, mode) => {
+    setScopeDrafts((prev) => ({ ...prev, [accountId]: { ...prev[accountId], mode } }));
+  };
+
+  const toggleScopeFolder = (accountId, folderId) => {
+    setScopeDrafts((prev) => {
+      const current = prev[accountId] || { mode: 'selected', selectedIds: [] };
+      const selectedIds = current.selectedIds.includes(folderId)
+        ? current.selectedIds.filter((id) => id !== folderId)
+        : [...current.selectedIds, folderId];
+      return { ...prev, [accountId]: { ...current, selectedIds } };
+    });
+  };
+
+  const saveScope = async (accountId) => {
+    const draft = scopeDrafts[accountId] || { mode: 'all', selectedIds: [] };
+    setSavingScope(true);
+    try {
+      await axios.patch(`${API_URL}/oauth/accounts/${accountId}/scope`, draft, authHeaders());
+      showToast('Sync scope saved — next sync will use it.', 'success');
+      setFolderPickerId(null);
+      fetchDetail();
+    } catch (error) {
+      showToast(error.response?.data?.error || 'Failed to save sync scope', 'error');
+    } finally {
+      setSavingScope(false);
+    }
   };
 
   // ---------- QuickBooks ----------
@@ -276,17 +351,93 @@ function IntegrationDetail({ provider, onBack }) {
             {detail.accounts.length > 0 && (
               <div className="qb-feature-list" style={{ marginBottom: '1.5rem' }}>
                 {detail.accounts.map((acc) => (
-                  <div key={acc.id} className="qb-feature-item active">
-                    <FiMail className="feature-icon" />
-                    <div className="feature-content" style={{ flex: 1 }}>
-                      <span className="feature-name">{acc.email}</span>
-                      <span className="feature-desc">
-                        {acc.lastSyncedAt ? `Last synced ${new Date(acc.lastSyncedAt).toLocaleString()}` : 'Not synced yet'}
-                      </span>
+                  <div key={acc.id} style={{ display: 'flex', flexDirection: 'column' }}>
+                    <div className="qb-feature-item active">
+                      <FiMail className="feature-icon" />
+                      <div className="feature-content" style={{ flex: 1 }}>
+                        <span className="feature-name">{acc.email}</span>
+                        <span className="feature-desc">
+                          {acc.lastSyncedAt ? `Last synced ${new Date(acc.lastSyncedAt).toLocaleString()}` : 'Not synced yet'}
+                          {acc.provider === 'microsoft' && acc.syncScope?.mode === 'selected' && ' · Scoped to selected folders'}
+                        </span>
+                      </div>
+                      <button
+                        className="icon-btn"
+                        onClick={() => syncEmailAccount(acc.id)}
+                        disabled={syncingAccountId === acc.id}
+                        title="Sync now"
+                      >
+                        <FiRefreshCw className={syncingAccountId === acc.id ? 'spinning' : ''} />
+                      </button>
+                      {acc.provider === 'microsoft' && (
+                        <button
+                          className="btn-secondary"
+                          onClick={() => openFolderPicker(acc)}
+                          style={{ padding: '6px 12px', fontSize: '13px', whiteSpace: 'nowrap' }}
+                        >
+                          Choose folders
+                        </button>
+                      )}
+                      <button className="icon-btn delete" onClick={() => disconnectEmailAccount(acc.id)} title="Disconnect">
+                        <FiTrash2 />
+                      </button>
                     </div>
-                    <button className="icon-btn delete" onClick={() => disconnectEmailAccount(acc.id)} title="Disconnect">
-                      <FiTrash2 />
-                    </button>
+
+                    {folderPickerId === acc.id && (
+                      <div style={{ margin: '0.5rem 0 1rem', padding: '1rem', background: '#f9fafb', borderRadius: '8px' }}>
+                        {loadingFolders ? (
+                          <p className="hint">Loading folders…</p>
+                        ) : (
+                          <>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '0.75rem' }}>
+                              <label className="checkbox-label">
+                                <input
+                                  type="radio"
+                                  name={`scope-mode-${acc.id}`}
+                                  checked={(scopeDrafts[acc.id]?.mode || 'all') === 'all'}
+                                  onChange={() => setScopeMode(acc.id, 'all')}
+                                />
+                                Sync everything
+                              </label>
+                              <label className="checkbox-label">
+                                <input
+                                  type="radio"
+                                  name={`scope-mode-${acc.id}`}
+                                  checked={scopeDrafts[acc.id]?.mode === 'selected'}
+                                  onChange={() => setScopeMode(acc.id, 'selected')}
+                                />
+                                Choose specific folders
+                              </label>
+                            </div>
+
+                            {scopeDrafts[acc.id]?.mode === 'selected' && (
+                              <div className="qb-feature-list" style={{ marginBottom: '0.75rem' }}>
+                                {folderOptions.map((folder) => (
+                                  <label key={folder.id} className="checkbox-label" style={{ padding: '0.5rem 0.75rem', background: 'white', borderRadius: '6px' }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={(scopeDrafts[acc.id]?.selectedIds || []).includes(folder.id)}
+                                      onChange={() => toggleScopeFolder(acc.id, folder.id)}
+                                    />
+                                    {folder.name}
+                                  </label>
+                                ))}
+                                {folderOptions.length === 0 && <p className="hint">No folders found.</p>}
+                              </div>
+                            )}
+
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button className="btn-primary" onClick={() => saveScope(acc.id)} disabled={savingScope} style={{ padding: '6px 14px', fontSize: '13px' }}>
+                                {savingScope ? 'Saving...' : 'Save'}
+                              </button>
+                              <button className="btn-secondary" onClick={() => setFolderPickerId(null)} style={{ padding: '6px 14px', fontSize: '13px' }}>
+                                Cancel
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
