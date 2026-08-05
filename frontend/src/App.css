@@ -1489,12 +1489,7 @@ body {
   /* Main content always full width on mobile, pushed down by topbar */
   .main-content.mobile {
     margin-left: 0 !important;
-    padding-top: 52px;
-  }
-
-  /* Pages that use full height (emails, diagrams) need topbar offset */
-  .main-content.mobile[style] {
-    padding-top: 0; /* inline style controls it via calc */
+    padding-top: 0;
   }
 }
 /* Sidebar with Black and Gold Theme */
@@ -2193,8 +2188,12 @@ body {
   .clients-page,
   .analytics-page,
   .marketing-page,
-  .home-page {
-    padding: 1rem 1rem;
+  .home-page,
+  .projects-page,
+  .calendar-page,
+  .settings-page,
+  .integrations-page {
+    padding: calc(52px + 0.75rem) 1rem 1rem 1rem;
   }
 
   /* emails-page has its own full-height layout, keep padding 0 */
@@ -2203,13 +2202,16 @@ body {
   }
 
   .page-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
   }
 
   .page-header h1 {
-    font-size: 1.5rem;
+    font-size: 1.2rem;
+    margin: 0;
   }
 
   .dashboard-grid,
