@@ -2263,6 +2263,7 @@ body {
   /* Email page fills below topbar, no double scroll */
   .emails-page {
     height: calc(100vh - 52px) !important;
+    margin-top: 52px;
     overflow: hidden;
   }
 
@@ -2295,9 +2296,13 @@ body {
 .emails-page-mobile-detail {
   display: flex;
   flex-direction: column;
+  /* full viewport minus the fixed app topbar */
   height: calc(100vh - 52px);
+  margin-top: 52px; /* push below the fixed app topbar */
   overflow: hidden;
   background: white;
+  position: relative;
+  z-index: 1;
 }
 
 .email-mobile-detail-topbar {

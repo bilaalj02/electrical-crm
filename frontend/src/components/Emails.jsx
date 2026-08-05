@@ -48,6 +48,14 @@ function Emails({ initialFolder = null, onConsumeInitial } = {}) {
     return () => window.removeEventListener('resize', handle);
   }, []);
 
+  // On mobile, never auto-restore a selected email — clear any saved session
+  useEffect(() => {
+    if (isMobile) {
+      sessionStorage.removeItem(SESSION_KEY);
+      setSelectedEmail(null);
+    }
+  }, [isMobile]);
+
   // Left folder sidebar
   const [folderSidebarCollapsed, setFolderSidebarCollapsed] = useState(false);
   const [folders, setFolders] = useState({}); // { accountId: [{ id, name, unreadCount }] }
@@ -102,11 +110,14 @@ function Emails({ initialFolder = null, onConsumeInitial } = {}) {
       const fetched = response.data.emails;
       setEmails(fetched);
 
-      // Restore selected email from sessionStorage
-      const savedId = sessionStorage.getItem(SESSION_KEY);
-      if (savedId && fetched?.length) {
-        const match = fetched.find(e => e._id === savedId);
-        if (match) setSelectedEmail(prev => prev?._id === savedId ? prev : match);
+      // Restore selected email from sessionStorage — desktop only
+      // On mobile we never auto-open an email; user must tap to open
+      if (!isMobile) {
+        const savedId = sessionStorage.getItem(SESSION_KEY);
+        if (savedId && fetched?.length) {
+          const match = fetched.find(e => e._id === savedId);
+          if (match) setSelectedEmail(prev => prev?._id === savedId ? prev : match);
+        }
       }
     } catch (error) {
       console.error('Error fetching emails:', error);
