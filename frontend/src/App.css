@@ -2262,10 +2262,10 @@ body {
     min-width: 100%;
   }
 
-  /* Email page fills below topbar, no double scroll */
+  /* Email page fills below the fixed topbar */
   .emails-page {
     height: calc(100vh - 52px) !important;
-    margin-top: 52px;
+    margin-top: 52px !important;
     overflow: hidden;
   }
 

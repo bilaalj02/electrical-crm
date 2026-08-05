@@ -397,7 +397,7 @@ function App() {
 
       {/* Main Content Area */}
       <main className={`main-content ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'} ${isMobile ? 'mobile' : ''}`}
-        style={(currentPage === 'diagrams' || currentPage === 'emails') ? { display: 'flex', flexDirection: 'column', height: isMobile ? 'calc(100vh - 52px)' : '100vh', overflow: 'hidden', padding: 0, minHeight: 'unset' } : {}}>
+        style={(currentPage === 'diagrams' || currentPage === 'emails') ? { display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', padding: 0, minHeight: 'unset' } : {}}>
         {currentPage === 'diagrams' ? (
           <Suspense fallback={<div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'#1a1a2e',color:'#c9a84c',fontSize:'18px'}}>Loading Diagram Editor…</div>}>
             <DiagramEditor />
