@@ -438,6 +438,148 @@ function Emails({ initialFolder = null, onConsumeInitial } = {}) {
   };
 
   // ── Render ──
+
+  // ── Mobile: full-screen detail view when email is open ──
+  if (isMobile && selectedEmail) {
+    return (
+      <div className="emails-page emails-page-mobile-detail">
+        {/* Mobile detail header bar */}
+        <div className="email-mobile-detail-topbar">
+          <button className="email-mobile-back-btn" onClick={closeEmail}>
+            <FiChevronLeft size={20} /> Back
+          </button>
+          <span className="email-mobile-detail-subject">{selectedEmail.subject || '(No Subject)'}</span>
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            <button className="email-toolbar-btn" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => toggleRead(selectedEmail._id, selectedEmail.isRead)}>
+              {selectedEmail.isRead ? 'Unread' : 'Read'}
+            </button>
+            <button className="email-toolbar-btn" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => {
+              setComposeData({
+                fromAccount: emailAccounts.find(a => selectedEmail.to?.some(t => t.email === a.email))?._id || '',
+                to: selectedEmail.from?.email,
+                cc: '',
+                subject: selectedEmail.subject?.startsWith('Re:') ? selectedEmail.subject : `Re: ${selectedEmail.subject || ''}`,
+                body: `\n\n---\nOn ${new Date(selectedEmail.date).toLocaleString()}, ${selectedEmail.from?.name || selectedEmail.from?.email} wrote:\n> ${selectedEmail.body?.text?.split('\n').join('\n> ')}`
+              });
+              setShowComposeModal(true);
+            }}>
+              <FiSend size={12} /> Reply
+            </button>
+            <button className="email-toolbar-btn email-toolbar-btn-danger" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => deleteEmail(selectedEmail._id)}>
+              <FiTrash2 size={12} />
+            </button>
+          </div>
+        </div>
+
+        {/* Detail content — scrollable */}
+        <div className="email-mobile-detail-content">
+          {/* Meta */}
+          <div className="email-detail-meta" style={{ padding: '12px 14px', borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
+            <div className="email-detail-avatar">
+              {(selectedEmail.from?.name || selectedEmail.from?.email || '?')[0].toUpperCase()}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 14, color: '#1f2937' }}>
+                {selectedEmail.from?.name || selectedEmail.from?.email}
+              </div>
+              <div style={{ fontSize: 11, color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                To: {selectedEmail.to?.map(t => t.email).join(', ')}
+              </div>
+              <div style={{ fontSize: 11, color: '#aaa' }}>{new Date(selectedEmail.date).toLocaleString()}</div>
+            </div>
+          </div>
+
+          {/* Body + attachments */}
+          <div className="email-detail-body">
+            {selectedEmail.body?.html ? (
+              <iframe
+                srcDoc={(() => {
+                  const cidMap = {};
+                  (selectedEmail.attachments || []).forEach(a => { if (a.contentId && a.url) cidMap[a.contentId] = a.url; });
+                  let html = selectedEmail.body.html;
+                  html = html.replace(/src="cid:([^"]*)"/gi, (_, cid) => cidMap[cid] ? `src="${cidMap[cid]}"` : 'src="" alt="[inline image]"');
+                  html = html.replace(/src='cid:([^']*)'/gi, (_, cid) => cidMap[cid] ? `src='${cidMap[cid]}'` : "src='' alt='[inline image]'");
+                  const resetStyle = '<style>html,body{margin:0!important;padding:0!important;}</style>';
+                  return html.includes('<head') ? html.replace(/<head[^>]*>/i, m => m + resetStyle) : resetStyle + html;
+                })()}
+                title="Email content"
+                className="email-html"
+                style={{ width: '100%', border: 'none', display: 'block' }}
+                sandbox="allow-same-origin allow-popups"
+                onLoad={e => {
+                  try {
+                    const doc = e.target.contentDocument || e.target.contentWindow?.document;
+                    if (doc) { const h = doc.body?.scrollHeight || doc.documentElement.scrollHeight; e.target.style.height = h + 'px'; }
+                  } catch (_) {}
+                }}
+              />
+            ) : (
+              <pre style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word', margin: 0, fontFamily: 'inherit', fontSize: 14, lineHeight: 1.7 }}>{selectedEmail.body?.text || '(No content)'}</pre>
+            )}
+
+            {/* Inline attachments */}
+            {selectedEmail.attachments?.length > 0 && (() => {
+              const visibleAtts = selectedEmail.attachments.filter(a => !a.contentId);
+              if (!visibleAtts.length) return null;
+              return (
+                <div className="email-inline-attachments">
+                  <div className="email-inline-att-header">📎 {visibleAtts.length} attachment{visibleAtts.length > 1 ? 's' : ''}</div>
+                  {visibleAtts.map((att, i) => {
+                    const isImage = att.mimeType?.startsWith('image/');
+                    if (!att.url) return <div key={i} className="att-inline-chip unavailable">📎 {att.filename} <span style={{ opacity: 0.5, fontSize: 11 }}>(unavailable)</span></div>;
+                    if (isImage) return (
+                      <div key={i} className="att-inline-image-wrap">
+                        <div className="att-inline-chip-bar"><span>🖼 {att.filename}</span></div>
+                        <img src={att.url} alt={att.filename} className="att-inline-image" />
+                      </div>
+                    );
+                    return (
+                      <div key={i} className="att-inline-chip-bar">
+                        <span>📎 {att.filename}</span>
+                        <a href={att.url} download={att.filename} className="att-chip-download" style={{ textDecoration: 'none' }}>⬇ Download</a>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+
+        {/* Compose/Reply modal */}
+        {showComposeModal && (
+          <div className="compose-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowComposeModal(false); }}>
+            <div className="compose-panel" ref={composePanelRef} style={{ position: 'fixed', bottom: 0, left: 0, right: 0, top: 'auto', width: '100%', maxWidth: '100%', borderRadius: '16px 16px 0 0', margin: 0 }}>
+              <div className="compose-header" onMouseDown={onComposeDragStart}>
+                <span>{composeData.subject?.startsWith('Re:') ? 'Reply' : 'New Message'}</span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="compose-header-btn" onClick={() => setShowComposeModal(false)}>×</button>
+                </div>
+              </div>
+              <div className="compose-body">
+                <div className="compose-field"><label>From</label>
+                  <select value={composeData.fromAccount} onChange={e => setComposeData({ ...composeData, fromAccount: e.target.value })}>
+                    <option value="">Select account…</option>
+                    {emailAccounts.map(a => <option key={a._id} value={a._id}>{a.email}</option>)}
+                  </select>
+                </div>
+                <div className="compose-field"><label>To</label><input value={composeData.to} onChange={e => setComposeData({ ...composeData, to: e.target.value })} /></div>
+                <div className="compose-field"><label>Subject</label><input value={composeData.subject} onChange={e => setComposeData({ ...composeData, subject: e.target.value })} /></div>
+                <textarea className="compose-textarea" value={composeData.body} onChange={e => setComposeData({ ...composeData, body: e.target.value })} rows={8} />
+              </div>
+              <div className="compose-footer">
+                <button className="btn btn-primary" onClick={sendEmail} disabled={sendingEmail}>{sendingEmail ? 'Sending…' : 'Send'}</button>
+                <button className="btn" onClick={() => setShowComposeModal(false)}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <NotificationModal {...notification} onClose={() => setNotification(n => ({ ...n, isOpen: false }))} />
+      </div>
+    );
+  }
+
   return (
     <div className="emails-page">
 
@@ -550,11 +692,11 @@ function Emails({ initialFolder = null, onConsumeInitial } = {}) {
         </div>
       )}
 
-      {/* ── Three-pane body ── */}
-      <div className={`email-body${isMobile ? ' email-body-mobile' : ''}`}>
+      {/* ── Three-pane body (desktop only reaches here on mobile when no email selected) ── */}
+      <div className="email-body">
 
-        {/* ── Left folder sidebar — hidden on mobile when email open ── */}
-        <div className={`email-nav-sidebar ${folderSidebarCollapsed ? 'collapsed' : ''}${isMobile && selectedEmail ? ' email-pane-hidden' : ''}`}>
+        {/* ── Left folder sidebar — hidden on mobile ── */}
+        <div className={`email-nav-sidebar ${folderSidebarCollapsed ? 'collapsed' : ''}`}>
           <button
             className="email-nav-collapse-btn"
             onClick={() => setFolderSidebarCollapsed(v => !v)}
@@ -636,8 +778,8 @@ function Emails({ initialFolder = null, onConsumeInitial } = {}) {
           )}
         </div>
 
-        {/* ── Email list — hidden on mobile when email is open ── */}
-        <div className={`email-list-pane${isMobile && selectedEmail ? ' email-pane-hidden' : ''}`}>
+        {/* ── Email list ── */}
+        <div className="email-list-pane">
           <div className="email-list-header">
             <label className="email-select-all-check">
               <input
@@ -693,17 +835,12 @@ function Emails({ initialFolder = null, onConsumeInitial } = {}) {
           </div>
         </div>
 
-        {/* ── Email detail pane ── */}
+        {/* ── Email detail pane (desktop only — mobile handled above) ── */}
         {selectedEmail ? (
-          <div className={`email-detail-pane${isMobile ? ' email-detail-pane-mobile' : ''}`}>
+          <div className="email-detail-pane">
             <div className="email-detail-header">
-              {isMobile && (
-                <button className="email-mobile-back-btn" onClick={closeEmail} title="Back to inbox">
-                  <FiChevronLeft size={18} /> Back
-                </button>
-              )}
               <h2 className="email-detail-subject">{selectedEmail.subject || '(No Subject)'}</h2>
-              {!isMobile && <button className="btn-close" onClick={closeEmail}>×</button>}
+              <button className="btn-close" onClick={closeEmail}>×</button>
             </div>
 
             <div className="email-detail-meta">
