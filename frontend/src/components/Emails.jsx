@@ -41,6 +41,13 @@ function Emails({ initialFolder = null, onConsumeInitial } = {}) {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
 
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
+  useEffect(() => {
+    const handle = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handle);
+    return () => window.removeEventListener('resize', handle);
+  }, []);
+
   // Left folder sidebar
   const [folderSidebarCollapsed, setFolderSidebarCollapsed] = useState(false);
   const [folders, setFolders] = useState({}); // { accountId: [{ id, name, unreadCount }] }
@@ -544,10 +551,10 @@ function Emails({ initialFolder = null, onConsumeInitial } = {}) {
       )}
 
       {/* ── Three-pane body ── */}
-      <div className="email-body">
+      <div className={`email-body${isMobile ? ' email-body-mobile' : ''}`}>
 
-        {/* ── Left folder sidebar ── */}
-        <div className={`email-nav-sidebar ${folderSidebarCollapsed ? 'collapsed' : ''}`}>
+        {/* ── Left folder sidebar — hidden on mobile when email open ── */}
+        <div className={`email-nav-sidebar ${folderSidebarCollapsed ? 'collapsed' : ''}${isMobile && selectedEmail ? ' email-pane-hidden' : ''}`}>
           <button
             className="email-nav-collapse-btn"
             onClick={() => setFolderSidebarCollapsed(v => !v)}
@@ -629,8 +636,8 @@ function Emails({ initialFolder = null, onConsumeInitial } = {}) {
           )}
         </div>
 
-        {/* ── Email list ── */}
-        <div className="email-list-pane">
+        {/* ── Email list — hidden on mobile when email is open ── */}
+        <div className={`email-list-pane${isMobile && selectedEmail ? ' email-pane-hidden' : ''}`}>
           <div className="email-list-header">
             <label className="email-select-all-check">
               <input
@@ -688,10 +695,15 @@ function Emails({ initialFolder = null, onConsumeInitial } = {}) {
 
         {/* ── Email detail pane ── */}
         {selectedEmail ? (
-          <div className="email-detail-pane">
+          <div className={`email-detail-pane${isMobile ? ' email-detail-pane-mobile' : ''}`}>
             <div className="email-detail-header">
+              {isMobile && (
+                <button className="email-mobile-back-btn" onClick={closeEmail} title="Back to inbox">
+                  <FiChevronLeft size={18} /> Back
+                </button>
+              )}
               <h2 className="email-detail-subject">{selectedEmail.subject || '(No Subject)'}</h2>
-              <button className="btn-close" onClick={closeEmail}>×</button>
+              {!isMobile && <button className="btn-close" onClick={closeEmail}>×</button>}
             </div>
 
             <div className="email-detail-meta">

@@ -2260,21 +2260,95 @@ body {
     min-width: 100%;
   }
 
-  /* Email page adjustments */
+  /* Email page — mobile full-screen panel approach */
   .emails-page .main-content {
     grid-template-columns: 1fr;
   }
 
-  .email-detail {
+  /* Hide a pane entirely on mobile */
+  .email-pane-hidden {
+    display: none !important;
+  }
+
+  /* Email body fills full height below topbar */
+  .email-body-mobile {
     position: fixed;
-    top: 0;
+    top: calc(52px + 44px); /* topbar + toolbar */
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 1000;
-    max-height: 100vh;
-    height: 100vh;
-    border-radius: 0;
+  }
+
+  /* List pane takes full width on mobile */
+  .email-list-pane {
+    width: 100% !important;
+    min-width: 0 !important;
+    flex: 1;
+  }
+
+  /* Detail pane: full-screen overlay above everything */
+  .email-detail-pane-mobile {
+    position: fixed !important;
+    top: 52px; /* below app topbar */
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2000;
+    border-radius: 0 !important;
+    border: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Back button in detail header */
+  .email-mobile-back-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    color: #d4af37;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  /* Detail header needs to fit back btn + subject */
+  .email-detail-pane-mobile .email-detail-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: nowrap;
+    padding: 12px 14px;
+  }
+
+  .email-detail-pane-mobile .email-detail-subject {
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    margin: 0;
+  }
+
+  /* Toolbar wraps on mobile */
+  .email-toolbar {
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 6px 8px;
+  }
+
+  .email-toolbar-btn {
+    font-size: 11px;
+    padding: 5px 8px;
+  }
+
+  /* Folder sidebar hidden on mobile by default (use filter bar instead) */
+  .email-nav-sidebar {
+    display: none;
   }
 }
 
