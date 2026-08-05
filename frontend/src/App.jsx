@@ -1,6 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import './App.css';
-import { FiMail, FiBriefcase, FiUsers, FiHome, FiBarChart2, FiCalendar, FiChevronLeft, FiChevronRight, FiChevronDown, FiUser, FiLogOut, FiSettings as FiSettingsIcon, FiBell, FiFolder, FiZap, FiSend, FiLink, FiHelpCircle } from 'react-icons/fi';
+import { FiMail, FiBriefcase, FiUsers, FiHome, FiBarChart2, FiCalendar, FiChevronLeft, FiChevronRight, FiChevronDown, FiUser, FiLogOut, FiSettings as FiSettingsIcon, FiBell, FiFolder, FiZap, FiSend, FiLink, FiHelpCircle, FiMenu, FiX } from 'react-icons/fi';
 import { ToastContainer } from './components/Toast';
 import { useAuth } from './context/AuthContext';
 import Login from './components/Login';
@@ -42,7 +42,8 @@ const getInitialPage = () => {
 function App() {
   const { isAuthenticated, user, logout, loading, isManager } = useAuth();
   const [currentPage, setCurrentPage] = useState(getInitialPage);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 768);
   const [emailDropdownOpen, setEmailDropdownOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -61,7 +62,18 @@ function App() {
     setCurrentPage(page);
     if (options.jobId)    setPendingJobId(options.jobId);
     if (options.clientId) setPendingClientId(options.clientId);
+    if (isMobile) setSidebarOpen(false);
   };
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth <= 768;
+      setIsMobile(mobile);
+      if (!mobile && !sidebarOpen) setSidebarOpen(true);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [sidebarOpen]);
+
   useEffect(() => {
     if (isAuthenticated) {
       // Fetch potential jobs count on load and every 5 minutes
@@ -126,13 +138,23 @@ function App() {
 
   return (
     <div className="app-container">
-      {/* Mobile overlay — dims content when sidebar is open */}
-      {sidebarOpen && (
+      {/* Mobile overlay — dims/blocks content when sidebar is open */}
+      {isMobile && sidebarOpen && (
         <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
       )}
 
+      {/* Mobile top bar with hamburger */}
+      {isMobile && (
+        <div className="mobile-topbar">
+          <button className="hamburger-btn" onClick={() => setSidebarOpen(o => !o)} aria-label="Toggle menu">
+            {sidebarOpen ? <FiX size={22} /> : <FiMenu size={22} />}
+          </button>
+          <img src={mesLogo} alt="MES Logo" className="mobile-topbar-logo" />
+        </div>
+      )}
+
       {/* Sidebar Navigation */}
-      <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
+      <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'} ${isMobile ? 'mobile' : ''}`}>
         <div className="sidebar-header">
           <img src={mesLogo} alt="MES Logo" className="sidebar-logo" />
         </div>
@@ -141,7 +163,7 @@ function App() {
           <button
             data-onboarding="nav-home"
             className={`sidebar-link ${currentPage === 'home' ? 'active' : ''}`}
-            onClick={() => setCurrentPage('home')}
+            onClick={() => { setCurrentPage('home'); if (isMobile) setSidebarOpen(false); }}
             title="Home"
           >
             <FiHome className="sidebar-icon" />
@@ -155,7 +177,7 @@ function App() {
                 <button
                   data-onboarding="nav-emails"
                   className={`sidebar-link ${currentPage === 'emails' ? 'active' : ''}`}
-                  onClick={() => setCurrentPage('emails')}
+                  onClick={() => { setCurrentPage('emails'); if (isMobile) setSidebarOpen(false); }}
                   title="Emails"
                 >
                   <FiMail className="sidebar-icon" />
@@ -210,7 +232,7 @@ function App() {
           <button
             data-onboarding="nav-jobs"
             className={`sidebar-link ${currentPage === 'jobs' ? 'active' : ''}`}
-            onClick={() => setCurrentPage('jobs')}
+            onClick={() => { setCurrentPage('jobs'); if (isMobile) setSidebarOpen(false); }}
             title="Jobs"
           >
             <FiBriefcase className="sidebar-icon" />
@@ -222,7 +244,7 @@ function App() {
             <button
               data-onboarding="nav-clients"
               className={`sidebar-link ${currentPage === 'clients' ? 'active' : ''}`}
-              onClick={() => setCurrentPage('clients')}
+              onClick={() => { setCurrentPage('clients'); if (isMobile) setSidebarOpen(false); }}
               title="Clients"
             >
               <FiUsers className="sidebar-icon" />
@@ -233,7 +255,7 @@ function App() {
           <button
             data-onboarding="nav-calendar"
             className={`sidebar-link ${currentPage === 'calendar' ? 'active' : ''}`}
-            onClick={() => setCurrentPage('calendar')}
+            onClick={() => { setCurrentPage('calendar'); if (isMobile) setSidebarOpen(false); }}
             title="Calendar"
           >
             <FiCalendar className="sidebar-icon" />
@@ -243,7 +265,7 @@ function App() {
           <button
             data-onboarding="nav-projects"
             className={`sidebar-link ${currentPage === 'projects' ? 'active' : ''}`}
-            onClick={() => setCurrentPage('projects')}
+            onClick={() => { setCurrentPage('projects'); if (isMobile) setSidebarOpen(false); }}
             title="Projects"
           >
             <FiFolder className="sidebar-icon" />
@@ -253,7 +275,7 @@ function App() {
           <button
             data-onboarding="nav-diagrams"
             className={`sidebar-link ${currentPage === 'diagrams' ? 'active' : ''}`}
-            onClick={() => setCurrentPage('diagrams')}
+            onClick={() => { setCurrentPage('diagrams'); if (isMobile) setSidebarOpen(false); }}
             title="Diagrams"
           >
             <FiZap className="sidebar-icon" />
@@ -266,7 +288,7 @@ function App() {
               <button
                 data-onboarding="nav-analytics"
                 className={`sidebar-link ${currentPage === 'analytics' ? 'active' : ''}`}
-                onClick={() => setCurrentPage('analytics')}
+                onClick={() => { setCurrentPage('analytics'); if (isMobile) setSidebarOpen(false); }}
                 title="Analytics"
               >
                 <FiBarChart2 className="sidebar-icon" />
@@ -275,7 +297,7 @@ function App() {
               <button
                 data-onboarding="nav-marketing"
                 className={`sidebar-link ${currentPage === 'marketing' ? 'active' : ''}`}
-                onClick={() => setCurrentPage('marketing')}
+                onClick={() => { setCurrentPage('marketing'); if (isMobile) setSidebarOpen(false); }}
                 title="Marketing"
               >
                 <FiSend className="sidebar-icon" />
@@ -284,7 +306,7 @@ function App() {
               <button
                 data-onboarding="nav-integrations"
                 className={`sidebar-link ${currentPage === 'integrations' ? 'active' : ''}`}
-                onClick={() => setCurrentPage('integrations')}
+                onClick={() => { setCurrentPage('integrations'); if (isMobile) setSidebarOpen(false); }}
                 title="Integrations"
               >
                 <FiLink className="sidebar-icon" />
@@ -335,45 +357,47 @@ function App() {
         </div>
       </aside>
 
-      {/* Sidebar Toggle Button - At edge between sidebar and main content */}
-      <button
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-        style={{
-          position: 'fixed',
-          left: sidebarOpen ? '188px' : '68px',
-          top: '80px',
-          background: '#d4af37',
-          border: 'none',
-          borderRadius: '50%',
-          width: '24px',
-          height: '24px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'white',
-          fontSize: '14px',
-          boxShadow: '0 2px 6px rgba(212, 175, 55, 0.4)',
-          zIndex: 1000,
-          transition: 'left 0.3s ease',
-          padding: '0'
-        }}
-        onMouseOver={(e) => {
-          e.currentTarget.style.background = '#b8941f';
-          e.currentTarget.style.boxShadow = '0 3px 10px rgba(212, 175, 55, 0.6)';
-        }}
-        onMouseOut={(e) => {
-          e.currentTarget.style.background = '#d4af37';
-          e.currentTarget.style.boxShadow = '0 2px 6px rgba(212, 175, 55, 0.4)';
-        }}
-      >
-        {sidebarOpen ? <FiChevronLeft size={14} /> : <FiChevronRight size={14} />}
-      </button>
+      {/* Sidebar Toggle Button — desktop only */}
+      {!isMobile && (
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+          style={{
+            position: 'fixed',
+            left: sidebarOpen ? '188px' : '68px',
+            top: '80px',
+            background: '#d4af37',
+            border: 'none',
+            borderRadius: '50%',
+            width: '24px',
+            height: '24px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+            fontSize: '14px',
+            boxShadow: '0 2px 6px rgba(212, 175, 55, 0.4)',
+            zIndex: 1000,
+            transition: 'left 0.3s ease',
+            padding: '0'
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.background = '#b8941f';
+            e.currentTarget.style.boxShadow = '0 3px 10px rgba(212, 175, 55, 0.6)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.background = '#d4af37';
+            e.currentTarget.style.boxShadow = '0 2px 6px rgba(212, 175, 55, 0.4)';
+          }}
+        >
+          {sidebarOpen ? <FiChevronLeft size={14} /> : <FiChevronRight size={14} />}
+        </button>
+      )}
 
       {/* Main Content Area */}
-      <main className={`main-content ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}
-        style={(currentPage === 'diagrams' || currentPage === 'emails') ? { display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', padding: 0, minHeight: 'unset' } : {}}>
+      <main className={`main-content ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'} ${isMobile ? 'mobile' : ''}`}
+        style={(currentPage === 'diagrams' || currentPage === 'emails') ? { display: 'flex', flexDirection: 'column', height: isMobile ? 'calc(100vh - 52px)' : '100vh', overflow: 'hidden', padding: 0, minHeight: 'unset' } : {}}>
         {currentPage === 'diagrams' ? (
           <Suspense fallback={<div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'#1a1a2e',color:'#c9a84c',fontSize:'18px'}}>Loading Diagram Editor…</div>}>
             <DiagramEditor />

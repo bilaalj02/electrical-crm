@@ -20,6 +20,9 @@ function JobForm({ job, clients, onClose, onSave }) {
   const [creatingClient, setCreatingClient] = useState(false);
   const [newClient, setNewClient] = useState(emptyNewClient);
   const [employees, setEmployees] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [projectSearch, setProjectSearch] = useState('');
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -31,6 +34,7 @@ function JobForm({ job, clients, onClose, onSave }) {
     scheduledDate: '',
     scheduledTime: '',
     dueDate: '',
+    projectId: '',
     costs: {
       laborHours: 0,
       laborRate: 85,
@@ -57,8 +61,13 @@ function JobForm({ job, clients, onClose, onSave }) {
         scheduledTime: sd ? sd.toTimeString().slice(0, 5) : '',
         dueDate: job.dueDate ? new Date(job.dueDate).toISOString().split('T')[0] : '',
         client: job.client?._id || job.client,
+        projectId: job.projectId?._id || job.projectId || '',
         assignedUsers: (job.assignedUsers || []).map(u => u._id || u)
       });
+      if (job.projectId) {
+        const p = job.projectId;
+        setProjectSearch(typeof p === 'object' ? p.title : '');
+      }
     }
   }, [job]);
 
@@ -68,6 +77,13 @@ function JobForm({ job, clients, onClose, onSave }) {
       .then(res => setEmployees(res.data.users || []))
       .catch(() => {});
   }, [isManager]);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    axios.get(`${API_URL}/projects`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => setProjects(res.data.projects || []))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const fetchRecommendations = async () => {
@@ -344,6 +360,55 @@ function JobForm({ job, clients, onClose, onSave }) {
                     onClick={(e) => e.target.showPicker?.()}
                     style={{ ...inputStyle, cursor: 'pointer' }}
                   />
+                </div>
+
+                <div className="form-group full-width" style={{ position: 'relative' }}>
+                  <label>Project <span style={{ color: '#9ca3af', fontWeight: 400, fontSize: '0.8em' }}>(optional)</span></label>
+                  <input
+                    type="text"
+                    placeholder="Search to link a project..."
+                    value={projectSearch}
+                    onChange={(e) => {
+                      setProjectSearch(e.target.value);
+                      setFormData({ ...formData, projectId: '' });
+                      setShowProjectDropdown(true);
+                    }}
+                    onFocus={() => setShowProjectDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowProjectDropdown(false), 150)}
+                    style={inputStyle}
+                  />
+                  {formData.projectId && (
+                    <button
+                      type="button"
+                      onClick={() => { setFormData({ ...formData, projectId: '' }); setProjectSearch(''); }}
+                      style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(4px)', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: 16 }}
+                      title="Clear project"
+                    >×</button>
+                  )}
+                  {showProjectDropdown && projects.filter(p =>
+                    !projectSearch || p.title?.toLowerCase().includes(projectSearch.toLowerCase())
+                  ).length > 0 && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'white', border: '1px solid #ddd', borderRadius: '8px', maxHeight: '200px', overflowY: 'auto', zIndex: 1000, marginTop: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                      {projects.filter(p =>
+                        !projectSearch || p.title?.toLowerCase().includes(projectSearch.toLowerCase())
+                      ).map(p => (
+                        <div
+                          key={p._id}
+                          onMouseDown={() => {
+                            setFormData({ ...formData, projectId: p._id });
+                            setProjectSearch(p.title);
+                            setShowProjectDropdown(false);
+                          }}
+                          style={{ padding: '12px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0' }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#f9f9f9'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                        >
+                          <div style={{ fontWeight: 500 }}>{p.title}</div>
+                          {p.description && <div style={{ fontSize: 12, color: '#666' }}>{p.description.slice(0, 60)}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </section>

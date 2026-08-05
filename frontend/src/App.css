@@ -1416,6 +1416,87 @@ body {
     margin-left: 0;
   }
 }
+
+/* ── Mobile topbar + hamburger ── */
+.mobile-topbar {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 52px;
+    background: #000;
+    border-bottom: 1px solid rgba(212, 175, 55, 0.25);
+    padding: 0 16px;
+    z-index: 3000;
+  }
+
+  .mobile-topbar-logo {
+    height: 34px;
+    width: auto;
+    object-fit: contain;
+  }
+
+  .hamburger-btn {
+    background: none;
+    border: none;
+    color: #d4af37;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    border-radius: 6px;
+    flex-shrink: 0;
+  }
+
+  .hamburger-btn:hover {
+    background: rgba(212, 175, 55, 0.12);
+  }
+
+  /* Sidebar slides in from left on mobile */
+  .sidebar.mobile {
+    position: fixed;
+    top: 52px; /* below topbar */
+    left: 0;
+    bottom: 0;
+    z-index: 2500;
+    width: 220px !important;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    overflow-y: auto;
+  }
+
+  .sidebar.mobile.open {
+    transform: translateX(0);
+  }
+
+  /* Overlay only needed on mobile */
+  .sidebar-overlay {
+    position: fixed;
+    inset: 52px 0 0 0; /* starts below topbar */
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 2400;
+  }
+
+  /* Main content always full width on mobile, pushed down by topbar */
+  .main-content.mobile {
+    margin-left: 0 !important;
+    padding-top: 52px;
+  }
+
+  /* Pages that use full height (emails, diagrams) need topbar offset */
+  .main-content.mobile[style] {
+    padding-top: 0; /* inline style controls it via calc */
+  }
+}
 /* Sidebar with Black and Gold Theme */
 .sidebar {
   background: linear-gradient(180deg, #000000 0%, #1a1a1a 100%);
@@ -2110,11 +2191,15 @@ body {
 
   .jobs-page,
   .clients-page,
-  .emails-page,
   .analytics-page,
   .marketing-page,
   .home-page {
-    padding: 1rem 1.5rem;
+    padding: 1rem 1rem;
+  }
+
+  /* emails-page has its own full-height layout, keep padding 0 */
+  .emails-page {
+    padding: 0;
   }
 
   .page-header {

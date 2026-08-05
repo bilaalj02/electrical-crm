@@ -131,16 +131,6 @@ export default function Projects() {
   const handleCreateProject = async (e) => {
     e.preventDefault();
 
-    if (!formData.jobId) {
-      setNotification({
-        isOpen: true,
-        type: 'error',
-        title: 'Missing Job',
-        message: 'Please select a job from the list'
-      });
-      return;
-    }
-
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(`${API_URL}/projects`, formData, {
@@ -591,17 +581,16 @@ export default function Projects() {
                   />
                 </div>
                 <div className="form-group" style={{ position: 'relative' }}>
-                  <label>Job *</label>
+                  <label>Job <span style={{ color: '#9ca3af', fontWeight: 400, fontSize: '0.8em' }}>(optional)</span></label>
                   <input
                     type="text"
-                    placeholder="Search or type job..."
+                    placeholder="Search or type job to link..."
                     value={formData.jobSearch}
                     onChange={(e) => {
                       setFormData({ ...formData, jobSearch: e.target.value, jobId: '' });
                       setShowJobDropdown(true);
                     }}
                     onFocus={() => setShowJobDropdown(true)}
-                    required={!formData.jobId}
                   />
                   {showJobDropdown && filteredJobs.length > 0 && (
                     <div style={{
