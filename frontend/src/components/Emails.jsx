@@ -1030,10 +1030,12 @@ function Emails({ initialFolder = null, onConsumeInitial } = {}) {
             </div>
           </div>
         ) : (
-          <div className="email-detail-empty">
-            <FiMail size={48} style={{ color: '#ddd' }} />
-            <p style={{ color: '#aaa', marginTop: 12 }}>Select an email to read</p>
-          </div>
+          !isMobile && (
+            <div className="email-detail-empty">
+              <FiMail size={48} style={{ color: '#ddd' }} />
+              <p style={{ color: '#aaa', marginTop: 12 }}>Select an email to read</p>
+            </div>
+          )
         )}
       </div>
 

@@ -2190,10 +2190,27 @@ body {
   .marketing-page,
   .home-page,
   .projects-page,
+  .projects-container,
+  .calendar-page,
+  .settings-page,
+  .integrations-page,
+  .content-wrapper > div:not(.emails-page) {
+    padding-top: calc(52px + 0.75rem) !important;
+  }
+
+  .jobs-page,
+  .clients-page,
+  .analytics-page,
+  .marketing-page,
+  .home-page,
+  .projects-page,
+  .projects-container,
   .calendar-page,
   .settings-page,
   .integrations-page {
-    padding: calc(52px + 0.75rem) 1rem 1rem 1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-bottom: 1rem;
   }
 
   /* emails-page has its own full-height layout, keep padding 0 */
