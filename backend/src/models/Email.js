@@ -73,7 +73,8 @@ const emailSchema = new mongoose.Schema({
     size: Number,
     attachmentId: String,
     url: String,      // Cloudinary secure_url — present once downloaded/stored
-    publicId: String   // Cloudinary public_id, for future deletion/management
+    publicId: String, // Cloudinary public_id, for future deletion/management
+    contentId: String // cid: reference used in email HTML for inline images (e.g. signature logos)
   }],
   clientId: {
     type: mongoose.Schema.Types.ObjectId,

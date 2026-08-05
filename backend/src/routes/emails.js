@@ -6,16 +6,21 @@ const {
   getEmail,
   markEmailRead,
   linkEmail,
-  sendEmail
+  sendEmail,
+  getFolders,
+  moveEmail,
+  fetchAttachment
 } = require('../controllers/emailController');
 const { auth } = require('../middleware/auth');
 
-// Email routes
 router.post('/sync/:accountId', auth, syncEmails);
 router.get('/', auth, getEmails);
+router.post('/send', auth, sendEmail);                         // before /:emailId
+router.get('/folders/:accountId', auth, getFolders);          // before /:emailId
+router.post('/move/:emailId', auth, moveEmail);               // before /:emailId
+router.post('/:emailId/attachment', auth, fetchAttachment);   // POST — attachmentId in body
 router.get('/:emailId', auth, getEmail);
 router.patch('/:emailId/read', auth, markEmailRead);
 router.patch('/:emailId/link', auth, linkEmail);
-router.post('/send', auth, sendEmail);
 
 module.exports = router;

@@ -133,11 +133,14 @@ const syncGmailEmails = async (req, res, emailAccount, maxResults) => {
     const attachments = [];
     const getAttachments = (payload) => {
       if (payload.filename && payload.body.attachmentId) {
+        const cidHeader = (payload.headers || []).find(h => h.name.toLowerCase() === 'content-id');
+        const contentId = cidHeader ? cidHeader.value.replace(/^<|>$/g, '') : null;
         attachments.push({
           filename: payload.filename,
           mimeType: payload.mimeType,
           size: payload.body.size,
-          attachmentId: payload.body.attachmentId
+          attachmentId: payload.body.attachmentId,
+          ...(contentId && { contentId })
         });
       }
       if (payload.parts) {
@@ -177,11 +180,10 @@ const syncGmailEmails = async (req, res, emailAccount, maxResults) => {
     syncedCount++;
   }
 
-  // Update last synced time
+  // Update last synced time. Do NOT persist nextPageToken as syncToken —
+  // nextPageToken paginates backwards through history; using it on the next
+  // sync would walk older mail instead of picking up newly arrived emails.
   emailAccount.lastSyncedAt = new Date();
-  if (response.data.nextPageToken) {
-    emailAccount.syncToken = response.data.nextPageToken;
-  }
   await emailAccount.save();
 
   res.json({
@@ -206,19 +208,16 @@ const fetchAndStoreMicrosoftAttachments = async (accessToken, messageId) => {
 
     if (!att.contentBytes) {
       console.warn(`[emailController] Skipping attachment "${att.name}" on message ${messageId} — no inline content (likely over the ~3MB inline limit)`);
-      result.push({ filename: att.name, mimeType: att.contentType, size: att.size, attachmentId: att.id });
+      result.push({ filename: att.name, mimeType: att.contentType, size: att.size, attachmentId: att.id, ...(att.contentId && { contentId: att.contentId.replace(/^<|>$/g, '') }) });
       continue;
     }
 
     try {
       const dataUri = `data:${att.contentType};base64,${att.contentBytes}`;
+      const isImg = att.contentType?.startsWith('image/');
       const uploadResult = await cloudinary.uploader.upload(dataUri, {
         folder: 'mes-electrical/email-attachments',
-        // 'auto' lets Cloudinary route images to its image pipeline and
-        // documents (PDF, DOCX, etc.) to 'raw' itself — hardcoding 'raw'
-        // for everything meant real images got stored suboptimally, and
-        // masked the fact that non-image documents need their own path.
-        resource_type: 'auto',
+        resource_type: isImg ? 'image' : 'raw',
         public_id: `${messageId}-${att.id}`
       });
       result.push({
@@ -227,7 +226,8 @@ const fetchAndStoreMicrosoftAttachments = async (accessToken, messageId) => {
         size: att.size,
         attachmentId: att.id,
         url: uploadResult.secure_url,
-        publicId: uploadResult.public_id
+        publicId: uploadResult.public_id,
+        ...(att.contentId && { contentId: att.contentId.replace(/^<|>$/g, '') })
       });
     } catch (error) {
       // Cloudinary's SDK throws a plain string (not an Error) for config
@@ -235,7 +235,7 @@ const fetchAndStoreMicrosoftAttachments = async (accessToken, messageId) => {
       // api_key"` — so error.message was silently logging `undefined`
       // for exactly the class of failure most worth seeing clearly.
       console.error(`[emailController] Failed to store attachment "${att.name}" on message ${messageId}:`, error?.message || error);
-      result.push({ filename: att.name, mimeType: att.contentType, size: att.size, attachmentId: att.id });
+      result.push({ filename: att.name, mimeType: att.contentType, size: att.size, attachmentId: att.id, ...(att.contentId && { contentId: att.contentId.replace(/^<|>$/g, '') }) });
     }
   }
 
@@ -382,7 +382,9 @@ const getEmails = async (req, res) => {
       isRead,
       hasAttachments,
       clientId,
-      jobId
+      jobId,
+      folderId,
+      folder
     } = req.query;
 
     const query = { userId: req.user._id };
@@ -393,13 +395,31 @@ const getEmails = async (req, res) => {
     if (clientId) query.clientId = clientId;
     if (jobId) query.jobId = jobId;
 
+    // folderId can be a Microsoft mailFolder ID or a Gmail label ID (e.g. "INBOX").
+    // Gmail emails store folder info in labels[], Microsoft in folderId.
+    // Match either so clicking a folder works for both providers.
+    if (folderId) {
+      query.$or = [{ folderId }, { labels: folderId }];
+    } else if (folder === 'inbox') {
+      query.$or = [{ folderId: { $in: ['inbox', 'INBOX'] } }, { labels: 'INBOX' }];
+    } else if (folder === 'sent') {
+      query.$or = [{ folderId: { $in: ['sentitems', 'SENT'] } }, { labels: 'SENT' }];
+    }
+
     if (search) {
-      query.$or = [
+      const searchOr = [
         { subject: { $regex: search, $options: 'i' } },
         { 'from.email': { $regex: search, $options: 'i' } },
         { 'from.name': { $regex: search, $options: 'i' } },
         { snippet: { $regex: search, $options: 'i' } }
       ];
+      // Merge with existing $or if folderId already set it
+      if (query.$or) {
+        query.$and = [{ $or: query.$or }, { $or: searchOr }];
+        delete query.$or;
+      } else {
+        query.$or = searchOr;
+      }
     }
 
     const skip = (page - 1) * limit;
@@ -565,11 +585,229 @@ const sendEmail = async (req, res) => {
   }
 };
 
+// Get folders for an account
+const getFolders = async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const emailAccount = await EmailAccount.findOne({ _id: accountId, userId: req.user._id });
+    if (!emailAccount) return res.status(404).json({ error: 'Account not found' });
+
+    if (emailAccount.provider === 'microsoft') {
+      const accessToken = await getAuthenticatedMicrosoftClient(emailAccount);
+      const flatFolders = await _fetchMicrosoftFolderTree(accessToken);
+      const FOLDER_ICONS = {
+        'Inbox': '📥', 'Sent Items': '📤', 'Drafts': '📝',
+        'Junk Email': '🚫', 'Deleted Items': '🗑️', 'Archive': '📦',
+        'Outbox': '📬'
+      };
+      const folders = flatFolders.map(f => ({
+        id: f.id,
+        name: f.name,
+        icon: FOLDER_ICONS[f.name] || '📁',
+        unreadCount: 0,
+        totalCount: 0
+      }));
+      return res.json({ folders });
+    }
+
+    if (emailAccount.provider === 'gmail') {
+      const oauth2Client = await getAuthenticatedClient(emailAccount);
+      const gmail = require('googleapis').google.gmail({ version: 'v1', auth: oauth2Client });
+      const { data } = await gmail.users.labels.list({ userId: 'me' });
+      const GMAIL_ICONS = {
+        'INBOX': '📥', 'SENT': '📤', 'DRAFT': '📝',
+        'SPAM': '🚫', 'TRASH': '🗑️', 'STARRED': '⭐', 'IMPORTANT': '🔔'
+      };
+      const folders = (data.labels || [])
+        .filter(l => l.type !== 'system' || ['INBOX','SENT','DRAFT','SPAM','TRASH','STARRED'].includes(l.id))
+        .map(l => ({
+          id: l.id,
+          name: l.name,
+          icon: GMAIL_ICONS[l.id] || '📁',
+          unreadCount: l.messagesUnread || 0,
+          totalCount: l.messagesTotal || 0
+        }));
+      return res.json({ folders });
+    }
+
+    res.json({ folders: [] });
+  } catch (error) {
+    console.error('Error fetching folders:', error.message);
+    res.status(500).json({ error: 'Failed to fetch folders' });
+  }
+};
+
+// Serve a Gmail attachment (fetched on-demand, uploaded to Cloudinary, URL returned)
+// Fetch an attachment on demand (Gmail or Microsoft) — attachmentId in body to avoid URL encoding issues
+const fetchAttachment = async (req, res) => {
+  try {
+    const { emailId } = req.params;
+    const { attachmentId } = req.body;
+
+    if (!attachmentId) return res.status(400).json({ error: 'attachmentId required' });
+
+    // NOTE: no userId scoping here, deliberately. The email list the UI shows
+    // (GET /api/emails, routes/emailRoutes.js) is a shared team inbox with NO
+    // per-user filter, so any authenticated user can open any synced email.
+    // Scoping this lookup to req.user._id made attachments 404 ("Email not
+    // found") for every email synced by a different team member, even though
+    // the email itself rendered fine. Auth is still required by the route.
+    const email = await Email.findOne({ _id: emailId });
+    if (!email) return res.status(404).json({ error: 'Email not found' });
+
+    const att = email.attachments.find(a => a.attachmentId === attachmentId);
+    if (!att) return res.status(404).json({ error: 'Attachment not found on this email' });
+
+    // Already uploaded to Cloudinary — return cached URL (include contentId so
+    // frontend can resolve cid: inline images for emails synced before the schema fix)
+    if (att.url) return res.json({ url: att.url, filename: att.filename, mimeType: att.mimeType, contentId: att.contentId || null });
+
+    // Use the account that synced this email (its owner's OAuth tokens), not
+    // an account owned by the requesting user — same shared-inbox reasoning.
+    const emailAccount = email.emailAccountId
+      ? await EmailAccount.findOne({ _id: email.emailAccountId })
+      : null;
+    if (!emailAccount) return res.status(404).json({ error: 'No connected email account found for this email' });
+
+    let base64Data, mimeType;
+
+    if (emailAccount.provider === 'gmail') {
+      const oauth2Client = await getAuthenticatedClient(emailAccount);
+      const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+      const { data } = await gmail.users.messages.attachments.get({
+        userId: 'me',
+        messageId: email.messageId,
+        id: attachmentId
+      });
+      if (!data.data) return res.status(404).json({ error: 'Attachment data not available from Gmail' });
+      // Gmail uses URL-safe base64 — convert to standard
+      base64Data = data.data.replace(/-/g, '+').replace(/_/g, '/');
+      mimeType = att.mimeType || 'application/octet-stream';
+
+    } else if (emailAccount.provider === 'microsoft') {
+      const accessToken = await getAuthenticatedMicrosoftClient(emailAccount);
+      // encodeURIComponent: Graph IDs are base64-ish and can contain chars
+      // ('=', '+', '/') that break the URL path if interpolated raw
+      const { data } = await axios.get(
+        `https://graph.microsoft.com/v1.0/me/messages/${encodeURIComponent(email.messageId)}/attachments/${encodeURIComponent(attachmentId)}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (!data.contentBytes) return res.status(404).json({ error: 'Attachment content not available from Microsoft (may exceed 3MB inline limit)' });
+      base64Data = data.contentBytes;
+      mimeType = data.contentType || att.mimeType || 'application/octet-stream';
+      // Backfill contentId if Graph returns it and it wasn't stored at sync time
+      if (data.contentId && !att.contentId) {
+        att._resolvedContentId = data.contentId.replace(/^<|>$/g, '');
+      }
+    } else {
+      return res.status(400).json({ error: 'Unsupported provider' });
+    }
+
+    // Upload to Cloudinary and cache
+    // Use 'raw' for PDFs/documents — Cloudinary's 'auto' maps non-image files
+    // to raw internally but generates /image/upload/ URLs which return 401 when
+    // accessed directly. Explicit 'raw' produces the correct /raw/upload/ URL.
+    const isImageMime = mimeType.startsWith('image/');
+    const cloudinaryResourceType = isImageMime ? 'image' : 'raw';
+    const dataUri = `data:${mimeType};base64,${base64Data}`;
+    const safePublicId = `${email._id}-${Buffer.from(attachmentId).toString('hex').slice(0, 40)}`;
+    const uploadResult = await cloudinary.uploader.upload(dataUri, {
+      folder: 'mes-electrical/email-attachments',
+      resource_type: cloudinaryResourceType,
+      public_id: safePublicId
+    });
+
+    const resolvedContentId = att.contentId || att._resolvedContentId || null;
+    const dbSet = {
+      'attachments.$.url': uploadResult.secure_url,
+      'attachments.$.publicId': uploadResult.public_id,
+      'attachments.$.mimeType': mimeType
+    };
+    if (resolvedContentId) dbSet['attachments.$.contentId'] = resolvedContentId;
+
+    // Targeted update instead of email.save(): a full-document save re-runs
+    // schema validation, which throws on legacy emails (synced by the old
+    // pre-OAuth services) that are missing now-required fields like userId —
+    // turning a successful attachment fetch into a 500 after the upload.
+    await Email.updateOne(
+      { _id: email._id, 'attachments.attachmentId': attachmentId },
+      { $set: dbSet }
+    );
+
+    res.json({ url: uploadResult.secure_url, filename: att.filename, mimeType, contentId: resolvedContentId });
+  } catch (error) {
+    console.error('Error fetching attachment:', error.message);
+    res.status(500).json({ error: 'Failed to fetch attachment', detail: error.message });
+  }
+};
+
+// Move email to a folder
+const moveEmail = async (req, res) => {
+  try {
+    const { emailId } = req.params;
+    const { folderId, folderName } = req.body;
+
+    // Unscoped by userId for the same shared-inbox reason as fetchAttachment
+    // above: the email list has no per-user filter, so moves must work on
+    // emails synced by other team members too.
+    const email = await Email.findOne({ _id: emailId });
+    if (!email) return res.status(404).json({ error: 'Email not found' });
+
+    const emailAccount = email.emailAccountId
+      ? await EmailAccount.findOne({ _id: email.emailAccountId })
+      : null;
+    if (!emailAccount) return res.status(404).json({ error: 'No connected email account found for this email' });
+
+    if (emailAccount.provider === 'microsoft') {
+      const accessToken = await getAuthenticatedMicrosoftClient(emailAccount);
+      // Graph returns the moved message with a NEW id — capture it so future
+      // attachment fetches and moves don't 404 on the old (now invalid) id.
+      const moveResponse = await axios.post(
+        `https://graph.microsoft.com/v1.0/me/messages/${encodeURIComponent(email.messageId)}/move`,
+        { destinationId: folderId },
+        { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
+      );
+      if (moveResponse.data?.id && moveResponse.data.id !== email.messageId) {
+        await Email.updateOne({ _id: email._id }, { $set: { messageId: moveResponse.data.id } });
+      }
+    } else if (emailAccount.provider === 'gmail') {
+      const oauth2Client = await getAuthenticatedClient(emailAccount);
+      const gmail = require('googleapis').google.gmail({ version: 'v1', auth: oauth2Client });
+      const currentLabels = email.labels || [];
+      const removeLabelIds = currentLabels.filter(l => ['INBOX','SENT','DRAFT','SPAM','TRASH'].includes(l));
+      await gmail.users.messages.modify({
+        userId: 'me',
+        id: email.messageId,
+        requestBody: { addLabelIds: [folderId], removeLabelIds }
+      });
+    }
+
+    // Schema fields are folderId/folderName — the old `email.folder = ...`
+    // wrote to a non-schema path and was silently discarded by Mongoose.
+    // updateOne (not save) so legacy docs missing required fields don't
+    // fail validation.
+    const folderUpdate = {};
+    if (folderId) folderUpdate.folderId = folderId;
+    if (folderName) folderUpdate.folderName = folderName;
+    if (Object.keys(folderUpdate).length) {
+      await Email.updateOne({ _id: email._id }, { $set: folderUpdate });
+    }
+
+    res.json({ message: 'Email moved successfully' });
+  } catch (error) {
+    console.error('Error moving email:', error.message);
+    res.status(500).json({ error: 'Failed to move email' });
+  }
+};
+
 module.exports = {
   syncEmails,
   getEmails,
   getEmail,
   markEmailRead,
   linkEmail,
-  sendEmail
+  sendEmail,
+  getFolders,
+  moveEmail,
+  fetchAttachment
 };

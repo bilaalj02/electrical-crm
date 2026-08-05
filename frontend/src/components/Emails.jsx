@@ -1,14 +1,27 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
-import { FiMail, FiRefreshCw, FiFilter, FiSearch, FiPlus, FiCheck, FiX, FiEdit, FiSend, FiMinus, FiMaximize2, FiMinimize2, FiTrash2, FiFolder } from 'react-icons/fi';
+import {
+  FiMail, FiRefreshCw, FiFilter, FiSearch, FiPlus, FiCheck, FiX, FiEdit,
+  FiSend, FiMinus, FiMaximize2, FiMinimize2, FiTrash2, FiFolder,
+  FiChevronDown, FiChevronRight, FiChevronLeft, FiMoreHorizontal
+} from 'react-icons/fi';
 import NotificationModal from './NotificationModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const SESSION_KEY = 'email_selectedId';
+
+// Default folders to show before a sync happens
+const DEFAULT_FOLDERS = [
+  { id: 'inbox',     name: 'Inbox',      icon: '📥' },
+  { id: 'sentitems', name: 'Sent',       icon: '📤' },
+  { id: 'drafts',    name: 'Drafts',     icon: '📝' },
+  { id: 'junkemail', name: 'Junk',       icon: '🚫' },
+  { id: 'deleteditems', name: 'Deleted', icon: '🗑️' },
+];
 
 function Emails({ initialFolder = null, onConsumeInitial } = {}) {
   const [emails, setEmails] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [stats, setStats] = useState(null);
   const [selectedEmail, setSelectedEmail] = useState(null);
   const [emailAccounts, setEmailAccounts] = useState([]);
   const [showAccountModal, setShowAccountModal] = useState(false);
@@ -16,36 +29,29 @@ function Emails({ initialFolder = null, onConsumeInitial } = {}) {
   const [showComposeModal, setShowComposeModal] = useState(false);
   const [composeMinimized, setComposeMinimized] = useState(false);
   const [composeExpanded, setComposeExpanded] = useState(false);
-  const [composePos, setComposePos] = useState(null); // null = default bottom-right
+  const [composePos, setComposePos] = useState(null);
   const composeDrag = useRef({ dragging: false, startX: 0, startY: 0, startLeft: 0, startTop: 0 });
   const composePanelRef = useRef(null);
   const [sendingEmail, setSendingEmail] = useState(false);
-  const [composeData, setComposeData] = useState({
-    fromAccount: '',
-    to: '',
-    cc: '',
-    subject: '',
-    body: ''
-  });
-  const [classifyingEmails, setClassifyingEmails] = useState(false);
+  const [composeData, setComposeData] = useState({ fromAccount: '', to: '', cc: '', subject: '', body: '' });
   const [extractingJob, setExtractingJob] = useState(false);
   const [showJobModal, setShowJobModal] = useState(false);
   const [extractedJobData, setExtractedJobData] = useState(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [emailContentWidth, setEmailContentWidth] = useState(null); // null means auto flex
-  const [isResizingContent, setIsResizingContent] = useState(false);
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
-  // Notification modal state
-  const [notification, setNotification] = useState({
-    isOpen: false,
-    type: 'info',
-    title: '',
-    message: '',
-    onConfirm: null
-  });
+  // Left folder sidebar
+  const [folderSidebarCollapsed, setFolderSidebarCollapsed] = useState(false);
+  const [folders, setFolders] = useState({}); // { accountId: [{ id, name, unreadCount }] }
+  const [expandedAccounts, setExpandedAccounts] = useState(new Set());
+  const [dragOverFolder, setDragOverFolder] = useState(null);
+  const [movingEmail, setMovingEmail] = useState(false);
+  const [showMoveDropdown, setShowMoveDropdown] = useState(false);
+  const [loadingAttachments, setLoadingAttachments] = useState({});
+  const [viewingAttachment, setViewingAttachment] = useState(null); // modal for non-pdf/image types
+  const [expandedPdfs, setExpandedPdfs] = useState(new Set()); // inline-expanded PDF attachmentIds
+  const moveDropdownRef = useRef(null);
 
   const [filters, setFilters] = useState({
     accountType: '',
@@ -56,145 +62,159 @@ function Emails({ initialFolder = null, onConsumeInitial } = {}) {
   });
   const [activeFolderName, setActiveFolderName] = useState(initialFolder?.name || '');
 
-  // Sidebar folder-dropdown deep link — same pattern as Jobs/Clients'
-  // initialJobId/initialClientId in App.jsx.
+  const [notification, setNotification] = useState({ isOpen: false, type: 'info', title: '', message: '', onConfirm: null });
+
+  // ── Deep-link folder from App.jsx nav ──
   useEffect(() => {
     if (initialFolder?.id) {
-      setFilters((prev) => ({ ...prev, folderId: initialFolder.id }));
+      setFilters(prev => ({ ...prev, folderId: initialFolder.id }));
       setActiveFolderName(initialFolder.name || '');
-      onConsumeInitial && onConsumeInitial();
+      onConsumeInitial?.();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialFolder]);
 
   const clearFolderFilter = () => {
-    setFilters((prev) => ({ ...prev, folderId: '' }));
+    setFilters(prev => ({ ...prev, folderId: '' }));
     setActiveFolderName('');
   };
 
-  const fetchEmails = async (silent = false) => {
+  // ── Fetch emails ──
+  const fetchEmails = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
       const queryParams = new URLSearchParams();
       if (filters.accountType) queryParams.append('accountType', filters.accountType);
-
-      // Handle inbox/sent filtering
-      if (filters.isWorkRelated === 'inbox') {
-        queryParams.append('folder', 'inbox');
-      } else if (filters.isWorkRelated === 'sent') {
-        queryParams.append('folder', 'sent');
-      } else if (filters.isWorkRelated) {
-        queryParams.append('isWorkRelated', filters.isWorkRelated);
-      }
-
+      if (filters.isWorkRelated === 'inbox') queryParams.append('folder', 'inbox');
+      else if (filters.isWorkRelated === 'sent') queryParams.append('folder', 'sent');
+      else if (filters.isWorkRelated) queryParams.append('isWorkRelated', filters.isWorkRelated);
       if (filters.isRead) queryParams.append('isRead', filters.isRead);
       if (filters.search) queryParams.append('search', filters.search);
       if (filters.folderId) queryParams.append('folderId', filters.folderId);
 
       const response = await axios.get(`${API_URL}/emails?${queryParams.toString()}`);
-      setEmails(response.data.emails);
+      const fetched = response.data.emails;
+      setEmails(fetched);
+
+      // Restore selected email from sessionStorage
+      const savedId = sessionStorage.getItem(SESSION_KEY);
+      if (savedId && fetched?.length) {
+        const match = fetched.find(e => e._id === savedId);
+        if (match) setSelectedEmail(prev => prev?._id === savedId ? prev : match);
+      }
     } catch (error) {
       console.error('Error fetching emails:', error);
     } finally {
       if (!silent) setLoading(false);
     }
-  };
-
-  const fetchStats = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/emails/stats/summary`);
-      setStats(response.data);
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    }
-  };
+  }, [filters]);
 
   const fetchEmailAccounts = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/oauth/accounts`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setEmailAccounts(response.data.emailAccounts);
+      const response = await axios.get(`${API_URL}/oauth/accounts`, { headers: { Authorization: `Bearer ${token}` } });
+      const accounts = response.data.emailAccounts;
+      setEmailAccounts(accounts);
+      // Auto-expand all accounts
+      setExpandedAccounts(new Set(accounts.map(a => a._id)));
+      return accounts;
     } catch (error) {
       console.error('Error fetching email accounts:', error);
+      return [];
     }
   };
 
+  const fetchFolders = async (accounts) => {
+    if (!accounts?.length) return;
+    const token = localStorage.getItem('token');
+    const result = {};
+    for (const account of accounts) {
+      try {
+        const res = await axios.get(`${API_URL}/email-sync/folders/${account._id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        result[account._id] = res.data.folders;
+      } catch {
+        // Fall back to default folders
+        result[account._id] = DEFAULT_FOLDERS.map(f => ({ ...f, unreadCount: 0, totalCount: 0 }));
+      }
+    }
+    setFolders(result);
+  };
+
+  const fetchStats = async () => {
+    try {
+      await axios.get(`${API_URL}/emails/stats/summary`);
+    } catch { /* non-fatal */ }
+  };
+
+  useEffect(() => {
+    const init = async () => {
+      const accounts = await fetchEmailAccounts();
+      await fetchFolders(accounts);
+      await fetchEmails();
+      await fetchStats();
+    };
+    init();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('oauth') === 'success') {
+      const email = urlParams.get('email');
+      setNotification({ isOpen: true, type: 'success', title: 'Email Connected', message: `Successfully connected ${email}!`, onConfirm: null });
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (urlParams.get('error')) {
+      setNotification({ isOpen: true, type: 'error', title: 'Connection Failed', message: 'Failed to connect email account.', onConfirm: null });
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
+  useEffect(() => { fetchEmails(); }, [filters]);
+
+  useEffect(() => {
+    const interval = setInterval(() => { fetchEmails(true); fetchStats(); }, 30000);
+    return () => clearInterval(interval);
+  }, [filters]);
+
+  // ── Persist selected email ──
+  const selectEmail = (email) => {
+    // Skip if same email is already open — avoids clobbering fetched attachment URLs
+    if (email._id === selectedEmail?._id) return;
+    setSelectedEmail(email);
+    sessionStorage.setItem(SESSION_KEY, email._id);
+  };
+  const closeEmail = () => {
+    setSelectedEmail(null);
+    sessionStorage.removeItem(SESSION_KEY);
+  };
+
+  // ── Account actions ──
   const connectGmail = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/oauth/gmail/auth-url`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      // Open OAuth window
-      const { authUrl } = response.data;
-      window.location.href = authUrl;
-    } catch (error) {
-      console.error('Error connecting Gmail:', error);
-      setNotification({
-        isOpen: true,
-        type: 'error',
-        title: 'Connection Error',
-        message: 'Error initiating Gmail connection. Please try again.',
-        onConfirm: null
-      });
-    }
+      const { data } = await axios.get(`${API_URL}/oauth/gmail/auth-url`, { headers: { Authorization: `Bearer ${token}` } });
+      window.location.href = data.authUrl;
+    } catch { setNotification({ isOpen: true, type: 'error', title: 'Connection Error', message: 'Error initiating Gmail connection.', onConfirm: null }); }
   };
 
   const connectMicrosoft = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/oauth/microsoft/auth-url`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      // Open OAuth window
-      const { authUrl } = response.data;
-      window.location.href = authUrl;
-    } catch (error) {
-      console.error('Error connecting Microsoft:', error);
-      setNotification({
-        isOpen: true,
-        type: 'error',
-        title: 'Connection Error',
-        message: 'Error initiating Microsoft connection. Please try again.',
-        onConfirm: null
-      });
-    }
+      const { data } = await axios.get(`${API_URL}/oauth/microsoft/auth-url`, { headers: { Authorization: `Bearer ${token}` } });
+      window.location.href = data.authUrl;
+    } catch { setNotification({ isOpen: true, type: 'error', title: 'Connection Error', message: 'Error initiating Microsoft connection.', onConfirm: null }); }
   };
 
-  const disconnectAccount = async (accountId) => {
+  const disconnectAccount = (accountId) => {
     setNotification({
-      isOpen: true,
-      type: 'confirm',
-      title: 'Disconnect Email Account',
+      isOpen: true, type: 'confirm', title: 'Disconnect Email Account',
       message: 'Are you sure you want to disconnect this email account?',
       onConfirm: async () => {
         try {
           const token = localStorage.getItem('token');
-          await axios.delete(`${API_URL}/oauth/accounts/${accountId}`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          fetchEmailAccounts();
-          setNotification({
-            isOpen: true,
-            type: 'success',
-            title: 'Success',
-            message: 'Email account disconnected successfully',
-            onConfirm: null
-          });
-        } catch (error) {
-          console.error('Error disconnecting account:', error);
-          setNotification({
-            isOpen: true,
-            type: 'error',
-            title: 'Error',
-            message: 'Error disconnecting email account. Please try again.',
-            onConfirm: null
-          });
-        }
+          await axios.delete(`${API_URL}/oauth/accounts/${accountId}`, { headers: { Authorization: `Bearer ${token}` } });
+          const accounts = await fetchEmailAccounts();
+          await fetchFolders(accounts);
+          setNotification({ isOpen: true, type: 'success', title: 'Success', message: 'Account disconnected.', onConfirm: null });
+        } catch { setNotification({ isOpen: true, type: 'error', title: 'Error', message: 'Failed to disconnect account.', onConfirm: null }); }
       }
     });
   };
@@ -203,1586 +223,791 @@ function Emails({ initialFolder = null, onConsumeInitial } = {}) {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      await axios.post(`${API_URL}/email-sync/sync/${accountId}`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await axios.post(`${API_URL}/email-sync/sync/${accountId}`, {}, { headers: { Authorization: `Bearer ${token}` } });
       await fetchEmails();
       await fetchStats();
-      setNotification({
-        isOpen: true,
-        type: 'success',
-        title: 'Success',
-        message: 'Emails synced successfully!',
-        onConfirm: null
-      });
-    } catch (error) {
-      console.error('Error syncing emails:', error);
-      setNotification({
-        isOpen: true,
-        type: 'error',
-        title: 'Sync Error',
-        message: 'Error syncing emails. Please try again.',
-        onConfirm: null
-      });
-    } finally {
-      setLoading(false);
-    }
+      // Refresh folders after sync (real folder data now available)
+      await fetchFolders(emailAccounts);
+      setNotification({ isOpen: true, type: 'success', title: 'Success', message: 'Emails synced!', onConfirm: null });
+    } catch {
+      setNotification({ isOpen: true, type: 'error', title: 'Sync Error', message: 'Error syncing emails.', onConfirm: null });
+    } finally { setLoading(false); }
   };
 
-  const syncEmails = async () => {
-    setLoading(true);
-    try {
-      await axios.post(`${API_URL}/emails/sync`);
-      await fetchEmails();
-      await fetchStats();
-      setNotification({
-        isOpen: true,
-        type: 'success',
-        title: 'Success',
-        message: 'Emails synced successfully!',
-        onConfirm: null
-      });
-    } catch (error) {
-      console.error('Error syncing emails:', error);
-      setNotification({
-        isOpen: true,
-        type: 'error',
-        title: 'Sync Error',
-        message: 'Error syncing emails. Make sure the backend is running and configured.',
-        onConfirm: null
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // ── Email actions ──
   const toggleRead = async (emailId, currentStatus) => {
     try {
-      await axios.patch(`${API_URL}/emails/${emailId}`, {
-        isRead: !currentStatus
-      });
+      await axios.patch(`${API_URL}/emails/${emailId}`, { isRead: !currentStatus });
       fetchEmails();
-    } catch (error) {
-      console.error('Error updating email:', error);
-    }
+    } catch (error) { console.error('Error updating email:', error); }
   };
 
-  const classifyEmail = async (emailId, isWork) => {
-    try {
-      await axios.patch(`${API_URL}/emails/${emailId}`, {
-        isWorkRelated: isWork
-      });
-      fetchEmails();
-      fetchStats();
-    } catch (error) {
-      console.error('Error classifying email:', error);
-    }
+  const deleteEmail = (emailId) => {
+    setNotification({
+      isOpen: true, type: 'confirm', title: 'Delete Email', message: 'Delete this email? This cannot be undone.',
+      onConfirm: async () => {
+        try {
+          await axios.delete(`${API_URL}/emails/${emailId}`);
+          setEmails(prev => prev.filter(e => e._id !== emailId));
+          if (selectedEmail?._id === emailId) closeEmail();
+          fetchStats();
+        } catch { setNotification({ isOpen: true, type: 'error', title: 'Error', message: 'Failed to delete email.', onConfirm: null }); }
+      }
+    });
   };
 
   const toggleSelectEmail = (emailId) => {
-    setSelectedIds((prev) => {
+    setSelectedIds(prev => {
       const next = new Set(prev);
-      if (next.has(emailId)) next.delete(emailId);
-      else next.add(emailId);
+      next.has(emailId) ? next.delete(emailId) : next.add(emailId);
       return next;
     });
   };
 
   const toggleSelectAll = () => {
-    setSelectedIds((prev) =>
-      prev.size === emails.length && emails.length > 0 ? new Set() : new Set(emails.map((e) => e._id))
-    );
-  };
-
-  const deleteEmail = (emailId) => {
-    setNotification({
-      isOpen: true,
-      type: 'confirm',
-      title: 'Delete Email',
-      message: 'Are you sure you want to delete this email? This cannot be undone.',
-      onConfirm: async () => {
-        try {
-          await axios.delete(`${API_URL}/emails/${emailId}`);
-          setEmails((prev) => prev.filter((e) => e._id !== emailId));
-          setSelectedIds((prev) => {
-            const next = new Set(prev);
-            next.delete(emailId);
-            return next;
-          });
-          if (selectedEmail?._id === emailId) setSelectedEmail(null);
-          fetchStats();
-        } catch (error) {
-          console.error('Error deleting email:', error);
-          setNotification({
-            isOpen: true,
-            type: 'error',
-            title: 'Error',
-            message: 'Failed to delete email. Please try again.',
-            onConfirm: null
-          });
-        }
-      }
-    });
+    setSelectedIds(prev => prev.size === emails.length && emails.length > 0 ? new Set() : new Set(emails.map(e => e._id)));
   };
 
   const bulkDeleteEmails = () => {
     const ids = Array.from(selectedIds);
-    if (ids.length === 0) return;
+    if (!ids.length) return;
     setNotification({
-      isOpen: true,
-      type: 'confirm',
-      title: 'Delete Emails',
-      message: `Are you sure you want to delete ${ids.length} email${ids.length === 1 ? '' : 's'}? This cannot be undone.`,
+      isOpen: true, type: 'confirm', title: 'Delete Emails', message: `Delete ${ids.length} email${ids.length > 1 ? 's' : ''}? This cannot be undone.`,
       onConfirm: async () => {
         setBulkDeleting(true);
         try {
           await axios.delete(`${API_URL}/emails/bulk`, { data: { ids } });
-          setEmails((prev) => prev.filter((e) => !selectedIds.has(e._id)));
-          if (selectedEmail && selectedIds.has(selectedEmail._id)) setSelectedEmail(null);
+          setEmails(prev => prev.filter(e => !selectedIds.has(e._id)));
+          if (selectedEmail && selectedIds.has(selectedEmail._id)) closeEmail();
           setSelectedIds(new Set());
           fetchStats();
-        } catch (error) {
-          console.error('Error bulk deleting emails:', error);
-          setNotification({
-            isOpen: true,
-            type: 'error',
-            title: 'Error',
-            message: 'Failed to delete emails. Please try again.',
-            onConfirm: null
-          });
-        } finally {
-          setBulkDeleting(false);
-        }
+        } catch { setNotification({ isOpen: true, type: 'error', title: 'Error', message: 'Failed to delete emails.', onConfirm: null }); }
+        finally { setBulkDeleting(false); }
       }
     });
-  };
-
-  const autoClassifyEmails = async () => {
-    setClassifyingEmails(true);
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.post(
-        `${API_URL}/automation/auto-classify-emails`,
-        { limit: 50 },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      setNotification({
-        isOpen: true,
-        type: 'success',
-        title: 'Classification Complete',
-        message: `Classified ${response.data.results.classified} emails (${response.data.results.workRelated} work-related, ${response.data.results.personal} personal)`,
-        onConfirm: null
-      });
-
-      await fetchEmails();
-      await fetchStats();
-    } catch (error) {
-      console.error('Error auto-classifying emails:', error);
-      setNotification({
-        isOpen: true,
-        type: 'error',
-        title: 'Classification Error',
-        message: error.response?.data?.message || 'Failed to auto-classify emails. Make sure OpenAI API key is configured.',
-        onConfirm: null
-      });
-    } finally {
-      setClassifyingEmails(false);
-    }
   };
 
   const extractJobFromEmail = async () => {
     setExtractingJob(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post(
-        `${API_URL}/automation/extract-job/${selectedEmail._id}`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      if (response.data.success) {
-        setExtractedJobData(response.data.jobData);
-        setShowJobModal(true);
-      }
+      const response = await axios.post(`${API_URL}/automation/extract-job/${selectedEmail._id}`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      if (response.data.success) { setExtractedJobData(response.data.jobData); setShowJobModal(true); }
     } catch (error) {
-      console.error('Error extracting job from email:', error);
-      setNotification({
-        isOpen: true,
-        type: 'error',
-        title: 'Extraction Error',
-        message: error.response?.data?.message || 'Failed to extract job details from email.',
-        onConfirm: null
-      });
-    } finally {
-      setExtractingJob(false);
-    }
+      setNotification({ isOpen: true, type: 'error', title: 'Extraction Error', message: error.response?.data?.message || 'Failed to extract job details.', onConfirm: null });
+    } finally { setExtractingJob(false); }
   };
 
   const createJobFromEmail = async (createCalendar = false) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post(
-        `${API_URL}/automation/create-job-from-email`,
-        {
-          emailId: selectedEmail._id,
-          jobData: extractedJobData,
-          createCalendarEvent: createCalendar
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
+      const response = await axios.post(`${API_URL}/automation/create-job-from-email`, {
+        emailId: selectedEmail._id, jobData: extractedJobData, createCalendarEvent: createCalendar
+      }, { headers: { Authorization: `Bearer ${token}` } });
       if (response.data.success) {
-        setNotification({
-          isOpen: true,
-          type: 'success',
-          title: 'Job Created',
-          message: `Job ${response.data.job.jobNumber} created successfully!`,
-          onConfirm: null
-        });
-        setShowJobModal(false);
-        setExtractedJobData(null);
-        await fetchEmails();
+        setNotification({ isOpen: true, type: 'success', title: 'Job Created', message: `Job ${response.data.job.jobNumber} created!`, onConfirm: null });
+        setShowJobModal(false); setExtractedJobData(null); await fetchEmails();
       }
     } catch (error) {
-      console.error('Error creating job from email:', error);
-      setNotification({
-        isOpen: true,
-        type: 'error',
-        title: 'Job Creation Error',
-        message: error.response?.data?.message || 'Failed to create job from email.',
-        onConfirm: null
-      });
+      setNotification({ isOpen: true, type: 'error', title: 'Job Creation Error', message: error.response?.data?.message || 'Failed to create job.', onConfirm: null });
     }
   };
 
-  useEffect(() => {
-    fetchEmails();
-    fetchStats();
-    fetchEmailAccounts();
+  // ── Drag & Drop ──
+  const onEmailDragStart = (e, email) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('emailId', email._id);
+    e.dataTransfer.setData('emailMessageId', email.messageId || '');
+  };
 
-    // Check for OAuth success callback
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('oauth') === 'success') {
-      const email = urlParams.get('email');
-      setNotification({
-        isOpen: true,
-        type: 'success',
-        title: 'Email Connected',
-        message: `Successfully connected ${email}!`,
-        onConfirm: null
+  const onFolderDragOver = (e, accountId, folderId) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverFolder(`${accountId}::${folderId}`);
+  };
+
+  const onFolderDragLeave = () => setDragOverFolder(null);
+
+  const onFolderDrop = async (e, account, folder) => {
+    e.preventDefault();
+    setDragOverFolder(null);
+    const emailId = e.dataTransfer.getData('emailId');
+    if (!emailId) return;
+    setMovingEmail(true);
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(`${API_URL}/email-sync/move/${emailId}`, {
+        folderId: folder.id, folderName: folder.name
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      setNotification({ isOpen: true, type: 'success', title: 'Moved', message: `Email moved to ${folder.name}`, onConfirm: null });
+      await fetchEmails();
+    } catch (error) {
+      setNotification({ isOpen: true, type: 'error', title: 'Error', message: error.response?.data?.error || 'Failed to move email.', onConfirm: null });
+    } finally { setMovingEmail(false); }
+  };
+
+  // ── Close move dropdown on outside click ──
+  useEffect(() => {
+    if (!showMoveDropdown) return;
+    const handler = (e) => { if (moveDropdownRef.current && !moveDropdownRef.current.contains(e.target)) setShowMoveDropdown(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showMoveDropdown]);
+
+  // ── Reset per-email UI state when switching emails ──
+  useEffect(() => {
+    setExpandedPdfs(new Set());
+    setLoadingAttachments({});
+  }, [selectedEmail?._id]);
+
+  // ── Fetch attachments once when an email is opened (Gmail + Microsoft) ──
+  useEffect(() => {
+    if (!selectedEmail?.attachments?.length) return;
+    const missing = selectedEmail.attachments.filter(a => !a.url && a.attachmentId);
+    if (!missing.length) return;
+
+    const token = localStorage.getItem('token');
+    missing.forEach(att => {
+      const idx = selectedEmail.attachments.indexOf(att);
+      setLoadingAttachments(prev => ({ ...prev, [att.attachmentId]: true }));
+      // POST — put attachmentId in body to avoid URL encoding issues with special chars
+      axios.post(
+        `${API_URL}/email-sync/${selectedEmail._id}/attachment`,
+        { attachmentId: att.attachmentId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      ).then(({ data }) => {
+        setSelectedEmail(prev => {
+          if (!prev || prev._id !== selectedEmail._id) return prev;
+          const atts = [...(prev.attachments || [])];
+          atts[idx] = {
+            ...atts[idx],
+            url: data.url,
+            mimeType: data.mimeType || atts[idx].mimeType,
+            contentId: data.contentId ?? atts[idx].contentId
+          };
+          return { ...prev, attachments: atts };
+        });
+      }).catch(err => {
+        // data.error carries the backend's specific reason (e.g. "Email not
+        // found", "Attachment content not available") — logging only .detail
+        // hid it for 4xx responses and left bare "Request failed with 404"
+        const serverMsg = err.response?.data?.error || err.response?.data?.detail;
+        console.error(`Attachment fetch failed (${att.filename}):`, serverMsg || err.message);
+      }).finally(() => {
+        setLoadingAttachments(prev => ({ ...prev, [att.attachmentId]: false }));
       });
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-      fetchEmailAccounts();
-    } else if (urlParams.get('error')) {
-      setNotification({
-        isOpen: true,
-        type: 'error',
-        title: 'Connection Failed',
-        message: 'Failed to connect email account. Please try again.',
-        onConfirm: null
-      });
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-  }, []);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEmail?._id]);
 
-  useEffect(() => {
-    fetchEmails();
-  }, [filters]);
-
-  // Auto-refresh emails every 10 seconds
-  useEffect(() => {
-    const refreshInterval = setInterval(() => {
-      fetchEmails(true); // Silent refresh without loading state
-      fetchStats(); // Also refresh stats
-    }, 10000); // 10 seconds
-
-    return () => clearInterval(refreshInterval); // Cleanup on unmount
-  }, [filters]); // Re-setup interval when filters change
-
-  // Handle email content resize
-  useEffect(() => {
-    const handleMouseMove = (e) => {
-      if (!isResizingContent) return;
-      e.preventDefault();
-
-      const mainContent = document.querySelector('.main-content');
-      const emailList = document.querySelector('.email-list');
-      if (!mainContent || !emailList) return;
-
-      const containerRect = mainContent.getBoundingClientRect();
-      const sidebarRect = emailList.getBoundingClientRect();
-      const mouseX = e.clientX;
-
-      // Get the bounds
-      const sidebarRight = sidebarRect.right;
-      const containerRight = containerRect.right;
-      const containerLeft = containerRect.left;
-
-      // Calculate the new width based on mouse position
-      // Width extends from mouse to right edge of container
-      let calculatedWidth = containerRight - mouseX;
-
-      // Minimum width
-      const minWidth = 300;
-
-      // Maximum width - from just after sidebar to container right
-      const maxWidth = containerRight - sidebarRight - 10;
-
-      // If calculated width is less than min, use min
-      if (calculatedWidth < minWidth) {
-        calculatedWidth = minWidth;
-      }
-
-      // If calculated width is more than max, use max
-      if (calculatedWidth > maxWidth) {
-        calculatedWidth = maxWidth;
-      }
-
-      console.log('Mouse X:', mouseX, 'Sidebar Right:', sidebarRight, 'Container Right:', containerRight, 'Calculated Width:', calculatedWidth, 'Max Width:', maxWidth);
-
-      setEmailContentWidth(calculatedWidth);
-    };
-
-    const handleMouseUp = () => {
-      setIsResizingContent(false);
-    };
-
-    if (isResizingContent) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = 'ew-resize';
-      document.body.style.userSelect = 'none';
-    } else {
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    }
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-  }, [isResizingContent, sidebarCollapsed]);
-
+  // ── Compose drag ──
   const onComposeDragStart = useCallback((e) => {
-    if (composeExpanded) return; // no drag when fullscreen
+    if (composeExpanded) return;
     e.preventDefault();
     const panel = composePanelRef.current;
     if (!panel) return;
     const rect = panel.getBoundingClientRect();
-    composeDrag.current = {
-      dragging: true,
-      startX: e.clientX,
-      startY: e.clientY,
-      startLeft: rect.left,
-      startTop: rect.top,
-    };
+    composeDrag.current = { dragging: true, startX: e.clientX, startY: e.clientY, startLeft: rect.left, startTop: rect.top };
     document.body.style.userSelect = 'none';
-
     const onMove = (ev) => {
       if (!composeDrag.current.dragging) return;
-      const dx = ev.clientX - composeDrag.current.startX;
-      const dy = ev.clientY - composeDrag.current.startY;
-      const newLeft = composeDrag.current.startLeft + dx;
-      const newTop = composeDrag.current.startTop + dy;
-      // Clamp inside viewport
-      const panelW = panel.offsetWidth;
-      const panelH = panel.offsetHeight;
-      const clampedLeft = Math.max(0, Math.min(window.innerWidth - panelW, newLeft));
-      const clampedTop = Math.max(0, Math.min(window.innerHeight - 44, newTop)); // 44 = header height minimum visible
-      setComposePos({ left: clampedLeft, top: clampedTop });
+      const newLeft = Math.max(0, Math.min(window.innerWidth - panel.offsetWidth, composeDrag.current.startLeft + ev.clientX - composeDrag.current.startX));
+      const newTop = Math.max(0, Math.min(window.innerHeight - 44, composeDrag.current.startTop + ev.clientY - composeDrag.current.startY));
+      setComposePos({ left: newLeft, top: newTop });
     };
-
-    const onUp = () => {
-      composeDrag.current.dragging = false;
-      document.body.style.userSelect = '';
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    };
-
+    const onUp = () => { composeDrag.current.dragging = false; document.body.style.userSelect = ''; document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
   }, [composeExpanded]);
 
-  const formatDate = (date) => {
-    return new Date(date).toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+  const formatDate = (date) => new Date(date).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+  const toggleAccountExpanded = (accountId) => {
+    setExpandedAccounts(prev => {
+      const next = new Set(prev);
+      next.has(accountId) ? next.delete(accountId) : next.add(accountId);
+      return next;
     });
   };
 
+  // ── Render ──
   return (
     <div className="emails-page">
-      <div className="page-header" style={{ padding: '0px 24px 0px 24px', marginBottom: '2px' }}>
-        <h1 style={{ margin: 0, fontSize: '22px' }}><FiMail /> Unified Inbox</h1>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <button type="button" onClick={() => setShowAccountModal(true)} className="btn-primary" style={{ padding: '6px 12px', fontSize: '13px' }}>
-            <FiPlus /> Connect Account
-          </button>
-          <button type="button" onClick={() => setShowComposeModal(true)} className="btn-primary" style={{ padding: '6px 12px', fontSize: '13px' }}>
-            <FiEdit /> Compose
-          </button>
-          <button
-            type="button"
-            onClick={autoClassifyEmails}
-            className="btn-secondary"
-            disabled={classifyingEmails}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '13px' }}
-          >
-            <FiFilter className={classifyingEmails ? 'spinning' : ''} />
-            {classifyingEmails ? 'Classifying...' : 'AI Auto-Classify'}
-          </button>
-          <button type="button" onClick={() => setShowSyncModal(true)} className="btn-sync" disabled={loading || emailAccounts.length === 0} style={{ padding: '6px 12px', fontSize: '13px' }}>
-            <FiRefreshCw className={loading ? 'spinning' : ''} />
-            {loading ? 'Syncing...' : 'Sync Emails'}
-          </button>
-        </div>
-      </div>
 
-      {/* Compact Boxes Row with Collapsible Filters */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', paddingLeft: '24px', paddingRight: '24px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-        {/* Connected Accounts Box */}
-        {emailAccounts.length > 0 && (
-          <div style={{
-            background: 'linear-gradient(135deg, #fef9e7 0%, #fef5d4 100%)',
-            padding: '12px 16px',
-            borderRadius: '12px',
-            boxShadow: '0 2px 8px rgba(212, 175, 55, 0.15)',
-            border: '1px solid rgba(212, 175, 55, 0.3)',
-            flex: '0 0 auto',
-            maxWidth: '400px'
-          }}>
-            <h3 style={{ margin: '0 0 8px 0', color: '#78350f', fontSize: '12px', fontWeight: '600' }}>
-              Connected ({emailAccounts.length})
-            </h3>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              {emailAccounts.map((account) => (
-                <div key={account._id} style={{
-                  background: 'white',
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontSize: '11px'
-                }}>
-                  <FiCheck style={{ color: '#10b981', fontSize: '10px' }} />
-                  <span style={{ fontWeight: '500', color: '#1f2937' }}>{account.email.split('@')[0]}</span>
-                  <button
-                    onClick={() => syncAccountEmails(account._id)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '2px',
-                      color: '#3b82f6',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}
-                    title="Sync this account"
-                  >
-                    <FiRefreshCw size={10} />
-                  </button>
-                  <button
-                    onClick={() => disconnectAccount(account._id)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '2px',
-                      color: '#ef4444',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}
-                    title="Disconnect account"
-                  >
-                    <FiX size={10} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {activeFolderName && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '6px',
-            background: '#1a1a1a', color: '#d4af37', borderRadius: '20px',
-            padding: '6px 12px', fontSize: '12px', fontWeight: '600'
-          }}>
-            <FiFolder size={13} />
-            {activeFolderName}
-            <button
-              onClick={clearFolderFilter}
-              title="Clear folder filter"
-              style={{ background: 'none', border: 'none', color: '#d4af37', cursor: 'pointer', display: 'flex', padding: 0, marginLeft: '2px' }}
-            >
-              <FiX size={13} />
+      {/* ── Top toolbar ── */}
+      <div className="email-toolbar">
+        <button className="email-toolbar-btn email-toolbar-btn-gold" onClick={() => setShowComposeModal(true)}>
+          <FiEdit size={13} /> New mail
+        </button>
+        <div className="email-toolbar-divider" />
+        <button className="email-toolbar-btn" onClick={() => setShowAccountModal(true)}>
+          <FiPlus size={13} /> Connect
+        </button>
+        <button className="email-toolbar-btn" onClick={() => setShowSyncModal(true)} disabled={loading || !emailAccounts.length}>
+          <FiRefreshCw size={13} className={loading ? 'spinning' : ''} /> {loading ? 'Syncing…' : 'Sync'}
+        </button>
+        {selectedEmail && (
+          <>
+            <div className="email-toolbar-divider" />
+            <button className="email-toolbar-btn" onClick={() => toggleRead(selectedEmail._id, selectedEmail.isRead)}>
+              <FiMail size={13} /> {selectedEmail.isRead ? 'Mark Unread' : 'Mark Read'}
             </button>
-          </div>
-        )}
-
-        {/* Filters Box - Collapsible */}
-        <div style={{
-          background: 'linear-gradient(135deg, #fef9e7 0%, #fef5d4 100%)',
-          padding: '8px 12px',
-          borderRadius: '12px',
-          boxShadow: '0 2px 8px rgba(212, 175, 55, 0.15)',
-          border: '1px solid rgba(212, 175, 55, 0.3)',
-          flex: '1 1 auto',
-          minWidth: filtersExpanded ? '500px' : 'auto'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: filtersExpanded ? '8px' : '0' }}>
-            <h3 style={{ margin: 0, color: '#78350f', fontSize: '12px', fontWeight: '600' }}>
-              <FiFilter style={{ marginRight: '6px' }} />
-              Filters & Search
-            </h3>
-            <button
-              onClick={() => setFiltersExpanded(!filtersExpanded)}
-              style={{
-                background: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                padding: '4px 8px',
-                cursor: 'pointer',
-                fontSize: '11px',
-                fontWeight: '600',
-                color: '#78350f'
-              }}
-            >
-              {filtersExpanded ? '▲' : '▼'}
+            <button className="email-toolbar-btn" onClick={() => {
+              setComposeData({
+                fromAccount: emailAccounts.find(a => selectedEmail.to?.some(t => t.email === a.email))?._id || '',
+                to: selectedEmail.from?.email,
+                cc: '',
+                subject: selectedEmail.subject?.startsWith('Re:') ? selectedEmail.subject : `Re: ${selectedEmail.subject || ''}`,
+                body: `\n\n---\nOn ${new Date(selectedEmail.date).toLocaleString()}, ${selectedEmail.from?.name || selectedEmail.from?.email} wrote:\n> ${selectedEmail.body?.text?.split('\n').join('\n> ')}`
+              });
+              setShowComposeModal(true);
+            }}>
+              <FiSend size={13} /> Reply
             </button>
-          </div>
-          {filtersExpanded && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px' }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', color: '#78350f', fontSize: '11px' }}>Search</label>
-              <input
-                type="text"
-                placeholder="Search..."
-                value={filters.search}
-                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '6px 8px',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  outline: 'none',
-                  background: 'white',
-                  color: '#333'
-                }}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', color: '#78350f', fontSize: '11px' }}>Account</label>
-              <select
-                value={filters.accountType}
-                onChange={(e) => setFilters({ ...filters, accountType: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '6px 8px',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  outline: 'none',
-                  background: 'white',
-                  color: '#333',
-                  cursor: 'pointer'
-                }}
-              >
-                <option value="">All</option>
-                <option value="gmail">Gmail</option>
-                <option value="microsoft">Microsoft</option>
-              </select>
-            </div>
-            <div>
-              <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', color: '#78350f', fontSize: '11px' }}>Type</label>
-              <select
-                value={filters.isWorkRelated}
-                onChange={(e) => setFilters({ ...filters, isWorkRelated: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '6px 8px',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  outline: 'none',
-                  background: 'white',
-                  color: '#333',
-                  cursor: 'pointer'
-                }}
-              >
-                <option value="">All</option>
-                <option value="inbox">Inbox</option>
-                <option value="sent">Sent</option>
-                <option value="true">Work</option>
-                <option value="false">Personal</option>
-              </select>
-            </div>
-            <div>
-              <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', color: '#78350f', fontSize: '11px' }}>Status</label>
-              <select
-                value={filters.isRead}
-                onChange={(e) => setFilters({ ...filters, isRead: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '6px 8px',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  outline: 'none',
-                  background: 'white',
-                  color: '#333',
-                  cursor: 'pointer'
-                }}
-              >
-                <option value="">All</option>
-                <option value="false">Unread</option>
-                <option value="true">Read</option>
-              </select>
-            </div>
-          </div>
-          )}
-        </div>
-      </div>
-
-      <div className="main-content" style={{ position: 'relative' }}>
-        <div className="email-list" style={{ width: sidebarCollapsed ? '200px' : '400px', position: 'relative', flexShrink: 0, transition: 'width 0.3s ease' }}>
-          {/* Minimalist Toggle */}
-          <button
-            onClick={() => {
-              setSidebarCollapsed(!sidebarCollapsed);
-            }}
-            className="email-list-toggle-btn"
-            title={sidebarCollapsed ? "Expand" : "Minimize"}
-          >
-            {sidebarCollapsed ? '▶' : '◀'}
-          </button>
-          {emails.length > 0 && (
-            <div className="email-select-bar">
-              <label className="email-select-all">
-                <input
-                  type="checkbox"
-                  checked={selectedIds.size === emails.length && emails.length > 0}
-                  ref={(el) => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < emails.length; }}
-                  onChange={toggleSelectAll}
-                />
-                {!sidebarCollapsed && <span>{selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select all'}</span>}
-              </label>
-              {selectedIds.size > 0 && (
-                <div className="email-select-actions">
-                  <button
-                    className="btn-danger email-bulk-delete-btn"
-                    onClick={bulkDeleteEmails}
-                    disabled={bulkDeleting}
-                    title="Delete selected"
-                  >
-                    {bulkDeleting ? '...' : (sidebarCollapsed ? '🗑' : 'Delete')}
-                  </button>
-                  {!sidebarCollapsed && (
-                    <button className="email-select-cancel" onClick={() => setSelectedIds(new Set())}>
-                      Cancel
-                    </button>
-                  )}
+            {/* Move to folder dropdown */}
+            <div style={{ position: 'relative' }} ref={moveDropdownRef}>
+              <button className="email-toolbar-btn" onClick={() => setShowMoveDropdown(v => !v)}>
+                <FiFolder size={13} /> Move to <FiChevronDown size={11} />
+              </button>
+              {showMoveDropdown && (
+                <div className="email-move-dropdown">
+                  {emailAccounts.map(account => {
+                    const accountFolders = folders[account._id] || DEFAULT_FOLDERS.map(f => ({ ...f }));
+                    return (
+                      <div key={account._id}>
+                        <div className="email-move-dropdown-account">{account.email}</div>
+                        {accountFolders.map(folder => (
+                          <button
+                            key={folder.id}
+                            className="email-move-dropdown-item"
+                            onClick={async () => {
+                              setShowMoveDropdown(false);
+                              await onFolderDrop({ preventDefault: () => {}, dataTransfer: { getData: (k) => k === 'emailId' ? selectedEmail._id : '' } }, account, folder);
+                            }}
+                          >
+                            <span>{folder.icon || '📁'}</span> {folder.name}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })}
+                  {emailAccounts.length === 0 && <div style={{ padding: '10px 14px', color: '#9ca3af', fontSize: 12 }}>No accounts connected</div>}
                 </div>
               )}
             </div>
-          )}
-          {loading && emails.length === 0 ? (
-            <div className="loading">Loading emails...</div>
-          ) : emails.length === 0 ? (
-            <div className="empty">
-              <FiMail size={48} />
-              <p>No emails found</p>
-              <p className="hint">Click "Sync Emails" to fetch your emails</p>
+            <button className="email-toolbar-btn email-toolbar-btn-danger" onClick={() => deleteEmail(selectedEmail._id)}>
+              <FiTrash2 size={13} /> Delete
+            </button>
+          </>
+        )}
+        {selectedIds.size > 0 && (
+          <>
+            <div className="email-toolbar-divider" />
+            <button className="email-toolbar-btn email-toolbar-btn-danger" onClick={bulkDeleteEmails} disabled={bulkDeleting}>
+              <FiTrash2 size={13} /> Delete {selectedIds.size} selected
+            </button>
+            <button className="email-toolbar-btn" onClick={() => setSelectedIds(new Set())}>Cancel</button>
+          </>
+        )}
+        <div style={{ flex: 1 }} />
+        <button className="email-toolbar-btn" onClick={() => setFiltersExpanded(v => !v)}>
+          <FiSearch size={13} /> {filtersExpanded ? 'Hide filters' : 'Search'}
+        </button>
+      </div>
+
+      {/* ── Filters bar ── */}
+      {filtersExpanded && (
+        <div className="email-filter-bar">
+          <input type="text" placeholder="Search emails…" value={filters.search} onChange={e => setFilters(f => ({ ...f, search: e.target.value }))} className="email-filter-input" style={{ minWidth: 200 }} />
+          <select value={filters.accountType} onChange={e => setFilters(f => ({ ...f, accountType: e.target.value }))} className="email-filter-select">
+            <option value="">All accounts</option>
+            <option value="gmail">Gmail</option>
+            <option value="microsoft">Microsoft</option>
+          </select>
+          <select value={filters.isWorkRelated} onChange={e => setFilters(f => ({ ...f, isWorkRelated: e.target.value }))} className="email-filter-select">
+            <option value="">All folders</option>
+            <option value="inbox">Inbox</option>
+            <option value="sent">Sent</option>
+          </select>
+          <select value={filters.isRead} onChange={e => setFilters(f => ({ ...f, isRead: e.target.value }))} className="email-filter-select">
+            <option value="">All status</option>
+            <option value="false">Unread</option>
+            <option value="true">Read</option>
+          </select>
+          {activeFolderName && (
+            <div className="email-active-folder-chip">
+              <FiFolder size={12} /> {activeFolderName}
+              <button onClick={clearFolderFilter} style={{ background: 'none', border: 'none', color: '#d4af37', cursor: 'pointer', padding: 0, display: 'flex' }}><FiX size={12} /></button>
             </div>
-          ) : (
-            emails.map((email) => {
-              const isCompact = sidebarCollapsed;
+          )}
+        </div>
+      )}
 
-              if (isCompact) {
-                // Compact professional view
-                return (
-                  <div
-                    key={email._id}
-                    className={`email-item-compact ${!email.isRead ? 'unread' : ''} ${selectedEmail?._id === email._id ? 'selected' : ''} ${selectedIds.has(email._id) ? 'checked' : ''}`}
-                    onClick={() => setSelectedEmail(email)}
-                  >
-                    <div className="compact-header">
-                      <div className="compact-indicator">
-                        <input
-                          type="checkbox"
-                          className="email-item-checkbox"
-                          checked={selectedIds.has(email._id)}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={() => toggleSelectEmail(email._id)}
-                        />
-                        {!email.isRead && <div className="unread-dot"></div>}
-                        {email.isWorkRelated && <div className="work-badge">💼</div>}
+      {/* ── Three-pane body ── */}
+      <div className="email-body">
+
+        {/* ── Left folder sidebar ── */}
+        <div className={`email-nav-sidebar ${folderSidebarCollapsed ? 'collapsed' : ''}`}>
+          <button
+            className="email-nav-collapse-btn"
+            onClick={() => setFolderSidebarCollapsed(v => !v)}
+            title={folderSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {folderSidebarCollapsed ? <FiChevronRight size={14} /> : <FiChevronLeft size={14} />}
+          </button>
+
+          {!folderSidebarCollapsed && (
+            <div className="email-nav-content">
+              {emailAccounts.length === 0 ? (
+                <div className="email-nav-empty">
+                  <FiMail size={24} style={{ color: '#ccc' }} />
+                  <p>No accounts connected</p>
+                  <button className="email-nav-connect-btn" onClick={() => setShowAccountModal(true)}>
+                    <FiPlus size={12} /> Connect
+                  </button>
+                </div>
+              ) : (
+                emailAccounts.map(account => {
+                  const accountFolders = folders[account._id] || DEFAULT_FOLDERS.map(f => ({ ...f, unreadCount: 0 }));
+                  const isExpanded = expandedAccounts.has(account._id);
+                  return (
+                    <div key={account._id} className="email-nav-account">
+                      <div className="email-nav-account-header" onClick={() => toggleAccountExpanded(account._id)}>
+                        <div className="email-nav-account-info">
+                          <div className="email-nav-account-avatar" style={{ background: account.provider === 'gmail' ? '#ef4444' : '#0078d4' }}>
+                            {account.email[0].toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="email-nav-account-email">{account.email}</div>
+                            <div className="email-nav-account-provider">{account.provider}</div>
+                          </div>
+                        </div>
+                        <div className="email-nav-account-actions">
+                          <button
+                            className="email-nav-icon-btn"
+                            onClick={e => { e.stopPropagation(); syncAccountEmails(account._id); }}
+                            title="Sync"
+                          >
+                            <FiRefreshCw size={11} />
+                          </button>
+                          {isExpanded ? <FiChevronDown size={12} /> : <FiChevronRight size={12} />}
+                        </div>
                       </div>
-                      <div className="compact-time">{new Date(email.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</div>
-                    </div>
-                    <div className="compact-from">{email.from?.name?.split(' ')[0] || email.from?.email?.split('@')[0]}</div>
-                    <div className="compact-subject">{(email.subject || 'No Subject').substring(0, 30)}{email.subject?.length > 30 ? '...' : ''}</div>
-                  </div>
-                );
-              }
 
-              // Full view
-              return (
+                      {isExpanded && (
+                        <div className="email-nav-folders">
+                          {accountFolders.map(folder => {
+                            const isDropTarget = dragOverFolder === `${account._id}::${folder.id}`;
+                            return (
+                              <div
+                                key={folder.id}
+                                className={`email-nav-folder ${activeFolderName === folder.name ? 'active' : ''} ${isDropTarget ? 'drop-target' : ''}`}
+                                onClick={() => {
+                                  setFilters(f => ({ ...f, folderId: folder.id }));
+                                  setActiveFolderName(folder.name);
+                                }}
+                                onDragOver={e => onFolderDragOver(e, account._id, folder.id)}
+                                onDragLeave={onFolderDragLeave}
+                                onDrop={e => onFolderDrop(e, account, folder)}
+                              >
+                                <span className="email-nav-folder-icon">{folder.icon || '📁'}</span>
+                                <span className="email-nav-folder-name">{folder.name}</span>
+                                {folder.unreadCount > 0 && (
+                                  <span className="email-nav-folder-badge">{folder.unreadCount}</span>
+                                )}
+                                {isDropTarget && <span className="email-nav-drop-hint">Drop here</span>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── Email list ── */}
+        <div className="email-list-pane">
+          <div className="email-list-header">
+            <label className="email-select-all-check">
+              <input
+                type="checkbox"
+                checked={selectedIds.size === emails.length && emails.length > 0}
+                ref={el => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < emails.length; }}
+                onChange={toggleSelectAll}
+              />
+              <span>{activeFolderName || 'All Mail'}</span>
+            </label>
+            <span style={{ fontSize: 11, color: '#999' }}>{emails.length} emails</span>
+          </div>
+
+          <div className="email-list-scroll">
+            {loading && emails.length === 0 ? (
+              <div className="email-list-empty"><FiRefreshCw size={28} className="spinning" /><p>Loading…</p></div>
+            ) : emails.length === 0 ? (
+              <div className="email-list-empty"><FiMail size={40} style={{ color: '#ccc' }} /><p>No emails found</p><p style={{ fontSize: 12, color: '#aaa' }}>Sync an account to fetch emails</p></div>
+            ) : (
+              emails.map(email => (
                 <div
                   key={email._id}
-                  className={`email-item ${!email.isRead ? 'unread' : ''} ${selectedEmail?._id === email._id ? 'selected' : ''} ${selectedIds.has(email._id) ? 'checked' : ''}`}
-                  onClick={() => setSelectedEmail(email)}
+                  className={`email-row ${!email.isRead ? 'unread' : ''} ${selectedEmail?._id === email._id ? 'selected' : ''} ${selectedIds.has(email._id) ? 'checked' : ''}`}
+                  onClick={() => selectEmail(email)}
+                  draggable
+                  onDragStart={e => onEmailDragStart(e, email)}
                 >
-                  <div className="email-header">
-                    <div className="email-from-group">
-                      <input
-                        type="checkbox"
-                        className="email-item-checkbox"
-                        checked={selectedIds.has(email._id)}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={() => toggleSelectEmail(email._id)}
-                      />
-                      <div className="email-from">{email.from?.name || email.from?.email}</div>
+                  <input
+                    type="checkbox"
+                    className="email-row-check"
+                    checked={selectedIds.has(email._id)}
+                    onClick={e => e.stopPropagation()}
+                    onChange={() => toggleSelectEmail(email._id)}
+                  />
+                  <div className="email-row-avatar">
+                    {(email.from?.name || email.from?.email || '?')[0].toUpperCase()}
+                  </div>
+                  <div className="email-row-body">
+                    <div className="email-row-top">
+                      <span className="email-row-from">{email.from?.name || email.from?.email}</span>
+                      <span className="email-row-date">{formatDate(email.date)}</span>
                     </div>
-                    <div className="email-meta">
+                    <div className="email-row-subject">{email.subject || '(No Subject)'}</div>
+                    <div className="email-row-preview">{email.snippet || email.body?.text?.substring(0, 80)}</div>
+                    <div className="email-row-tags">
                       <span className={`badge ${email.accountType}`}>{email.accountType}</span>
-                      <span className="email-date">{formatDate(email.date)}</span>
+                      {email.hasAttachments && <span style={{ fontSize: 11, color: '#888' }}>📎</span>}
                     </div>
-                  </div>
-                  <div className="email-subject">
-                    {email.subject || '(No Subject)'}
-                  </div>
-                  <div className="email-preview">{email.body?.text?.substring(0, 100)}...</div>
-                  <div className="email-actions">
-                    {email.isWorkRelated === null && (
-                      <>
-                        <button className="btn-classify work" onClick={(e) => { e.stopPropagation(); classifyEmail(email._id, true); }}>Work</button>
-                        <button className="btn-classify non-work" onClick={(e) => { e.stopPropagation(); classifyEmail(email._id, false); }}>Non-Work</button>
-                      </>
-                    )}
-                    {email.isWorkRelated !== null && (
-                      <span className={`classification ${email.isWorkRelated ? 'work' : 'non-work'}`}>
-                        {email.isWorkRelated ? '💼 Work' : '📧 Personal'}
-                      </span>
-                    )}
                   </div>
                 </div>
-              );
-            })
-          )}
+              ))
+            )}
+          </div>
         </div>
 
-        {selectedEmail && (
-          <div
-            className="email-detail"
-            style={{
-              width: emailContentWidth ? `${emailContentWidth}px` : 'auto',
-              minWidth: emailContentWidth ? `${emailContentWidth}px` : undefined,
-              maxWidth: emailContentWidth ? `${emailContentWidth}px` : undefined,
-              flex: emailContentWidth ? '0 0 auto' : 1,
-              display: 'flex',
-              flexDirection: 'column',
-              height: '100%',
-              overflow: 'hidden',
-              position: 'absolute',
-              right: 0,
-              top: 0
-            }}
-          >
-            {/* Resize handle for email content - on the left edge closest to sidebar */}
-            <div
-              onMouseDown={(e) => {
-                e.preventDefault();
-                setIsResizingContent(true);
-              }}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '10px',
-                height: '100%',
-                cursor: 'ew-resize',
-                background: isResizingContent ? '#d4af37' : 'transparent',
-                transition: 'background 0.2s',
-                zIndex: 10,
-                borderLeft: '3px solid rgba(212, 175, 55, 0.4)'
-              }}
-              onMouseEnter={(e) => {
-                if (!isResizingContent) {
-                  e.target.style.background = 'rgba(212, 175, 55, 0.3)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isResizingContent) {
-                  e.target.style.background = 'transparent';
-                }
-              }}
-            />
-            <div className="detail-header">
-              <h2>{selectedEmail.subject || '(No Subject)'}</h2>
-              <button className="btn-close" onClick={() => setSelectedEmail(null)}>×</button>
+        {/* ── Email detail pane ── */}
+        {selectedEmail ? (
+          <div className="email-detail-pane">
+            <div className="email-detail-header">
+              <h2 className="email-detail-subject">{selectedEmail.subject || '(No Subject)'}</h2>
+              <button className="btn-close" onClick={closeEmail}>×</button>
             </div>
-            <div className="detail-meta">
-              <div className="meta-row"><strong>From:</strong> {selectedEmail.from?.name} &lt;{selectedEmail.from?.email}&gt;</div>
-              <div className="meta-row"><strong>To:</strong> {selectedEmail.to?.map(t => t.email).join(', ')}</div>
-              <div className="meta-row"><strong>Date:</strong> {new Date(selectedEmail.date).toLocaleString()}</div>
-              <div className="meta-row"><strong>Account:</strong> <span className={`badge ${selectedEmail.accountType}`}>{selectedEmail.accountType}</span></div>
-              {selectedEmail.attachments?.length > 0 && (
-                <div className="meta-row" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
-                  <strong>Attachments:</strong>
-                  {selectedEmail.attachments.map((att, i) => (
-                    att.url ? (
-                      <a
-                        key={att.attachmentId || i}
-                        href={att.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ padding: '2px 10px', background: '#fef9e7', border: '1px solid #d4af37', borderRadius: '6px', fontSize: '13px', textDecoration: 'none', color: '#1f2937' }}
-                      >
-                        {att.filename}
-                      </a>
-                    ) : (
-                      <span
-                        key={att.attachmentId || i}
-                        title="Not available — file was too large to sync"
-                        style={{ padding: '2px 10px', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', color: '#9ca3af' }}
-                      >
-                        {att.filename}
-                      </span>
-                    )
-                  ))}
+
+            <div className="email-detail-meta">
+              <div className="email-detail-avatar">
+                {(selectedEmail.from?.name || selectedEmail.from?.email || '?')[0].toUpperCase()}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: 14, color: '#1f2937' }}>
+                  {selectedEmail.from?.name || selectedEmail.from?.email}
+                  {selectedEmail.from?.name && <span style={{ fontWeight: 400, color: '#888', fontSize: 12 }}> &lt;{selectedEmail.from.email}&gt;</span>}
                 </div>
-              )}
+                <div style={{ fontSize: 12, color: '#888' }}>To: {selectedEmail.to?.map(t => t.email).join(', ')}</div>
+              </div>
+              <div style={{ fontSize: 12, color: '#888', whiteSpace: 'nowrap' }}>
+                {new Date(selectedEmail.date).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </div>
             </div>
-            <div className="detail-body" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+
+            <div className="email-detail-body">
               {selectedEmail.body?.html ? (
                 <iframe
-                  srcDoc={selectedEmail.body.html}
+                  srcDoc={(() => {
+                    // Build a cid→url map from any inline attachments that have been fetched
+                    const cidMap = {};
+                    (selectedEmail.attachments || []).forEach(a => {
+                      if (a.contentId && a.url) cidMap[a.contentId] = a.url;
+                    });
+                    let html = selectedEmail.body.html;
+                    // Replace resolved cid: references with actual Cloudinary URLs
+                    html = html.replace(/src="cid:([^"]*)"/gi, (_, cid) =>
+                      cidMap[cid] ? `src="${cidMap[cid]}"` : 'src="" alt="[inline image]"'
+                    );
+                    html = html.replace(/src='cid:([^']*)'/gi, (_, cid) =>
+                      cidMap[cid] ? `src='${cidMap[cid]}'` : "src='' alt='[inline image]'"
+                    );
+                    // Inject margin/padding reset so iframe height matches actual content
+                    const resetStyle = '<style>html,body{margin:0!important;padding:0!important;}</style>';
+                    return html.includes('<head') ? html.replace(/<head[^>]*>/i, m => m + resetStyle) : resetStyle + html;
+                  })()}
                   title="Email content"
                   className="email-html"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    border: 'none',
-                    overflow: 'auto'
+                  style={{ width: '100%', border: 'none', display: 'block' }}
+                  sandbox="allow-same-origin allow-popups"
+                  onLoad={e => {
+                    try {
+                      const doc = e.target.contentDocument || e.target.contentWindow?.document;
+                      if (doc) {
+                        const h = doc.body?.scrollHeight || doc.documentElement.scrollHeight;
+                        e.target.style.height = h + 'px';
+                      }
+                    } catch (_) {}
                   }}
                 />
               ) : (
-                <pre style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word', margin: 0, flex: 1, overflow: 'auto' }}>{selectedEmail.body?.text}</pre>
+                <pre style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word', margin: 0, fontFamily: 'inherit', fontSize: 14, lineHeight: 1.7, padding: '0 0 16px' }}>{selectedEmail.body?.text || '(No content)'}</pre>
               )}
+
+              {/* ── Inline attachments below email body ── */}
+              {selectedEmail.attachments?.length > 0 && (() => {
+                // Exclude cid: inline images — they render inside the email body itself
+                const visibleAtts = selectedEmail.attachments.filter(a => !a.contentId);
+                if (!visibleAtts.length) return null;
+                return (
+                <div className="email-inline-attachments">
+                  <div className="email-inline-att-header">
+                    📎 {visibleAtts.length} attachment{visibleAtts.length > 1 ? 's' : ''}
+                  </div>
+
+                  {visibleAtts.map((att, i) => {
+                    const isLoading = loadingAttachments[att.attachmentId];
+                    const isImage = att.mimeType?.startsWith('image/');
+                    const isPdf = att.mimeType === 'application/pdf' || att.filename?.toLowerCase().endsWith('.pdf');
+                    const isOffice = /\.(docx?|xlsx?|pptx?|csv)$/i.test(att.filename || '');
+                    const pdfKey = att.attachmentId || `${selectedEmail._id}-${i}`;
+                    const isPdfExpanded = expandedPdfs.has(pdfKey);
+
+                    const downloadFile = async () => {
+                      const res = await fetch(att.url);
+                      const blob = await res.blob();
+                      const a = document.createElement('a');
+                      a.href = URL.createObjectURL(blob);
+                      a.download = att.filename;
+                      a.click();
+                      URL.revokeObjectURL(a.href);
+                    };
+
+                    // Loading spinner
+                    if (!att.url && isLoading) {
+                      return (
+                        <div key={att.attachmentId || i} className="att-inline-chip loading">
+                          <span className="att-spinner" /> {att.filename}
+                        </div>
+                      );
+                    }
+
+                    // Failed fetch (not loading, no URL) — show plain unavailable chip
+                    if (!att.url) {
+                      return (
+                        <div key={att.attachmentId || i} className="att-inline-chip unavailable" title="Attachment could not be loaded">
+                          📎 {att.filename} <span style={{ opacity: 0.5, fontSize: 11 }}>(unavailable)</span>
+                        </div>
+                      );
+                    }
+
+                    // Image — render inline directly
+                    if (isImage) {
+                      return (
+                        <div key={att.attachmentId || i} className="att-inline-image-wrap">
+                          <div className="att-inline-chip-bar">
+                            <span>🖼 {att.filename}</span>
+                            <button className="att-chip-download" onClick={downloadFile} title="Download">⬇ Download</button>
+                          </div>
+                          <img src={att.url} alt={att.filename} className="att-inline-image" />
+                        </div>
+                      );
+                    }
+
+                    // PDF — collapsible inline viewer
+                    if (isPdf) {
+                      return (
+                        <div key={pdfKey} className="att-inline-pdf-wrap">
+                          <div
+                            className={`att-inline-chip-bar clickable ${isPdfExpanded ? 'expanded' : ''}`}
+                            onClick={() => setExpandedPdfs(prev => {
+                              const next = new Set(prev);
+                              next.has(pdfKey) ? next.delete(pdfKey) : next.add(pdfKey);
+                              return next;
+                            })}
+                          >
+                            <span>📄 {att.filename}</span>
+                            <div style={{ display: 'flex', gap: 8 }} onClick={e => e.stopPropagation()}>
+                              <button className="att-chip-download" onClick={downloadFile} title="Download">⬇ Download</button>
+                              <button
+                                className="att-chip-toggle"
+                                onClick={() => setExpandedPdfs(prev => {
+                                  const next = new Set(prev);
+                                  next.has(pdfKey) ? next.delete(pdfKey) : next.add(pdfKey);
+                                  return next;
+                                })}
+                              >{isPdfExpanded ? '▲ Collapse' : '▼ Preview'}</button>
+                            </div>
+                          </div>
+                          {isPdfExpanded && (
+                            <iframe
+                              src={`https://docs.google.com/viewer?url=${encodeURIComponent(att.url)}&embedded=true`}
+                              title={att.filename}
+                              className="att-inline-pdf-frame"
+                            />
+                          )}
+                        </div>
+                      );
+                    }
+
+                    // Office or other — download chip only
+                    return (
+                      <div key={att.attachmentId || i} className="att-inline-chip-bar">
+                        <span>{isOffice ? '📊' : '📎'} {att.filename}</span>
+                        <button className="att-chip-download" onClick={downloadFile} title="Download">⬇ Download</button>
+                      </div>
+                    );
+                  })}
+                </div>
+                );
+              })()}
             </div>
-            <div className="detail-actions">
-              <button
-                className="btn btn-primary"
-                onClick={() => {
-                  const replyTo = selectedEmail.from?.email;
-                  const replySubject = selectedEmail.subject?.startsWith('Re:')
-                    ? selectedEmail.subject
-                    : `Re: ${selectedEmail.subject || ''}`;
 
-                  // Find the account this email was received on
-                  const recipientAccount = emailAccounts.find(acc =>
-                    selectedEmail.to?.some(t => t.email === acc.email)
-                  );
-
-                  setComposeData({
-                    fromAccount: recipientAccount?._id || '',
-                    to: replyTo,
-                    cc: '',
-                    subject: replySubject,
-                    body: `\n\n---\nOn ${new Date(selectedEmail.date).toLocaleString()}, ${selectedEmail.from?.name || selectedEmail.from?.email} wrote:\n> ${selectedEmail.body?.text?.split('\n').join('\n> ')}`
-                  });
-                  setShowComposeModal(true);
-                }}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-              >
-                <FiSend /> Reply
-              </button>
-              <button className="btn" onClick={() => toggleRead(selectedEmail._id, selectedEmail.isRead)}>
-                Mark as {selectedEmail.isRead ? 'Unread' : 'Read'}
-              </button>
-              <button
-                className="btn-danger"
-                onClick={() => deleteEmail(selectedEmail._id)}
-                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                title="Delete this email"
-              >
-                <FiTrash2 /> Delete
-              </button>
-              {selectedEmail.isWorkRelated === null ? (
-                <>
-                  <button className="btn btn-work" onClick={() => classifyEmail(selectedEmail._id, true)}>Mark as Work</button>
-                  <button className="btn btn-non-work" onClick={() => classifyEmail(selectedEmail._id, false)}>Mark as Non-Work</button>
-                </>
-              ) : (
-                <button className="btn" onClick={() => classifyEmail(selectedEmail._id, !selectedEmail.isWorkRelated)}>
-                  Reclassify as {selectedEmail.isWorkRelated ? 'Non-Work' : 'Work'}
-                </button>
-              )}
-              {selectedEmail.isWorkRelated && !selectedEmail.jobId && (
-                <button
-                  className="btn btn-primary"
-                  onClick={extractJobFromEmail}
-                  disabled={extractingJob}
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-                >
-                  <FiPlus />
-                  {extractingJob ? 'Extracting...' : 'Convert to Job'}
+            <div className="email-detail-footer">
+              {!selectedEmail.jobId && (
+                <button className="btn btn-primary" onClick={extractJobFromEmail} disabled={extractingJob} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <FiPlus /> {extractingJob ? 'Extracting…' : 'Convert to Job'}
                 </button>
               )}
               {selectedEmail.jobId && (
-                <span style={{
-                  padding: '8px 12px',
-                  background: '#d4af37',
-                  color: 'white',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  fontWeight: '500'
-                }}>
-                  Linked to Job
-                </span>
+                <span style={{ padding: '8px 12px', background: '#d4af37', color: 'white', borderRadius: 6, fontSize: 13, fontWeight: 500 }}>Linked to Job</span>
               )}
             </div>
+          </div>
+        ) : (
+          <div className="email-detail-empty">
+            <FiMail size={48} style={{ color: '#ddd' }} />
+            <p style={{ color: '#aaa', marginTop: 12 }}>Select an email to read</p>
           </div>
         )}
       </div>
 
-      {/* Connect Account Modal */}
+      {/* ── Connect Account Modal ── */}
       {showAccountModal && (
         <div className="modal-overlay" onClick={() => setShowAccountModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
-            <div className="modal-header">
-              <h2><FiPlus /> Connect Email Account</h2>
-              <button className="icon-btn" onClick={() => setShowAccountModal(false)}>×</button>
-            </div>
-            <div className="modal-body" style={{ padding: '24px' }}>
-              <p style={{ marginBottom: '20px', color: '#6b7280' }}>
-                Choose an email provider to connect to your CRM:
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <button
-                  onClick={() => {
-                    connectGmail();
-                    setShowAccountModal(false);
-                  }}
-                  style={{
-                    padding: '16px 20px',
-                    background: 'white',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    fontSize: '15px',
-                    fontWeight: '500',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.borderColor = '#d4af37';
-                    e.currentTarget.style.background = '#fef9e7';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.borderColor = '#e5e7eb';
-                    e.currentTarget.style.background = 'white';
-                  }}
-                >
-                  <FiMail size={24} style={{ color: '#ef4444' }} />
-                  <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontWeight: '600', color: '#111827' }}>Gmail</div>
-                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Connect your Google account</div>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => {
-                    connectMicrosoft();
-                    setShowAccountModal(false);
-                  }}
-                  style={{
-                    padding: '16px 20px',
-                    background: 'white',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    fontSize: '15px',
-                    fontWeight: '500',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.borderColor = '#d4af37';
-                    e.currentTarget.style.background = '#fef9e7';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.borderColor = '#e5e7eb';
-                    e.currentTarget.style.background = 'white';
-                  }}
-                >
-                  <FiMail size={24} style={{ color: '#0078d4' }} />
-                  <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontWeight: '600', color: '#111827' }}>Microsoft / Outlook</div>
-                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Connect your Microsoft account</div>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => setNotification({
-                    isOpen: true,
-                    type: 'info',
-                    title: 'Coming Soon',
-                    message: 'IMAP integration coming soon!',
-                    onConfirm: null
-                  })}
-                  style={{
-                    padding: '16px 20px',
-                    background: 'white',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    fontSize: '15px',
-                    fontWeight: '500',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    opacity: 0.6
-                  }}
-                  disabled
-                >
-                  <FiMail size={24} style={{ color: '#6b7280' }} />
-                  <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontWeight: '600', color: '#111827' }}>IMAP / Other Providers</div>
-                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Coming soon</div>
-                  </div>
-                </button>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
+            <div className="modal-header"><h2><FiPlus /> Connect Email Account</h2><button className="icon-btn" onClick={() => setShowAccountModal(false)}>×</button></div>
+            <div className="modal-body" style={{ padding: 24 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {[
+                  { label: 'Gmail', sub: 'Connect your Google account', color: '#ef4444', action: connectGmail },
+                  { label: 'Microsoft / Outlook', sub: 'Connect your Microsoft account', color: '#0078d4', action: connectMicrosoft }
+                ].map(p => (
+                  <button key={p.label} onClick={() => { p.action(); setShowAccountModal(false); }}
+                    style={{ padding: '16px 20px', background: 'white', border: '2px solid #e5e7eb', borderRadius: 12, cursor: 'pointer', fontSize: 15, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 12, transition: 'all 0.2s' }}
+                    onMouseOver={e => { e.currentTarget.style.borderColor = '#d4af37'; e.currentTarget.style.background = '#fef9e7'; }}
+                    onMouseOut={e => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.background = 'white'; }}
+                  >
+                    <FiMail size={24} style={{ color: p.color }} />
+                    <div style={{ textAlign: 'left' }}><div style={{ fontWeight: 600 }}>{p.label}</div><div style={{ fontSize: 12, color: '#6b7280' }}>{p.sub}</div></div>
+                  </button>
+                ))}
               </div>
             </div>
-            <div className="modal-footer">
-              <button className="btn-secondary" onClick={() => setShowAccountModal(false)}>Cancel</button>
-            </div>
+            <div className="modal-footer"><button className="btn-secondary" onClick={() => setShowAccountModal(false)}>Cancel</button></div>
           </div>
         </div>
       )}
 
-      {/* Sync Emails Modal */}
+      {/* ── Sync Modal ── */}
       {showSyncModal && (
         <div className="modal-overlay" onClick={() => setShowSyncModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
-            <div className="modal-header">
-              <h2><FiRefreshCw /> Sync Email Accounts</h2>
-              <button className="icon-btn" onClick={() => setShowSyncModal(false)}>×</button>
-            </div>
-            <div className="modal-body" style={{ padding: '24px' }}>
-              <p style={{ marginBottom: '20px', color: '#6b7280' }}>
-                Select which email accounts to sync:
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {emailAccounts.map((account) => (
-                  <button
-                    key={account._id}
-                    onClick={() => {
-                      syncAccountEmails(account._id);
-                      setShowSyncModal(false);
-                    }}
-                    disabled={loading}
-                    style={{
-                      padding: '16px 20px',
-                      background: 'white',
-                      border: '2px solid #e5e7eb',
-                      borderRadius: '12px',
-                      cursor: loading ? 'not-allowed' : 'pointer',
-                      fontSize: '15px',
-                      fontWeight: '500',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      transition: 'all 0.2s',
-                      opacity: loading ? 0.6 : 1
-                    }}
-                    onMouseOver={(e) => {
-                      if (!loading) {
-                        e.currentTarget.style.borderColor = '#d4af37';
-                        e.currentTarget.style.background = '#fef9e7';
-                      }
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.borderColor = '#e5e7eb';
-                      e.currentTarget.style.background = 'white';
-                    }}
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
+            <div className="modal-header"><h2><FiRefreshCw /> Sync Email Accounts</h2><button className="icon-btn" onClick={() => setShowSyncModal(false)}>×</button></div>
+            <div className="modal-body" style={{ padding: 24 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {emailAccounts.map(account => (
+                  <button key={account._id} onClick={() => { syncAccountEmails(account._id); setShowSyncModal(false); }} disabled={loading}
+                    style={{ padding: '16px 20px', background: 'white', border: '2px solid #e5e7eb', borderRadius: 12, cursor: loading ? 'not-allowed' : 'pointer', fontSize: 15, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 12, opacity: loading ? 0.6 : 1 }}
+                    onMouseOver={e => { if (!loading) { e.currentTarget.style.borderColor = '#d4af37'; e.currentTarget.style.background = '#fef9e7'; } }}
+                    onMouseOut={e => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.background = 'white'; }}
                   >
                     <FiMail size={24} style={{ color: account.provider === 'gmail' ? '#ef4444' : '#0078d4' }} />
-                    <div style={{ textAlign: 'left', flex: 1 }}>
-                      <div style={{ fontWeight: '600', color: '#1f2937' }}>{account.email}</div>
-                      <div style={{ fontSize: '12px', color: '#6b7280', textTransform: 'capitalize' }}>{account.provider}</div>
-                    </div>
+                    <div style={{ textAlign: 'left', flex: 1 }}><div style={{ fontWeight: 600 }}>{account.email}</div><div style={{ fontSize: 12, color: '#6b7280', textTransform: 'capitalize' }}>{account.provider}</div></div>
                     <FiRefreshCw size={18} style={{ color: '#3b82f6' }} />
                   </button>
                 ))}
               </div>
             </div>
-            <div className="modal-footer">
-              <button className="btn-secondary" onClick={() => setShowSyncModal(false)}>Cancel</button>
-            </div>
+            <div className="modal-footer"><button className="btn-secondary" onClick={() => setShowSyncModal(false)}>Cancel</button></div>
           </div>
         </div>
       )}
 
-      {/* Gmail-Style Compose Panel */}
+      {/* ── Compose Panel ── */}
       {showComposeModal && (
-        <div
-          ref={composePanelRef}
-          className={`gmail-compose-panel ${composeMinimized ? 'minimized' : ''} ${composeExpanded ? 'expanded' : ''}`}
-          style={composeExpanded ? {} : composePos ? { position: 'fixed', left: composePos.left, top: composePos.top, bottom: 'auto', right: 'auto' } : {}}
-        >
+        <div ref={composePanelRef} className={`gmail-compose-panel ${composeMinimized ? 'minimized' : ''} ${composeExpanded ? 'expanded' : ''}`}
+          style={composeExpanded ? {} : composePos ? { position: 'fixed', left: composePos.left, top: composePos.top, bottom: 'auto', right: 'auto' } : {}}>
           <div className="compose-header" onMouseDown={onComposeDragStart}>
             <span className="compose-title">New Message</span>
             <div className="compose-actions">
-              <button
-                className="compose-icon-btn"
-                onClick={() => setComposeMinimized(!composeMinimized)}
-                title={composeMinimized ? "Restore" : "Minimize"}
-              >
-                {composeMinimized ? <FiMaximize2 size={14} /> : <FiMinus size={14} />}
-              </button>
-              <button
-                className="compose-icon-btn"
-                onClick={() => { setComposeExpanded(e => !e); setComposeMinimized(false); }}
-                title={composeExpanded ? "Shrink" : "Expand"}
-              >
-                {composeExpanded ? <FiMinimize2 size={14} /> : <FiMaximize2 size={14} />}
-              </button>
-              <button
-                className="compose-icon-btn"
-                onClick={() => {
-                  setNotification({
-                    isOpen: true,
-                    type: 'confirm',
-                    title: 'Discard Draft',
-                    message: 'Discard this draft?',
-                    onConfirm: () => {
-                      setShowComposeModal(false);
-                      setComposeData({ fromAccount: '', to: '', cc: '', subject: '', body: '' });
-                    }
-                  });
-                }}
-                title="Close"
-              >
-                <FiX size={16} />
-              </button>
+              <button className="compose-icon-btn" onClick={() => setComposeMinimized(!composeMinimized)}>{composeMinimized ? <FiMaximize2 size={14} /> : <FiMinus size={14} />}</button>
+              <button className="compose-icon-btn" onClick={() => { setComposeExpanded(v => !v); setComposeMinimized(false); }}>{composeExpanded ? <FiMinimize2 size={14} /> : <FiMaximize2 size={14} />}</button>
+              <button className="compose-icon-btn" onClick={() => setNotification({ isOpen: true, type: 'confirm', title: 'Discard Draft', message: 'Discard this draft?', onConfirm: () => { setShowComposeModal(false); setComposeData({ fromAccount: '', to: '', cc: '', subject: '', body: '' }); } })}><FiX size={16} /></button>
             </div>
           </div>
           {!composeMinimized && (
-            <div className="compose-body">
-              <div className="compose-field">
-                <select
-                  className="compose-select"
-                  value={composeData.fromAccount}
-                  onChange={(e) => setComposeData({...composeData, fromAccount: e.target.value})}
-                >
-                  <option value="">From: Select account...</option>
-                  {emailAccounts.map((account) => (
-                    <option key={account._id} value={account._id}>
-                      {account.email}
-                    </option>
-                  ))}
-                </select>
+            <>
+              <div className="compose-body">
+                <div className="compose-field">
+                  <select className="compose-select" value={composeData.fromAccount} onChange={e => setComposeData(d => ({ ...d, fromAccount: e.target.value }))}>
+                    <option value="">From: Select account…</option>
+                    {emailAccounts.map(a => <option key={a._id} value={a._id}>{a.email}</option>)}
+                  </select>
+                </div>
+                <div className="compose-field"><input type="email" className="compose-input" value={composeData.to} onChange={e => setComposeData(d => ({ ...d, to: e.target.value }))} placeholder="To" /></div>
+                <div className="compose-field"><input type="email" className="compose-input" value={composeData.cc} onChange={e => setComposeData(d => ({ ...d, cc: e.target.value }))} placeholder="Cc" /></div>
+                <div className="compose-field"><input type="text" className="compose-input" value={composeData.subject} onChange={e => setComposeData(d => ({ ...d, subject: e.target.value }))} placeholder="Subject" /></div>
+                <div className="compose-field compose-textarea-container">
+                  <textarea className="compose-textarea" value={composeData.body} onChange={e => setComposeData(d => ({ ...d, body: e.target.value }))} placeholder="Write your message…" rows="10" />
+                </div>
               </div>
-              <div className="compose-field">
-                <input
-                  type="email"
-                  className="compose-input"
-                  value={composeData.to}
-                  onChange={(e) => setComposeData({...composeData, to: e.target.value})}
-                  placeholder="To"
-                  autoComplete="off"
-                />
-              </div>
-              <div className="compose-field">
-                <input
-                  type="email"
-                  className="compose-input"
-                  value={composeData.cc}
-                  onChange={(e) => setComposeData({...composeData, cc: e.target.value})}
-                  placeholder="Cc"
-                  autoComplete="off"
-                />
-              </div>
-              <div className="compose-field">
-                <input
-                  type="text"
-                  className="compose-input"
-                  value={composeData.subject}
-                  onChange={(e) => setComposeData({...composeData, subject: e.target.value})}
-                  placeholder="Subject"
-                  autoComplete="off"
-                />
-              </div>
-              <div className="compose-field compose-textarea-container">
-                <textarea
-                  className="compose-textarea"
-                  value={composeData.body}
-                  onChange={(e) => setComposeData({...composeData, body: e.target.value})}
-                  placeholder="Write your message..."
-                  rows="10"
-                />
-              </div>
-            </div>
-          )}
-          {!composeMinimized && (
-            <div className="compose-footer">
-              <button
-                type="button"
-                className="compose-send-btn"
-                onClick={async () => {
-                  // Validation
-                  if (!composeData.fromAccount) {
-                    setNotification({
-                      isOpen: true,
-                      type: 'warning',
-                      title: 'Missing Information',
-                      message: 'Please select an email account to send from',
-                      onConfirm: null
-                    });
-                    return;
+              <div className="compose-footer">
+                <button type="button" className="compose-send-btn" disabled={sendingEmail} onClick={async () => {
+                  if (!composeData.fromAccount || !composeData.to || !composeData.subject || !composeData.body) {
+                    setNotification({ isOpen: true, type: 'warning', title: 'Missing Fields', message: 'Please fill in all required fields.', onConfirm: null }); return;
                   }
-                  if (!composeData.to) {
-                    setNotification({
-                      isOpen: true,
-                      type: 'warning',
-                      title: 'Missing Information',
-                      message: 'Please enter a recipient email address',
-                      onConfirm: null
-                    });
-                    return;
-                  }
-                  if (!composeData.subject) {
-                    setNotification({
-                      isOpen: true,
-                      type: 'warning',
-                      title: 'Missing Information',
-                      message: 'Please enter an email subject',
-                      onConfirm: null
-                    });
-                    return;
-                  }
-                  if (!composeData.body) {
-                    setNotification({
-                      isOpen: true,
-                      type: 'warning',
-                      title: 'Missing Information',
-                      message: 'Please enter an email body',
-                      onConfirm: null
-                    });
-                    return;
-                  }
-
                   setSendingEmail(true);
                   try {
-                    await axios.post(`${API_URL}/emails/send`, {
-                      accountId: composeData.fromAccount,
-                      to: composeData.to,
-                      cc: composeData.cc,
-                      subject: composeData.subject,
-                      body: composeData.body
-                    });
-
-                    setShowComposeModal(false);
-                    setComposeMinimized(false);
-                    setComposeData({ fromAccount: '', to: '', cc: '', subject: '', body: '' });
-                    setNotification({
-                      isOpen: true,
-                      type: 'success',
-                      title: 'Email Sent',
-                      message: 'Email sent successfully!',
-                      onConfirm: null
-                    });
+                    await axios.post(`${API_URL}/emails/send`, { accountId: composeData.fromAccount, to: composeData.to, cc: composeData.cc, subject: composeData.subject, body: composeData.body });
+                    setShowComposeModal(false); setComposeData({ fromAccount: '', to: '', cc: '', subject: '', body: '' });
+                    setNotification({ isOpen: true, type: 'success', title: 'Sent', message: 'Email sent!', onConfirm: null });
                   } catch (error) {
-                    console.error('Error sending email:', error);
-                    setNotification({
-                      isOpen: true,
-                      type: 'error',
-                      title: 'Send Failed',
-                      message: `Failed to send email: ${error.response?.data?.details || error.message}`,
-                      onConfirm: null
-                    });
-                  } finally {
-                    setSendingEmail(false);
-                  }
-                }}
-                disabled={sendingEmail}
-              >
-                <FiSend /> {sendingEmail ? 'Sending...' : 'Send'}
-              </button>
-            </div>
+                    setNotification({ isOpen: true, type: 'error', title: 'Send Failed', message: `Failed: ${error.response?.data?.details || error.message}`, onConfirm: null });
+                  } finally { setSendingEmail(false); }
+                }}>
+                  <FiSend /> {sendingEmail ? 'Sending…' : 'Send'}
+                </button>
+              </div>
+            </>
           )}
         </div>
       )}
 
-      {/* Job Creation Modal */}
+      {/* ── Job Modal ── */}
       {showJobModal && extractedJobData && (
         <div className="modal-overlay" onClick={() => setShowJobModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px' }}>
-            <div className="modal-header">
-              <h2><FiPlus /> Create Job from Email</h2>
-              <button className="icon-btn" onClick={() => setShowJobModal(false)}>×</button>
-            </div>
-            <div className="modal-body" style={{ padding: '24px' }}>
-              <p style={{ marginBottom: '20px', color: '#6b7280' }}>
-                Review the AI-extracted job details and make any necessary edits before creating the job:
-              </p>
-
-              <div style={{ display: 'grid', gap: '16px' }}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 700 }}>
+            <div className="modal-header"><h2><FiPlus /> Create Job from Email</h2><button className="icon-btn" onClick={() => setShowJobModal(false)}>×</button></div>
+            <div className="modal-body" style={{ padding: 24 }}>
+              <div style={{ display: 'grid', gap: 16 }}>
+                {[
+                  { label: 'Job Title *', key: 'title', type: 'text' },
+                  { label: 'Customer Name *', key: 'customerName', type: 'text' },
+                  { label: 'Customer Email *', key: 'customerEmail', type: 'email' },
+                  { label: 'Customer Phone', key: 'customerPhone', type: 'tel' },
+                  { label: 'Address', key: 'address', type: 'text' }
+                ].map(({ label, key, type }) => (
+                  <div key={key}>
+                    <label style={{ display: 'block', marginBottom: 6, fontWeight: 500, color: '#374151' }}>{label}</label>
+                    <input type={type} value={extractedJobData[key] || ''} onChange={e => setExtractedJobData(d => ({ ...d, [key]: e.target.value }))} style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14 }} />
+                  </div>
+                ))}
                 <div>
-                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500', color: '#374151' }}>
-                    Job Title *
-                  </label>
-                  <input
-                    type="text"
-                    value={extractedJobData.title || ''}
-                    onChange={(e) => setExtractedJobData({ ...extractedJobData, title: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500', color: '#374151' }}>
-                    Description
-                  </label>
-                  <textarea
-                    value={extractedJobData.description || ''}
-                    onChange={(e) => setExtractedJobData({ ...extractedJobData, description: e.target.value })}
-                    rows={4}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      fontSize: '14px',
-                      fontFamily: 'inherit'
-                    }}
-                  />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500', color: '#374151' }}>
-                      Customer Name *
-                    </label>
-                    <input
-                      type="text"
-                      value={extractedJobData.customerName || ''}
-                      onChange={(e) => setExtractedJobData({ ...extractedJobData, customerName: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '6px',
-                        fontSize: '14px'
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500', color: '#374151' }}>
-                      Customer Email *
-                    </label>
-                    <input
-                      type="email"
-                      value={extractedJobData.customerEmail || ''}
-                      onChange={(e) => setExtractedJobData({ ...extractedJobData, customerEmail: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '6px',
-                        fontSize: '14px'
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500', color: '#374151' }}>
-                      Customer Phone
-                    </label>
-                    <input
-                      type="tel"
-                      value={extractedJobData.customerPhone || ''}
-                      onChange={(e) => setExtractedJobData({ ...extractedJobData, customerPhone: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '6px',
-                        fontSize: '14px'
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500', color: '#374151' }}>
-                      Priority
-                    </label>
-                    <select
-                      value={extractedJobData.priority || 'medium'}
-                      onChange={(e) => setExtractedJobData({ ...extractedJobData, priority: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '6px',
-                        fontSize: '14px'
-                      }}
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                      <option value="urgent">Urgent</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500', color: '#374151' }}>
-                    Address
-                  </label>
-                  <input
-                    type="text"
-                    value={extractedJobData.address || ''}
-                    onChange={(e) => setExtractedJobData({ ...extractedJobData, address: e.target.value })}
-                    placeholder="Street, City, State ZIP"
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500', color: '#374151' }}>
-                      Estimated Hours
-                    </label>
-                    <input
-                      type="number"
-                      value={extractedJobData.estimatedHours || ''}
-                      onChange={(e) => setExtractedJobData({ ...extractedJobData, estimatedHours: parseFloat(e.target.value) || 0 })}
-                      min="0"
-                      step="0.5"
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '6px',
-                        fontSize: '14px'
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500', color: '#374151' }}>
-                      Preferred Date
-                    </label>
-                    <input
-                      type="date"
-                      value={extractedJobData.preferredDate ? new Date(extractedJobData.preferredDate).toISOString().split('T')[0] : ''}
-                      onChange={(e) => setExtractedJobData({ ...extractedJobData, preferredDate: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '6px',
-                        fontSize: '14px'
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500', color: '#374151' }}>
-                    Notes
-                  </label>
-                  <textarea
-                    value={extractedJobData.notes || ''}
-                    onChange={(e) => setExtractedJobData({ ...extractedJobData, notes: e.target.value })}
-                    rows={3}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      fontSize: '14px',
-                      fontFamily: 'inherit'
-                    }}
-                  />
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: 500, color: '#374151' }}>Description</label>
+                  <textarea value={extractedJobData.description || ''} onChange={e => setExtractedJobData(d => ({ ...d, description: e.target.value }))} rows={3} style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14, fontFamily: 'inherit' }} />
                 </div>
               </div>
             </div>
-
-            <div className="modal-footer" style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => setShowJobModal(false)}
-                style={{
-                  padding: '10px 24px',
-                  background: 'white',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  color: '#374151',
-                  fontWeight: '600',
-                  cursor: 'pointer'
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => createJobFromEmail(false)}
-                style={{
-                  padding: '10px 24px',
-                  background: '#6b7280',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: 'white',
-                  fontWeight: '600',
-                  cursor: 'pointer'
-                }}
-              >
-                Create Job
-              </button>
-              <button
-                onClick={() => createJobFromEmail(true)}
-                style={{
-                  padding: '10px 24px',
-                  background: '#d4af37',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: 'white',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
+            <div className="modal-footer" style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowJobModal(false)} style={{ padding: '10px 24px', background: 'white', border: '1px solid #d1d5db', borderRadius: 8, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => createJobFromEmail(false)} style={{ padding: '10px 24px', background: '#6b7280', border: 'none', borderRadius: 8, color: 'white', fontWeight: 600, cursor: 'pointer' }}>Create Job</button>
+              <button onClick={() => createJobFromEmail(true)} style={{ padding: '10px 24px', background: '#d4af37', border: 'none', borderRadius: 8, color: 'white', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <FiPlus /> Create & Add to Calendar
               </button>
             </div>
@@ -1790,15 +1015,7 @@ function Emails({ initialFolder = null, onConsumeInitial } = {}) {
         </div>
       )}
 
-      {/* Notification Modal */}
-      <NotificationModal
-        isOpen={notification.isOpen}
-        onClose={() => setNotification({ ...notification, isOpen: false })}
-        type={notification.type}
-        title={notification.title}
-        message={notification.message}
-        onConfirm={notification.onConfirm}
-      />
+      <NotificationModal isOpen={notification.isOpen} onClose={() => setNotification(n => ({ ...n, isOpen: false }))} type={notification.type} title={notification.title} message={notification.message} onConfirm={notification.onConfirm} />
     </div>
   );
 }

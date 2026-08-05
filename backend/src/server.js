@@ -49,7 +49,7 @@ app.use(cors({
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 100,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many login attempts. Please try again in 15 minutes.' }
@@ -58,7 +58,7 @@ app.use('/api/auth/login', loginLimiter);
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 1000,
+  max: 5000,
   standardHeaders: true,
   legacyHeaders: false
 });
