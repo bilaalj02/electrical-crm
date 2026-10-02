@@ -4,7 +4,16 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Invitation = require('../models/Invitation');
+const ActivityLog = require('../models/ActivityLog');
 const { auth, authorize } = require('../middleware/auth');
+
+// Best-effort — a logging failure must never block or mask a real login
+// response, same rule as the existing integration error logger.
+const logLoginAttempt = (fields) => {
+  ActivityLog.create(fields).catch(err => {
+    console.error('Failed to write login activity log:', err.message);
+  });
+};
 
 // Generate JWT token — 90 days so users stay signed in across sessions
 // until they explicitly log out. Configurable via JWT_EXPIRES_IN env var.
@@ -61,17 +70,51 @@ router.post('/login', async (req, res) => {
     // Find user
     const user = await User.findOne({ email });
     if (!user) {
+      logLoginAttempt({
+        category: 'login_failure',
+        attemptedEmail: email,
+        failureReason: 'unknown_email',
+        actionLabel: 'Failed login attempt',
+        method: 'POST',
+        route: '/api/auth/login',
+        statusCode: 401,
+        ip: req.ip
+      });
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     // Check if user is active
     if (user.status !== 'active') {
+      logLoginAttempt({
+        category: 'login_failure',
+        userId: user._id,
+        userRole: user.role,
+        attemptedEmail: email,
+        failureReason: 'account_inactive',
+        actionLabel: 'Failed login attempt (inactive account)',
+        method: 'POST',
+        route: '/api/auth/login',
+        statusCode: 401,
+        ip: req.ip
+      });
       return res.status(401).json({ error: 'Account is inactive or suspended' });
     }
 
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
+      logLoginAttempt({
+        category: 'login_failure',
+        userId: user._id,
+        userRole: user.role,
+        attemptedEmail: email,
+        failureReason: 'invalid_password',
+        actionLabel: 'Failed login attempt',
+        method: 'POST',
+        route: '/api/auth/login',
+        statusCode: 401,
+        ip: req.ip
+      });
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -81,6 +124,18 @@ router.post('/login', async (req, res) => {
 
     // Generate token
     const token = generateToken(user._id);
+
+    logLoginAttempt({
+      category: 'action',
+      userId: user._id,
+      userRole: user.role,
+      isDeveloperAction: !!user.isDeveloper,
+      actionLabel: 'Logged in',
+      method: 'POST',
+      route: '/api/auth/login',
+      statusCode: 200,
+      ip: req.ip
+    });
 
     // Return user without password
     const userResponse = user.toObject();
@@ -102,6 +157,19 @@ router.get('/me', auth, async (req, res) => {
     const userResponse = req.user.toObject();
     delete userResponse.password;
     res.json(userResponse);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Marks the activity-monitoring disclosure as seen for the current user.
+// Anyone can call this for themselves — it's just dismissing their own
+// notice, not a privileged action.
+router.patch('/monitoring-notice-seen', auth, async (req, res) => {
+  try {
+    req.user.hasSeenMonitoringNotice = true;
+    await req.user.save();
+    res.json({ hasSeenMonitoringNotice: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

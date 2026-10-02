@@ -50,4 +50,18 @@ const adminOnly = (req, res, next) => {
 // Protect routes (alias for auth)
 const protect = auth;
 
-module.exports = { auth, authorize, protect, adminOnly };
+// Gate for activity-monitoring routes. Deliberately separate from
+// adminOnly/role checks — a client's own `role: 'admin'` account (e.g. the
+// business owner running their CRM) must NOT see this, only accounts with
+// isDeveloper explicitly set, which is done by hand in the database, never
+// through any in-app screen.
+const requireDeveloper = (req, res, next) => {
+  if (!req.user?.isDeveloper) {
+    return res.status(403).json({
+      error: 'Access denied.'
+    });
+  }
+  next();
+};
+
+module.exports = { auth, authorize, protect, adminOnly, requireDeveloper };

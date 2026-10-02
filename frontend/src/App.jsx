@@ -1,6 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import './App.css';
-import { FiMail, FiBriefcase, FiUsers, FiHome, FiBarChart2, FiCalendar, FiChevronLeft, FiChevronRight, FiChevronDown, FiUser, FiLogOut, FiSettings as FiSettingsIcon, FiBell, FiFolder, FiZap, FiSend, FiLink, FiHelpCircle, FiMenu, FiX } from 'react-icons/fi';
+import { FiMail, FiBriefcase, FiUsers, FiHome, FiBarChart2, FiCalendar, FiChevronLeft, FiChevronRight, FiChevronDown, FiUser, FiLogOut, FiSettings as FiSettingsIcon, FiBell, FiFolder, FiZap, FiSend, FiLink, FiHelpCircle, FiMenu, FiX, FiActivity } from 'react-icons/fi';
 import { ToastContainer } from './components/Toast';
 import { useAuth } from './context/AuthContext';
 import Login from './components/Login';
@@ -15,6 +15,8 @@ import Calendar from './components/Calendar';
 import Projects from './components/Projects';
 import Settings from './components/Settings';
 import Integrations from './components/Integrations';
+import ActivityLog from './components/ActivityLog';
+import MonitoringNotice from './components/MonitoringNotice';
 const DiagramEditor = lazy(() => import('./components/DiagramEditor/DiagramEditor'));
 import mesLogo from './assets/mes-logo.png';
 import axios from 'axios';
@@ -138,6 +140,8 @@ function App() {
 
   return (
     <div className="app-container">
+      <MonitoringNotice />
+
       {/* Mobile overlay — dims/blocks content when sidebar is open */}
       {isMobile && sidebarOpen && (
         <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
@@ -314,6 +318,20 @@ function App() {
               </button>
             </>
           )}
+
+          {/* Developer-only — separate from the admin-only pages above.
+              A client's own admin role never sees this; only accounts
+              with isDeveloper set directly in the database do. */}
+          {user?.isDeveloper && (
+            <button
+              className={`sidebar-link ${currentPage === 'activity-log' ? 'active' : ''}`}
+              onClick={() => setCurrentPage('activity-log')}
+              title="Activity Log"
+            >
+              <FiActivity className="sidebar-icon" />
+              {sidebarOpen && <span>Activity Log</span>}
+            </button>
+          )}
         </nav>
 
         {/* User Menu */}
@@ -431,6 +449,7 @@ function App() {
               <Integrations onNavigate={navigate} />
             )}
             {currentPage === 'settings' && <Settings />}
+            {currentPage === 'activity-log' && user?.isDeveloper && <ActivityLog />}
           </div>
         )}
       </main>

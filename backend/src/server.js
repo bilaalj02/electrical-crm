@@ -19,6 +19,8 @@ const diagramRoutes = require('./routes/diagramRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const calendarRoutes = require('./routes/calendarRoutes');
 const integrationRoutes = require('./routes/integrationRoutes');
+const activityLogRoutes = require('./routes/activityLogRoutes');
+const activityLogger = require('./middleware/activityLogger');
 // const emailSyncService = require('./services/emailSyncService'); // Disabled - using new OAuth system
 
 const app = express();
@@ -90,6 +92,14 @@ app.use((req, res, next) => {
   next();
 });
 
+// Records who hit which route and whether it succeeded, for support/
+// debugging purposes — never request/response bodies or any record
+// content. See middleware/activityLogger.js and models/ActivityLog.js.
+// Mounted application-wide (not per-route) so nothing has to remember to
+// call it; it reads req.user lazily at response-finish time, after each
+// route's own auth middleware has already run.
+app.use(activityLogger);
+
 // Connect to MongoDB
 connectDB();
 
@@ -125,6 +135,7 @@ app.use('/api/diagrams', diagramRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/calendar-events', calendarRoutes);
 app.use('/api/integrations', integrationRoutes);
+app.use('/api/activity-logs', activityLogRoutes);
 
 // Serve uploaded files
 app.use('/uploads', express.static('uploads'));

@@ -1,0 +1,182 @@
+.activity-log-page {
+  padding: 1.5rem;
+}
+
+.activity-filters {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.2rem 0;
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #666;
+}
+
+.filter-group select {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.filter-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: #444;
+  cursor: pointer;
+}
+
+.filter-refresh {
+  background: none;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+  color: #666;
+}
+
+.filter-refresh:hover {
+  background: #f5f5f5;
+}
+
+.activity-error {
+  background: #ffebee;
+  color: #c62828;
+  padding: 0.6rem 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+.activity-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid #eee;
+  border-radius: 8px;
+}
+
+.activity-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.activity-table th {
+  text-align: left;
+  background: #fafafa;
+  padding: 0.6rem 0.8rem;
+  border-bottom: 1px solid #eee;
+  color: #666;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.activity-table td {
+  padding: 0.55rem 0.8rem;
+  border-bottom: 1px solid #f3f3f3;
+  color: #222;
+  white-space: nowrap;
+}
+
+.activity-row-error {
+  background: #fff8f7;
+}
+
+.activity-empty {
+  text-align: center;
+  color: #999;
+  padding: 2rem !important;
+}
+
+.activity-badge-dev {
+  background: #d4af37;
+  color: #000;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  margin-left: 0.4rem;
+  text-transform: uppercase;
+}
+
+.activity-failure-reason {
+  color: #999;
+  font-size: 0.8rem;
+}
+
+.activity-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 10px;
+  font-size: 0.8rem;
+}
+
+.status-ok {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-error {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.activity-ip {
+  color: #999;
+  font-family: monospace;
+  font-size: 0.8rem;
+}
+
+.activity-retention-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: none;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  color: #666;
+  cursor: pointer;
+}
+
+.activity-retention-btn:hover {
+  background: #f5f5f5;
+}
+
+.activity-retention-btn.kept {
+  background: #fffbea;
+  border-color: #e8d99a;
+  color: #b8941f;
+}
+
+.activity-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.2rem;
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.activity-pagination button {
+  background: none;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+}
+
+.activity-pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

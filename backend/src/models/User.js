@@ -46,6 +46,24 @@ const userSchema = new mongoose.Schema({
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
+  },
+  // Separate from `role` on purpose: `role: 'admin'` means "runs their own
+  // CRM" (e.g. a client's business owner) — it says nothing about access to
+  // platform-level activity monitoring. isDeveloper is Cold Solutions' own
+  // flag, set manually and directly in the database on specific accounts
+  // only. It is never exposed through any registration/user-management UI,
+  // so there is no in-app path for anyone (including a client admin) to
+  // grant it to themselves or anyone else.
+  isDeveloper: {
+    type: Boolean,
+    default: false
+  },
+  // Whether this user has dismissed the activity-monitoring disclosure
+  // banner at least once. Tracked server-side (not just localStorage) so it
+  // persists across devices/browsers for the same account.
+  hasSeenMonitoringNotice: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true
