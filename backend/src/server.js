@@ -20,6 +20,8 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 const calendarRoutes = require('./routes/calendarRoutes');
 const integrationRoutes = require('./routes/integrationRoutes');
 const activityLogRoutes = require('./routes/activityLogRoutes');
+const monitoringRoutes = require('./routes/monitoringRoutes');
+const { recordError } = require('./services/monitoring');
 const activityLogger = require('./middleware/activityLogger');
 // const emailSyncService = require('./services/emailSyncService'); // Disabled - using new OAuth system
 
@@ -136,6 +138,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/calendar-events', calendarRoutes);
 app.use('/api/integrations', integrationRoutes);
 app.use('/api/activity-logs', activityLogRoutes);
+app.use('/api/monitoring', monitoringRoutes);
 
 // Serve uploaded files
 app.use('/uploads', express.static('uploads'));
@@ -173,6 +176,7 @@ app.use((err, req, res, next) => {
     return res.status(403).json({ error: 'Not allowed by CORS' });
   }
   console.error(err.stack);
+  res.locals.error = err; // picked up by the error monitor (activityLogger)
   res.status(500).json({
     error: 'Something went wrong!',
     message: err.message
@@ -190,6 +194,13 @@ app.listen(PORT, () => {
   //   console.log('Starting automatic email sync...');
   //   emailSyncService.startAutoSync();
   // }
+});
+
+// Background failures (email sync, webhooks...) that never reach a request
+// still get reported to the error monitor.
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection:', reason);
+  recordError({ source: 'server', message: reason?.message || String(reason), stack: reason?.stack, where: 'background task' });
 });
 
 // Handle graceful shutdown

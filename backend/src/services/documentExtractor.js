@@ -2,6 +2,7 @@ const fs = require('fs');
 const { PDFParse } = require('pdf-parse');
 const mammoth = require('mammoth');
 const OpenAI = require('openai');
+const { recordUsage } = require('./monitoring');
 
 let openai = null;
 if (process.env.OPENAI_API_KEY) {
@@ -77,6 +78,7 @@ Rules:
 - Only extract what's actually in the text. Do not invent data.
 - Return ONLY the JSON object, no additional text.`;
 
+    recordUsage({ feature: 'Document upload (AI parsing)', label: 'AI read an uploaded document' });
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [

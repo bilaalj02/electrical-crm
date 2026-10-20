@@ -6,11 +6,13 @@ const Client = require('../models/Client');
 const { getAuthenticatedClient, getAuthenticatedMicrosoftClient, _fetchMicrosoftFolderTree } = require('./oauthController');
 const cloudinary = require('../config/cloudinary');
 const { isJobRequest } = require('../services/aiJobExtractor');
+const { recordUsage } = require('../services/monitoring');
 
 async function notifyMCPNewEmail(emailId) {
   const mcpUrl = process.env.MCP_WEBHOOK_URL;
   const secret = process.env.MCP_WEBHOOK_SECRET;
   if (!mcpUrl) return;
+  recordUsage({ feature: 'AI analysis', label: 'Email sent for AI analysis' });
   try {
     await fetch(`${mcpUrl}/webhook/new-email`, {
       method: 'POST',

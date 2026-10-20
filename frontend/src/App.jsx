@@ -15,7 +15,9 @@ import Calendar from './components/Calendar';
 import Projects from './components/Projects';
 import Settings from './components/Settings';
 import Integrations from './components/Integrations';
-import ActivityLog from './components/ActivityLog';
+import UsageHealth from './components/UsageHealth';
+import ErrorBoundary from './components/ErrorBoundary';
+import { installGlobalErrorHandlers, trackPage } from './monitoring';
 import MonitoringNotice from './components/MonitoringNotice';
 const DiagramEditor = lazy(() => import('./components/DiagramEditor/DiagramEditor'));
 import mesLogo from './assets/mes-logo.png';
@@ -75,6 +77,12 @@ function App() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [sidebarOpen]);
+
+  // Usage + crash monitoring (see src/monitoring.js).
+  useEffect(() => { installGlobalErrorHandlers(); }, []);
+  useEffect(() => {
+    if (isAuthenticated) trackPage(currentPage);
+  }, [isAuthenticated, currentPage]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -326,10 +334,10 @@ function App() {
             <button
               className={`sidebar-link ${currentPage === 'activity-log' ? 'active' : ''}`}
               onClick={() => setCurrentPage('activity-log')}
-              title="Activity Log"
+              title="Usage & Health"
             >
               <FiActivity className="sidebar-icon" />
-              {sidebarOpen && <span>Activity Log</span>}
+              {sidebarOpen && <span>Usage &amp; Health</span>}
             </button>
           )}
         </nav>
@@ -417,11 +425,14 @@ function App() {
       <main className={`main-content ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'} ${isMobile ? 'mobile' : ''}`}
         style={(currentPage === 'diagrams' || currentPage === 'emails') ? { display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', padding: 0, minHeight: 'unset' } : {}}>
         {currentPage === 'diagrams' ? (
-          <Suspense fallback={<div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'#1a1a2e',color:'#c9a84c',fontSize:'18px'}}>Loading Diagram Editor…</div>}>
-            <DiagramEditor />
-          </Suspense>
+          <ErrorBoundary key="diagrams">
+            <Suspense fallback={<div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'#1a1a2e',color:'#c9a84c',fontSize:'18px'}}>Loading Diagram Editor…</div>}>
+              <DiagramEditor />
+            </Suspense>
+          </ErrorBoundary>
         ) : (
           <div className="content-wrapper" style={currentPage === 'emails' ? { height: '100%', display: 'flex', flexDirection: 'column' } : {}}>
+          <ErrorBoundary key={currentPage}>
             {currentPage === 'home' && <Home onNavigate={navigate} />}
             {currentPage === 'emails' && user?.role === 'admin' && (
               <Emails
@@ -449,7 +460,8 @@ function App() {
               <Integrations onNavigate={navigate} />
             )}
             {currentPage === 'settings' && <Settings />}
-            {currentPage === 'activity-log' && user?.isDeveloper && <ActivityLog />}
+            {currentPage === 'activity-log' && user?.isDeveloper && <UsageHealth />}
+          </ErrorBoundary>
           </div>
         )}
       </main>

@@ -1,5 +1,6 @@
 const ActivityLog = require('../models/ActivityLog');
 const { getActionLabel } = require('../utils/activityLabels');
+const { featureFor, recordUsage, recordError, scopeOf } = require('../services/monitoring');
 
 // Mounted once, early, application-wide — NOT per-route — so logging never
 // has to be remembered/added by hand in every controller. It only writes
@@ -15,10 +16,55 @@ const { getActionLabel } = require('../utils/activityLabels');
 // integration error logger's "logging must never cause a second failure"
 // rule.
 function activityLogger(req, res, next) {
+  // Remember the error text a route sends back with a 5xx, e.g.
+  // res.status(500).json({ error: err.message }), so the error monitor can
+  // report what actually broke. Only the error/message fields, never the rest.
+  const originalJson = res.json.bind(res);
+  res.json = (body) => {
+    if (res.statusCode >= 500 && body && typeof body === 'object') {
+      res.locals.errorMessage = [body.error, body.message].filter(Boolean).join(': ');
+    }
+    return originalJson(body);
+  };
+
   res.on('finish', () => {
     // Skip static assets and anything outside /api — nothing useful to a
     // "what did someone do" log lives there.
     if (!req.originalUrl.startsWith('/api')) return;
+
+    // Usage counts and error capture (see services/monitoring.js). The
+    // app's own page-open / crash reports are counted by their routes.
+    const usageRoute = req.route ? req.route.path : req.path;
+    const beacon = req.baseUrl === '/api/monitoring' && (usageRoute === '/page' || usageRoute === '/client-error');
+    if (beacon) return;
+    const feature = featureFor(req.baseUrl || '', usageRoute === '/' ? '' : usageRoute);
+    const failed = res.statusCode >= 500;
+    const who = req.user || res.locals.monitorUser;
+    const isLogin = feature === 'Sign-in' && req.method === 'POST';
+    // Usage = page opens (reported by the app), actions (create/edit/delete/
+    // send...) and opening one specific record. Plain list/stat loads are
+    // skipped: the dashboard and background checks load those constantly,
+    // which would make every feature look used. Failures are always counted.
+    const opensRecord = /:/.test(usageRoute);
+    const countsAsUse = req.method !== 'GET' || opensRecord;
+    if (countsAsUse || failed) recordUsage({
+      feature,
+      label: isLogin ? (res.statusCode < 400 ? 'Signed in' : 'Failed sign-in') : getActionLabel(req.method, req.baseUrl || '', usageRoute),
+      scope: scopeOf(who),
+      isError: failed,
+    });
+    if (failed) {
+      const err = res.locals.error;
+      recordError({
+        source: 'server',
+        message: res.locals.errorMessage || err?.message || `HTTP ${res.statusCode}`,
+        stack: err?.stack,
+        where: `${req.method} ${req.baseUrl || ''}${usageRoute === '/' ? '' : usageRoute}`,
+        statusCode: res.statusCode,
+        user: req.user,
+        browser: req.get('user-agent'),
+      });
+    }
 
     // Login attempts are logged explicitly in authRoutes.js instead (both
     // the failure and success paths need detail — attemptedEmail,

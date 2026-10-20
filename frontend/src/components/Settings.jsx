@@ -14,6 +14,7 @@ export default function Settings() {
   const isAdmin = user?.role === 'admin';
   const [activeTab, setActiveTab] = useState('profile');
   const [employees, setEmployees] = useState([]);
+  const [developers, setDevelopers] = useState([]); // Cold Solutions, first names only
   const [invitations, setInvitations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -50,6 +51,7 @@ export default function Settings() {
         headers: { Authorization: `Bearer ${token}` }
       });
       setEmployees(response.data.users || []);
+      setDevelopers(response.data.developers || []);
     } catch (error) {
       console.error('Error fetching employees:', error);
     } finally {
@@ -438,6 +440,11 @@ export default function Settings() {
                 </tbody>
               </table>
             </div>
+            {developers.length > 0 && (
+              <p style={{ marginTop: '14px', fontSize: '13px', color: '#6b7280' }}>
+                Developer access (Cold Solutions): {developers.map(d => d.name).join(' & ')}. They maintain and support your CRM and aren't part of your team.
+              </p>
+            )}
           </div>
         )}
 

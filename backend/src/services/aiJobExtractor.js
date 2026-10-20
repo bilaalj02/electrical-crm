@@ -1,4 +1,5 @@
 const OpenAI = require('openai');
+const { recordUsage } = require('./monitoring');
 
 // Initialize OpenAI only if API key is available
 let openai = null;
@@ -55,6 +56,7 @@ Rules:
 
 Return ONLY the JSON object, no additional text.`;
 
+    recordUsage({ feature: 'AI analysis', label: 'AI read an email for job details' });
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
@@ -115,6 +117,7 @@ NOT a job request if it's:
 - General marketing
 - Unrelated topics`;
 
+    recordUsage({ feature: 'AI analysis', label: 'AI checked if an email is a job request' });
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [

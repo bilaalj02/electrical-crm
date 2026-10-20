@@ -89,8 +89,8 @@ export default function MonitoringNotice() {
         <div className="monitoring-notice-detail">
           <p>
             <strong>What's recorded:</strong> which pages and features get used, when, and
-            whether the action succeeded — so if something breaks, it can be traced back
-            and fixed.
+            whether the action succeeded, plus technical error reports when something breaks
+            on the page — so problems can be traced back and fixed quickly.
           </p>
           <p>
             <strong>What's never recorded:</strong> the content of your messages, emails,

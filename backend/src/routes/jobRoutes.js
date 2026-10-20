@@ -3,12 +3,14 @@ const router = express.Router();
 const Job = require('../models/Job');
 const Client = require('../models/Client');
 const { auth, authorize } = require('../middleware/auth');
+const { recordUsage } = require('../services/monitoring');
 
 // Fire-and-forget: notify MCP automation engine
 async function notifyMCP(endpoint, payload) {
   const mcpUrl = process.env.MCP_WEBHOOK_URL;
   const secret = process.env.MCP_WEBHOOK_SECRET;
   if (!mcpUrl) return;
+  recordUsage({ feature: 'AI analysis', label: `AI automation: ${endpoint.replace('/webhook/', '').replace(/-/g, ' ')}` });
   try {
     await fetch(`${mcpUrl}${endpoint}`, {
       method: 'POST',
@@ -105,9 +107,17 @@ router.get('/stats', auth, async (req, res) => {
       'payment.paidInFull': false
     });
 
+    // The Home dashboard tiles read these two; they were never returned, so
+    // both tiles always showed 0.
+    const countOf = (statuses) => byStatus
+      .filter(s => statuses.includes(s._id))
+      .reduce((n, s) => n + s.count, 0);
+
     res.json({
       total,
       byStatus,
+      activeJobs: countOf(['approved', 'scheduled', 'in-progress']),
+      completedJobs: countOf(['completed', 'invoiced', 'paid']),
       totalRevenue: totalRevenue[0]?.total || 0,
       pendingRevenue: pendingRevenue[0]?.total || 0,
       unpaidInvoices

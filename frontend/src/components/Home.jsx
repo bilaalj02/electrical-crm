@@ -23,6 +23,18 @@ function Home({ onNavigate }) {
     todayScheduled: [],
   });
   const [loading, setLoading] = useState(true);
+  const [month, setMonth] = useState(null);
+
+  // "This month" summary: loaded on its own so it can never hold up or
+  // break the rest of the dashboard.
+  useEffect(() => {
+    if (!isAdmin) return;
+    let live = true;
+    axios.get(`${API_URL}/monitoring/my-month`)
+      .then((r) => live && setMonth(r.data))
+      .catch(() => {});
+    return () => { live = false; };
+  }, [isAdmin]);
 
   useEffect(() => {
     let mounted = true;
@@ -116,6 +128,8 @@ function Home({ onNavigate }) {
           <div className="card-meta">All time</div>
         </div>
       </div>
+
+      {month && <MonthCard m={month} />}
 
       {/* ── QUICK ACTIONS ───────────────────────────────────────── */}
       <div className="dashboard-section" style={{ animationDelay: '220ms' }}>
@@ -261,6 +275,46 @@ function Home({ onNavigate }) {
           </div>
         </div>
 
+      </div>
+    </div>
+  );
+}
+
+function MonthCard({ m }) {
+  const items = [
+    { label: 'Emails filed to a job or client', value: m.emailsLinked },
+    { label: 'Emails brought into the CRM', value: m.emailsSynced },
+    { label: 'Jobs set up', value: m.jobsCreated },
+    { label: 'Jobs completed', value: m.jobsCompleted },
+    { label: 'New clients', value: m.clientsAdded },
+    { label: 'Photos filed', value: m.photos },
+    { label: 'Calendar events', value: m.events },
+    { label: 'Automatic AI checks', value: m.aiChecks },
+  ].filter((i) => i.value > 0);
+  const hours = Math.floor(m.minutesSaved / 60);
+  const mins = m.minutesSaved % 60;
+  const saved = m.minutesSaved >= 60 ? `${hours} h${mins ? ` ${mins} min` : ''}` : `${m.minutesSaved} min`;
+
+  return (
+    <div className="dashboard-section month-card" style={{ animationDelay: '180ms' }}>
+      <h2 className="section-title">Your CRM in {m.month}</h2>
+      <div className="month-card-body">
+        {m.minutesSaved > 0 && (
+          <div className="month-saved">
+            <div className="month-saved-value">≈ {saved}</div>
+            <div className="month-saved-label">of admin work handled for you</div>
+            <div className="month-saved-basis" title={m.basis}>Estimate: {m.basis}</div>
+          </div>
+        )}
+        {items.length > 0 ? (
+          <ul className="month-stats">
+            {items.map((i) => (
+              <li key={i.label}><b>{i.value}</b><span>{i.label}</span></li>
+            ))}
+          </ul>
+        ) : (
+          <p className="month-empty">Your numbers for {m.month} will show here as you use the CRM.</p>
+        )}
       </div>
     </div>
   );

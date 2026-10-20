@@ -69,6 +69,12 @@ const ENTRIES = [
   { method: 'POST',   base: '/api/invitations', path: '',     label: 'Sent a team invitation' },
   { method: 'POST',   base: '/api/auth',        path: '/register', label: 'Created a team member account' },
 
+  // Monitoring
+  { method: 'GET',    base: '/api/monitoring', path: '/my-month', label: "Loaded the 'This month' summary" },
+  { method: 'GET',    base: '/api/monitoring', path: '/usage',    label: 'Viewed usage report' },
+  { method: 'GET',    base: '/api/monitoring', path: '/errors',   label: 'Viewed error reports' },
+  { method: 'PATCH',  base: '/api/monitoring', path: '/errors/:id', label: 'Updated an error report' },
+
   // Auth (non-login — login success/failure is captured separately)
   { method: 'GET',    base: '/api/auth',        path: '/me',   label: 'Loaded profile' },
   { method: 'POST',   base: '/api/auth',        path: '/logout', label: 'Logged out' },

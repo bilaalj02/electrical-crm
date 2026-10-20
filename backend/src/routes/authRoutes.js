@@ -124,6 +124,7 @@ router.post('/login', async (req, res) => {
 
     // Generate token
     const token = generateToken(user._id);
+    res.locals.monitorUser = user; // so usage counts this sign-in as Marc's or a developer's
 
     logLoginAttempt({
       category: 'action',
@@ -246,12 +247,24 @@ router.get('/users', auth, authorize('admin', 'manager'), async (req, res) => {
       ];
     }
 
+    // Cold Solutions developer accounts aren't part of the client's team:
+    // a non-developer gets them only as first names, never in the team list
+    // or job-assignment dropdowns.
+    const viewerIsDeveloper = !!req.user.isDeveloper;
+    if (!viewerIsDeveloper) filter.isDeveloper = { $ne: true };
+
     const users = await User.find(filter)
       .select('-password')
       .populate('createdBy', 'name email')
       .sort({ createdAt: -1 });
 
-    res.json({ users });
+    let developers = [];
+    if (!viewerIsDeveloper) {
+      const devs = await User.find({ isDeveloper: true, status: 'active' }).select('name').sort({ name: 1 }).lean();
+      developers = devs.map(d => ({ name: String(d.name || '').trim().split(/\s+/)[0] || 'Developer' }));
+    }
+
+    res.json({ users, developers });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -261,6 +274,11 @@ router.get('/users', auth, authorize('admin', 'manager'), async (req, res) => {
 router.patch('/users/:id', auth, authorize('admin'), async (req, res) => {
   try {
     const { id } = req.params;
+    // Only a developer can change or remove a developer account.
+    const target = await User.findById(id).select('isDeveloper').lean();
+    if (target?.isDeveloper && !req.user.isDeveloper) {
+      return res.status(403).json({ error: 'This account is managed by Cold Solutions.' });
+    }
     const allowedUpdates = ['name', 'email', 'role', 'status', 'phone'];
     const updates = {};
 
@@ -293,6 +311,11 @@ router.delete('/users/:id', auth, authorize('admin'), async (req, res) => {
     // Prevent self-deletion
     if (id === req.user._id.toString()) {
       return res.status(400).json({ error: 'Cannot delete your own account' });
+    }
+    // Only a developer can change or remove a developer account.
+    const target = await User.findById(id).select('isDeveloper').lean();
+    if (target?.isDeveloper && !req.user.isDeveloper) {
+      return res.status(403).json({ error: 'This account is managed by Cold Solutions.' });
     }
 
     const user = await User.findByIdAndDelete(id);
