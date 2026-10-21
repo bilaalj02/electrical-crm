@@ -17,18 +17,19 @@ const REALERT_MS = 6 * 60 * 60 * 1000;
 // "what does Marc use" view.
 // ---------------------------------------------------------------------------
 const FEATURES = [
+  // `addon` = the optional add-on (config/plan.js) a feature belongs to; none = Essentials.
   { name: 'Home dashboard', page: 'home', services: ['railway'] },
   { name: 'Emails', page: 'emails', services: ['railway', 'google', 'microsoft'] },
   { name: 'AI analysis', services: ['anthropic', 'openai'] },
-  { name: 'Jobs', page: 'jobs', services: ['railway'] },
-  { name: 'Clients', page: 'clients', services: ['railway'] },
-  { name: 'Calendar', page: 'calendar', services: ['railway', 'google'] },
-  { name: 'Projects & photos', page: 'projects', services: ['railway', 'cloudinary', 'upstash'] },
-  { name: 'Diagrams', page: 'diagrams', services: ['railway'] },
-  { name: 'Analytics', page: 'analytics', services: ['railway', 'quickbooks'] },
-  { name: 'Marketing', page: 'marketing', services: ['railway', 'resend'] },
-  { name: 'QuickBooks & integrations', page: 'integrations', services: ['railway', 'quickbooks'] },
-  { name: 'Document upload (AI parsing)', services: ['openai', 'cloudinary'] },
+  { name: 'Jobs', addon: 'jobs', page: 'jobs', services: ['railway'] },
+  { name: 'Clients', addon: 'jobs', page: 'clients', services: ['railway'] },
+  { name: 'Calendar', addon: 'jobs', page: 'calendar', services: ['railway', 'google'] },
+  { name: 'Projects & photos', addon: 'projects', page: 'projects', services: ['railway', 'cloudinary', 'upstash'] },
+  { name: 'Diagrams', addon: 'diagrams', page: 'diagrams', services: ['railway'] },
+  { name: 'Analytics', addon: 'quickbooks', page: 'analytics', services: ['railway', 'quickbooks'] },
+  { name: 'Marketing', addon: 'marketing', page: 'marketing', services: ['railway', 'resend'] },
+  { name: 'QuickBooks & integrations', addon: 'quickbooks', page: 'integrations', services: ['railway', 'quickbooks'] },
+  { name: 'Document upload (AI parsing)', addon: 'documents', services: ['openai', 'cloudinary'] },
   { name: 'Team & settings', page: 'settings', services: ['railway', 'resend'] },
   { name: 'Sign-in', services: ['railway'] },
   { name: 'Profile & session', internal: true, services: ['railway'] },
@@ -65,7 +66,8 @@ function featureFor(baseUrl, routePath = '') {
     case '/api/projects':
     case '/api/photos': return 'Projects & photos';
     case '/api/diagrams': return 'Diagrams';
-    case '/api/invitations': return 'Team & settings';
+    case '/api/invitations':
+    case '/api/addons': return 'Team & settings';
     case '/api/activity-logs':
     case '/api/monitoring': return 'Monitoring';
     case '/api/automation':

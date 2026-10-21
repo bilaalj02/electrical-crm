@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FiUsers, FiMail, FiTrash2, FiUserPlus, FiX, FiRefreshCw, FiSettings as FiSettingsIcon, FiUser, FiSave, FiPhone, FiPlayCircle } from 'react-icons/fi';
+import { FiUsers, FiMail, FiTrash2, FiUserPlus, FiX, FiRefreshCw, FiSettings as FiSettingsIcon, FiUser, FiSave, FiPhone, FiPlayCircle, FiCreditCard } from 'react-icons/fi';
+import { PlanSettings } from './PlayMode';
 import { useAuth } from '../context/AuthContext';
 import NotificationModal from './NotificationModal';
 import { showToast } from './Toast';
@@ -228,6 +229,12 @@ export default function Settings() {
             >
               <FiMail /> Pending Invitations ({invitations.filter(inv => inv.status === 'pending').length})
             </button>
+            <button
+              className={activeTab === 'plan' ? 'active' : ''}
+              onClick={() => setActiveTab('plan')}
+            >
+              <FiCreditCard /> Plan
+            </button>
           </>
         )}
       </div>
@@ -447,6 +454,8 @@ export default function Settings() {
             )}
           </div>
         )}
+
+        {activeTab === 'plan' && isAdmin && <PlanSettings />}
 
         {activeTab === 'invitations' && isAdmin && (
           <div className="invitations-section">

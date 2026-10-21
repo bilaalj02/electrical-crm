@@ -21,6 +21,8 @@ const calendarRoutes = require('./routes/calendarRoutes');
 const integrationRoutes = require('./routes/integrationRoutes');
 const activityLogRoutes = require('./routes/activityLogRoutes');
 const monitoringRoutes = require('./routes/monitoringRoutes');
+const addonRoutes = require('./routes/addonRoutes');
+const { addonGate } = require('./middleware/addonGate');
 const { recordError } = require('./services/monitoring');
 const activityLogger = require('./middleware/activityLogger');
 // const emailSyncService = require('./services/emailSyncService'); // Disabled - using new OAuth system
@@ -101,6 +103,7 @@ app.use((req, res, next) => {
 // call it; it reads req.user lazily at response-finish time, after each
 // route's own auth middleware has already run.
 app.use(activityLogger);
+app.use(addonGate); // Play mode for add-ons that aren't switched on (see config/plan.js)
 
 // Connect to MongoDB
 connectDB();
@@ -139,6 +142,7 @@ app.use('/api/calendar-events', calendarRoutes);
 app.use('/api/integrations', integrationRoutes);
 app.use('/api/activity-logs', activityLogRoutes);
 app.use('/api/monitoring', monitoringRoutes);
+app.use('/api/addons', addonRoutes);
 
 // Serve uploaded files
 app.use('/uploads', express.static('uploads'));
@@ -174,6 +178,11 @@ app.get('/auth/microsoft/callback', async (req, res) => {
 app.use((err, req, res, next) => {
   if (err.message === 'Not allowed by CORS') {
     return res.status(403).json({ error: 'Not allowed by CORS' });
+  }
+  // A request body that isn't valid JSON is the sender's mistake, not a server error
+  // (and shouldn't trigger an error alert).
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'Invalid request body' });
   }
   console.error(err.stack);
   res.locals.error = err; // picked up by the error monitor (activityLogger)

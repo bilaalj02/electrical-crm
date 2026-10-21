@@ -17,6 +17,8 @@ import Settings from './components/Settings';
 import Integrations from './components/Integrations';
 import UsageHealth from './components/UsageHealth';
 import ErrorBoundary from './components/ErrorBoundary';
+import { AddonPage } from './components/PlayMode';
+import { useAddons } from './addons';
 import { installGlobalErrorHandlers, trackPage } from './monitoring';
 import MonitoringNotice from './components/MonitoringNotice';
 const DiagramEditor = lazy(() => import('./components/DiagramEditor/DiagramEditor'));
@@ -249,6 +251,7 @@ function App() {
           >
             <FiBriefcase className="sidebar-icon" />
             {sidebarOpen && <span>Jobs</span>}
+              {sidebarOpen && <PlayTag page="jobs" />}
           </button>
 
           {/* Admin only pages */}
@@ -261,6 +264,7 @@ function App() {
             >
               <FiUsers className="sidebar-icon" />
               {sidebarOpen && <span>Clients</span>}
+              {sidebarOpen && <PlayTag page="clients" />}
             </button>
           )}
 
@@ -272,6 +276,7 @@ function App() {
           >
             <FiCalendar className="sidebar-icon" />
             {sidebarOpen && <span>Calendar</span>}
+              {sidebarOpen && <PlayTag page="calendar" />}
           </button>
 
           <button
@@ -282,6 +287,7 @@ function App() {
           >
             <FiFolder className="sidebar-icon" />
             {sidebarOpen && <span>Projects</span>}
+              {sidebarOpen && <PlayTag page="projects" />}
           </button>
 
           <button
@@ -292,6 +298,7 @@ function App() {
           >
             <FiZap className="sidebar-icon" />
             {sidebarOpen && <span>Diagrams</span>}
+              {sidebarOpen && <PlayTag page="diagrams" />}
           </button>
 
           {/* Admin only pages */}
@@ -305,6 +312,7 @@ function App() {
               >
                 <FiBarChart2 className="sidebar-icon" />
                 {sidebarOpen && <span>Analytics</span>}
+              {sidebarOpen && <PlayTag page="analytics" />}
               </button>
               <button
                 data-onboarding="nav-marketing"
@@ -314,6 +322,7 @@ function App() {
               >
                 <FiSend className="sidebar-icon" />
                 {sidebarOpen && <span>Marketing</span>}
+              {sidebarOpen && <PlayTag page="marketing" />}
               </button>
               <button
                 data-onboarding="nav-integrations"
@@ -426,13 +435,16 @@ function App() {
         style={(currentPage === 'diagrams' || currentPage === 'emails') ? { display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', padding: 0, minHeight: 'unset' } : {}}>
         {currentPage === 'diagrams' ? (
           <ErrorBoundary key="diagrams">
-            <Suspense fallback={<div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'#1a1a2e',color:'#c9a84c',fontSize:'18px'}}>Loading Diagram Editor…</div>}>
-              <DiagramEditor />
-            </Suspense>
+            <AddonPage page="diagrams">
+              <Suspense fallback={<div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'#1a1a2e',color:'#c9a84c',fontSize:'18px'}}>Loading Diagram Editor…</div>}>
+                <DiagramEditor />
+              </Suspense>
+            </AddonPage>
           </ErrorBoundary>
         ) : (
           <div className="content-wrapper" style={currentPage === 'emails' ? { height: '100%', display: 'flex', flexDirection: 'column' } : {}}>
           <ErrorBoundary key={currentPage}>
+          <AddonPage page={currentPage}>
             {currentPage === 'home' && <Home onNavigate={navigate} />}
             {currentPage === 'emails' && user?.role === 'admin' && (
               <Emails
@@ -461,6 +473,7 @@ function App() {
             )}
             {currentPage === 'settings' && <Settings />}
             {currentPage === 'activity-log' && user?.isDeveloper && <UsageHealth />}
+          </AddonPage>
           </ErrorBoundary>
           </div>
         )}
@@ -527,6 +540,14 @@ function App() {
       <Onboarding onNavigate={navigate} />
     </div>
   );
+}
+
+/** Small "Play" marker in the sidebar for add-ons that aren't switched on. */
+function PlayTag({ page }) {
+  const addons = useAddons();
+  const a = addons?.addonForPage(page);
+  if (!a || a.enabled || addons.plan?.bypass) return null;
+  return <span className="pm-nav-tag">Play</span>;
 }
 
 export default App;

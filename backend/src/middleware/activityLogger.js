@@ -34,10 +34,14 @@ function activityLogger(req, res, next) {
 
     // Usage counts and error capture (see services/monitoring.js). The
     // app's own page-open / crash reports are counted by their routes.
-    const usageRoute = req.route ? req.route.path : req.path;
-    const beacon = req.baseUrl === '/api/monitoring' && (usageRoute === '/page' || usageRoute === '/client-error');
+    // Requests answered before reaching their router (e.g. Play mode's 402) have no
+    // baseUrl/route yet, so work them out from the URL itself.
+    const fromUrl = req.originalUrl.split('?')[0].match(/^(\/api\/[^/]+)(.*)$/) || [];
+    const usageBase = req.baseUrl || fromUrl[1] || '';
+    const usageRoute = req.route ? req.route.path : (req.baseUrl ? req.path : (fromUrl[2] || '/').replace(/\/[0-9a-f]{24}(?=\/|$)/gi, '/:id'));
+    const beacon = usageBase === '/api/monitoring' && (usageRoute === '/page' || usageRoute === '/client-error');
     if (beacon) return;
-    const feature = featureFor(req.baseUrl || '', usageRoute === '/' ? '' : usageRoute);
+    const feature = featureFor(usageBase, usageRoute === '/' ? '' : usageRoute);
     const failed = res.statusCode >= 500;
     const who = req.user || res.locals.monitorUser;
     const isLogin = feature === 'Sign-in' && req.method === 'POST';
@@ -49,7 +53,9 @@ function activityLogger(req, res, next) {
     const countsAsUse = req.method !== 'GET' || opensRecord;
     if (countsAsUse || failed) recordUsage({
       feature,
-      label: isLogin ? (res.statusCode < 400 ? 'Signed in' : 'Failed sign-in') : getActionLabel(req.method, req.baseUrl || '', usageRoute),
+      label: isLogin
+        ? (res.statusCode < 400 ? 'Signed in' : 'Failed sign-in')
+        : `${res.statusCode === 402 ? 'Tried in Play mode: ' : ''}${getActionLabel(req.method, usageBase, usageRoute === '/' ? '' : usageRoute)}`,
       scope: scopeOf(who),
       isError: failed,
     });
@@ -59,7 +65,7 @@ function activityLogger(req, res, next) {
         source: 'server',
         message: res.locals.errorMessage || err?.message || `HTTP ${res.statusCode}`,
         stack: err?.stack,
-        where: `${req.method} ${req.baseUrl || ''}${usageRoute === '/' ? '' : usageRoute}`,
+        where: `${req.method} ${usageBase}${usageRoute === '/' ? '' : usageRoute}`,
         statusCode: res.statusCode,
         user: req.user,
         browser: req.get('user-agent'),

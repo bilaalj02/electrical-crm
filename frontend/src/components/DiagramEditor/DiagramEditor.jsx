@@ -11,7 +11,15 @@ import { setCustomSymbols } from './symbols/electricalSymbols.js';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5000';
 
+import { useAddons } from '../../addons';
+import { showToast } from '../Toast';
+
 export default function DiagramEditor() {
+  // Play mode (Diagrams add-on off): sketch with a starter set of symbols; no saving,
+  // opening saved diagrams, exporting or custom symbols. The server enforces the same.
+  const addons = useAddons();
+  const playMode = !!addons?.plan && !addons.isReal('diagrams');
+  const playBlocked = (what) => showToast(`${what} is part of Real mode. Switch Diagrams to Real mode (top of the page) to use it.`, 'info', 6000);
   const canvasRef = useRef(null);
   const tourRestartRef = useRef(null);
 
@@ -225,9 +233,9 @@ export default function DiagramEditor() {
         onAlignTop={() => canvasRef.current?.align('top')}
         onAlignMiddle={() => canvasRef.current?.align('middle')}
         onAlignBottom={() => canvasRef.current?.align('bottom')}
-        onSave={() => saveDiagram()}
+        onSave={() => (playMode ? playBlocked('Saving') : saveDiagram())}
         saving={saving}
-        onExport={() => setShowExport(true)}
+        onExport={() => (playMode ? playBlocked('Exporting') : setShowExport(true))}
         onToggleGrid={() => setGridVisible(v => !v)}
         gridVisible={gridVisible}
         onToggleSnap={() => setSnapEnabled(v => !v)}
@@ -242,7 +250,8 @@ export default function DiagramEditor() {
         <SymbolLibrary
           onDragStart={() => {}}
           onSymbolDrop={handleSymbolDrop}
-          onAddCustom={() => setShowCreator(true)}
+          onAddCustom={() => (playMode ? playBlocked('Custom symbols') : setShowCreator(true))}
+          playMode={playMode}
         />
 
         {/* Center: Canvas */}

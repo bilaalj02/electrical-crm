@@ -69,6 +69,11 @@ const ENTRIES = [
   { method: 'POST',   base: '/api/invitations', path: '',     label: 'Sent a team invitation' },
   { method: 'POST',   base: '/api/auth',        path: '/register', label: 'Created a team member account' },
 
+  // Plan / add-ons
+  { method: 'GET',    base: '/api/addons', path: '',             label: 'Viewed plan' },
+  { method: 'POST',   base: '/api/addons', path: '/:key/enable',  label: 'Switched an add-on to Real mode' },
+  { method: 'POST',   base: '/api/addons', path: '/:key/disable', label: 'Switched an add-on back to Play mode' },
+
   // Monitoring
   { method: 'GET',    base: '/api/monitoring', path: '/my-month', label: "Loaded the 'This month' summary" },
   { method: 'GET',    base: '/api/monitoring', path: '/usage',    label: 'Viewed usage report' },

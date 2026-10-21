@@ -21,9 +21,13 @@ function SymbolTile({ symbol, onDragStart, onDoubleClick }) {
   );
 }
 
-function CategorySection({ category, onDragStart, onDoubleClick }) {
+// Play mode shows a small starter set from each category.
+const PLAY_PER_CATEGORY = 3;
+
+function CategorySection({ category, onDragStart, onDoubleClick, playMode }) {
   const [open, setOpen] = useState(false);
-  const symbols = useMemo(() => getSymbolsByCategory(category.id), [category.id]);
+  const all = useMemo(() => getSymbolsByCategory(category.id), [category.id]);
+  const symbols = playMode ? all.slice(0, PLAY_PER_CATEGORY) : all;
 
   if (symbols.length === 0) return null;
 
@@ -35,7 +39,7 @@ function CategorySection({ category, onDragStart, onDoubleClick }) {
       >
         <span className="de-cat-icon">{category.icon}</span>
         <span className="de-cat-label">{category.label}</span>
-        <span className="de-cat-count">{symbols.length}</span>
+        <span className="de-cat-count">{playMode ? `${symbols.length}/${all.length}` : symbols.length}</span>
         <span className={`de-cat-chevron${open ? ' open' : ''}`}>▶</span>
       </div>
       {open && (
@@ -54,13 +58,19 @@ function CategorySection({ category, onDragStart, onDoubleClick }) {
   );
 }
 
-export default function SymbolLibrary({ onDragStart, onSymbolDrop, onAddCustom }) {
+export default function SymbolLibrary({ onDragStart, onSymbolDrop, onAddCustom, playMode }) {
   const [query, setQuery] = useState('');
 
+  // In Play mode, search only finds the starter symbols.
+  const starter = useMemo(
+    () => new Set(CATEGORIES.flatMap(c => getSymbolsByCategory(c.id).slice(0, PLAY_PER_CATEGORY).map(s => s.id))),
+    []
+  );
   const searchResults = useMemo(() => {
     if (!query.trim()) return null;
-    return searchSymbols(query, true);
-  }, [query]);
+    const found = searchSymbols(query, true);
+    return playMode ? found.filter(s => starter.has(s.id)) : found;
+  }, [query, playMode, starter]);
 
   return (
     <div className="de-library" data-diagram-tour="dt-library">
@@ -125,8 +135,14 @@ export default function SymbolLibrary({ onDragStart, onSymbolDrop, onAddCustom }
                 category={cat}
                 onDragStart={onDragStart}
                 onDoubleClick={sym => onSymbolDrop && onSymbolDrop(sym, null)}
+                playMode={playMode}
               />
             ))}
+            {playMode && (
+              <p style={{ padding: '10px 14px', fontSize: 12, lineHeight: 1.45, color: 'var(--de-gold, #c9a84c)' }}>
+                Play mode: a starter set of symbols. All 400+ symbols, saving and export come with Real mode.
+              </p>
+            )}
           </>
         )}
       </div>

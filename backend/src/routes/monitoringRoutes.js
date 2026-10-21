@@ -9,6 +9,8 @@ const Email = require('../models/Email');
 const Photo = require('../models/Photo');
 const CalendarEvent = require('../models/CalendarEvent');
 const { FEATURES, SERVICES, PAGE_TO_FEATURE, dayKey, recordUsage, recordError, scopeOf } = require('../services/monitoring');
+const Addon = require('../models/Addon');
+const { monthlyCents } = require('../config/plan');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -115,7 +117,7 @@ router.get('/usage', async (req, res) => {
     const from = dayKey(new Date(now - (days - 1) * DAY_MS));
     const prevFrom = dayKey(new Date(now - (2 * days - 1) * DAY_MS));
 
-    const [current, previous, lastUsed, daily, labels, openErrors] = await Promise.all([
+    const [current, previous, lastUsed, daily, labels, openErrors, addonRows] = await Promise.all([
       UsageDaily.aggregate([
         { $match: { day: { $gte: from } } },
         { $group: { _id: { feature: '$feature', scope: '$scope' }, count: { $sum: '$count' }, errors: { $sum: '$errorCount' } } },
@@ -138,7 +140,9 @@ router.get('/usage', async (req, res) => {
         { $sort: { count: -1 } },
       ]),
       ErrorEvent.countDocuments({ resolvedAt: null }),
+      Addon.find({ enabled: true }).select('key').lean(),
     ]);
+    const enabledAddons = new Set(addonRows.map((r) => r.key));
 
     const by = (rows, f) => Object.fromEntries(rows.map(r => [f(r), r]));
     const cur = by(current, r => `${r._id.feature}|${r._id.scope}`);
@@ -151,6 +155,8 @@ router.get('/usage', async (req, res) => {
       return {
         name: f.name,
         services: f.services,
+        addon: f.addon || null,
+        realMode: f.addon ? enabledAddons.has(f.addon) : null,
         clientUses: client,
         previousClientUses: prev[f.name]?.count || 0,
         developerUses: cur[`${f.name}|developer`]?.count || 0,
@@ -175,6 +181,7 @@ router.get('/usage', async (req, res) => {
       series,
       services: SERVICES,
       openErrors,
+      plan: { enabledAddons: [...enabledAddons], monthlyCents: monthlyCents([...enabledAddons]) },
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

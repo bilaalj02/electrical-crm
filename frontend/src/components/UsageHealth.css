@@ -98,3 +98,5 @@
   .uh-row > .uh-bar-cell { grid-column: 1 / -1; order: 3; }
   .uh-row > .uh-chips { grid-column: 1 / -1; order: 4; }
 }
+.uh-mode { font-style: normal; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; padding: 1px 6px; border-radius: 999px; background: rgba(201,165,72,0.15); color: #a07f1f; margin-left: 4px; }
+.uh-mode.real { background: #e7f5ec; color: #1a7f37; }

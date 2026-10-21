@@ -109,6 +109,15 @@ function UsageTab({ onOpenErrors, goErrors }) {
           <div className="uh-kpi-label">Not touched in {days} days</div>
           <div className="uh-kpi-value">{data.unused.length}</div>
         </div>
+        {data.plan && (
+          <div className="uh-kpi">
+            <div className="uh-kpi-label">Marc's plan (invoice this)</div>
+            <div className="uh-kpi-value">${(data.plan.monthlyCents / 100).toFixed(0)} <span>/mo + GST</span></div>
+            <div className="uh-kpi-label" style={{ marginTop: 6, marginBottom: 0 }}>
+              Essentials{data.plan.enabledAddons.length ? ` + ${data.plan.enabledAddons.length} add-on${data.plan.enabledAddons.length === 1 ? '' : 's'}` : ' only'}
+            </div>
+          </div>
+        )}
         <button className={`uh-kpi uh-kpi-btn ${data.openErrors ? 'bad' : ''}`} onClick={goErrors}>
           <div className="uh-kpi-label">Open errors</div>
           <div className="uh-kpi-value">{data.openErrors}</div>
@@ -123,7 +132,10 @@ function UsageTab({ onOpenErrors, goErrors }) {
         {data.features.map((f) => (
           <div key={f.name} className="uh-row-wrap">
             <button className={`uh-row ${f.clientUses === 0 && f.automaticRuns === 0 ? 'idle' : ''}`} role="row" onClick={() => setOpen(open === f.name ? null : f.name)}>
-              <span className="uh-name">{open === f.name ? <FiChevronDown /> : <FiChevronRight />} {f.name}</span>
+              <span className="uh-name">
+                {open === f.name ? <FiChevronDown /> : <FiChevronRight />} {f.name}
+                {f.addon && <em className={`uh-mode ${f.realMode ? 'real' : ''}`}>{f.realMode ? 'Real' : 'Play'}</em>}
+              </span>
               <span className="uh-bar-cell">
                 <span className="uh-bar"><span style={{ width: `${(f.clientUses / max) * 100}%` }} /></span>
                 <b>{f.clientUses}</b>
