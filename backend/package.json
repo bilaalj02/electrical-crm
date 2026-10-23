@@ -15,7 +15,7 @@
     "@azure/msal-node": "^3.8.4",
     "axios": "^1.18.1",
     "bcryptjs": "^3.0.3",
-    "cloudinary": "^1.41.3",
+    "cloudinary": "^2.11.0",
     "cors": "^2.8.5",
     "crypto-js": "^4.2.0",
     "dotenv": "^17.2.3",
@@ -33,9 +33,19 @@
     "multer": "^2.2.0",
     "multer-storage-cloudinary": "^4.0.0",
     "node-quickbooks": "^2.0.50",
-    "nodemailer": "^7.0.12",
     "openai": "^6.15.0",
     "pdf-parse": "^2.4.5",
     "resend": "^6.12.4"
+  },
+  "overrides": {
+    "multer-storage-cloudinary": {
+      "cloudinary": "$cloudinary"
+    },
+    "node-quickbooks": {
+      "underscore": "^1.13.8"
+    },
+    "utf7": {
+      "semver": "^5.7.2"
+    }
   }
 }
